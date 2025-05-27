@@ -1,0 +1,200 @@
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="display-4">
+        <i class="bi bi-currency-bitcoin text-warning"></i>
+        Top 50 Kryptowährungen
+      </h1>
+      
+      <div class="text-end">
+        <% if @last_update %>
+          <small class="text-muted">
+            Letzte Aktualisierung: <%= @last_update.strftime("%d.%m.%Y %H:%M") %>
+          </small><br>
+        <% end %>
+        <%= link_to refresh_data_cryptocurrencies_path, method: :post, 
+            class: "btn btn-primary" do %>
+          <i class="bi bi-arrow-clockwise"></i> Daten aktualisieren
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if @cryptocurrencies.any? %>
+  <!-- Desktop Table View -->
+  <div class="d-none d-lg-block">
+    <div class="table-responsive">
+      <table id="crypto-table" class="table table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th>Rang</th>
+            <th>Name</th>
+            <th>Symbol</th>
+            <th>Preis</th>
+            <th>24h Änderung</th>
+            <th>Market Cap</th>
+            <th>Volumen 24h</th>
+            <th>RSI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @cryptocurrencies.each do |crypto| %>
+            <tr>
+              <td><span class="badge bg-secondary">#<%= crypto.market_cap_rank %></span></td>
+              <td>
+                <strong><%= crypto.name %></strong>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark"><%= crypto.symbol %></span>
+              </td>
+              <td>
+                <strong><%= crypto.formatted_current_price %></strong>
+              </td>
+              <td>
+                <span class="<%= crypto.price_change_color_class %>">
+                  <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
+                    <i class="bi bi-arrow-up"></i>
+                  <% elsif crypto.price_change_percentage_24h %>
+                    <i class="bi bi-arrow-down"></i>
+                  <% end %>
+                  <%= crypto.price_change_percentage_24h_formatted %>
+                </span>
+              </td>
+              <td><%= crypto.formatted_market_cap %></td>
+              <td>
+                <% if crypto.volume_24h %>
+                  <%= number_to_currency(crypto.volume_24h, unit: "€", precision: 0) %>
+                <% else %>
+                  N/A
+                <% end %>
+              </td>
+              <td>
+                <% if crypto.rsi %>
+                  <% rsi_class = if crypto.rsi <= 30
+                                   "rsi-oversold"
+                                 elsif crypto.rsi >= 70
+                                   "rsi-overbought"
+                                 else
+                                   "rsi-neutral"
+                                 end %>
+                  <span class="badge <%= rsi_class %>">
+                    <%= crypto.rsi %>
+                  </span>
+                <% else %>
+                  <span class="badge bg-secondary">N/A</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Mobile Card View -->
+  <div class="d-lg-none">
+    <div class="row">
+      <% @cryptocurrencies.each do |crypto| %>
+        <div class="col-12 mb-3">
+          <div class="card crypto-card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <h5 class="card-title mb-1">
+                    <span class="badge bg-secondary me-2">#<%= crypto.market_cap_rank %></span>
+                    <%= crypto.name %>
+                  </h5>
+                  <span class="badge bg-light text-dark"><%= crypto.symbol %></span>
+                </div>
+                <div class="text-end">
+                  <strong class="h5"><%= crypto.formatted_current_price %></strong>
+                </div>
+              </div>
+              
+              <div class="row">
+                <div class="col-6">
+                  <small class="text-muted">24h Änderung</small><br>
+                  <span class="<%= crypto.price_change_color_class %>">
+                    <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
+                      <i class="bi bi-arrow-up"></i>
+                    <% elsif crypto.price_change_percentage_24h %>
+                      <i class="bi bi-arrow-down"></i>
+                    <% end %>
+                    <%= crypto.price_change_percentage_24h_formatted %>
+                  </span>
+                </div>
+                <div class="col-6">
+                  <small class="text-muted">RSI</small><br>
+                  <% if crypto.rsi %>
+                    <% rsi_class = if crypto.rsi <= 30
+                                     "rsi-oversold"
+                                   elsif crypto.rsi >= 70
+                                     "rsi-overbought"
+                                   else
+                                     "rsi-neutral"
+                                   end %>
+                    <span class="badge <%= rsi_class %>">
+                      <%= crypto.rsi %>
+                    </span>
+                  <% else %>
+                    <span class="badge bg-secondary">N/A</span>
+                  <% end %>
+                </div>
+              </div>
+              
+              <div class="row mt-2">
+                <div class="col-12">
+                  <small class="text-muted">Market Cap</small><br>
+                  <strong><%= crypto.formatted_market_cap %></strong>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- RSI Legend -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">RSI Legende</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4">
+              <span class="badge rsi-oversold me-2">≤ 30</span>
+              <strong>Überverkauft</strong> - Potentieller Kaufsignal
+            </div>
+            <div class="col-md-4">
+              <span class="badge rsi-neutral me-2">31-69</span>
+              <strong>Neutral</strong> - Normale Marktbedingungen
+            </div>
+            <div class="col-md-4">
+              <span class="badge rsi-overbought me-2">≥ 70</span>
+              <strong>Überkauft</strong> - Potentieller Verkaufssignal
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<% else %>
+  <!-- Empty State -->
+  <div class="text-center py-5">
+    <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+    <h3 class="mt-3">Keine Daten verfügbar</h3>
+    <p class="text-muted">
+      Es konnten keine Kryptowährungsdaten geladen werden. 
+      Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.
+    </p>
+    <%= link_to refresh_data_cryptocurrencies_path, method: :post, 
+        class: "btn btn-primary btn-lg" do %>
+      <i class="bi bi-arrow-clockwise"></i> Daten laden
+    <% end %>
+  </div>
+<% end %> 

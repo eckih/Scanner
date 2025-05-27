@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Krypto Scanner</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    
+    <%= stylesheet_link_tag 'application', 'data-turbo-track': 'reload' %>
+    <%= javascript_importmap_tags %>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <style>
+      .crypto-card {
+        transition: transform 0.2s;
+      }
+      .crypto-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      }
+      .price-positive {
+        color: #28a745;
+      }
+      .price-negative {
+        color: #dc3545;
+      }
+      .rsi-oversold {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .rsi-overbought {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .rsi-neutral {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <%= link_to "Krypto Scanner", root_path, class: "navbar-brand" %>
+        
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+              <%= link_to "Dashboard", root_path, class: "nav-link" %>
+            </li>
+            <li class="nav-item">
+              <%= link_to refresh_data_cryptocurrencies_path, method: :post, class: "nav-link" do %>
+                <i class="bi bi-arrow-clockwise"></i> Daten aktualisieren
+              <% end %>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <% if flash.any? %>
+      <div class="container mt-3">
+        <% flash.each do |type, message| %>
+          <div class="alert alert-<%= type == 'notice' ? 'info' : type == 'alert' ? 'danger' : type %> alert-dismissible fade show">
+            <%= message %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <!-- Main Content -->
+    <main class="container my-4">
+      <%= yield %>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+      <div class="container text-center">
+        <p>&copy; 2024 Krypto Scanner. Daten von Freqtrade API und CoinGecko.</p>
+      </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- jQuery und DataTables -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('crypto-table')) {
+          // Custom sorting function for RSI column (extracts number from badge)
+          $.fn.dataTable.ext.type.order['rsi-pre'] = function(data) {
+            var match = data.match(/(\d+\.?\d*)/);
+            return match ? parseFloat(match[1]) : 0;
+          };
+          
+          // Custom sorting function for rank column (extracts number from badge)
+          $.fn.dataTable.ext.type.order['rank-pre'] = function(data) {
+            var match = data.match(/#(\d+)/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          
+          $('#crypto-table').DataTable({
+            "language": {
+              "lengthMenu": "Zeige _MENU_ Einträge pro Seite",
+              "zeroRecords": "Keine Einträge gefunden",
+              "info": "Zeige _START_ bis _END_ von _TOTAL_ Einträgen",
+              "infoEmpty": "Keine Einträge verfügbar",
+              "infoFiltered": "(gefiltert von _MAX_ Einträgen)",
+              "search": "Suchen:",
+              "paginate": {
+                "first": "Erste",
+                "last": "Letzte",
+                "next": "Nächste",
+                "previous": "Vorherige"
+              }
+            },
+            "pageLength": 25,
+            "order": [[ 0, "asc" ]],
+            "columnDefs": [
+              {
+                "targets": [0], // Rang Spalte
+                "type": "rank"
+              },
+              {
+                "targets": [3, 5], // Preis und Market Cap Spalten
+                "type": "currency"
+              },
+              {
+                "targets": [7], // RSI Spalte
+                "type": "rsi"
+              }
+            ]
+          });
+        }
+      });
+    </script>
+  </body>
+</html> 
