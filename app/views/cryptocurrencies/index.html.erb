@@ -4,17 +4,28 @@
       <h1 class="display-4">
         <i class="bi bi-currency-bitcoin text-warning"></i>
         Top 50 Kryptowährungen
+        <small class="text-muted fs-6">USDC-Paare • 1h RSI</small>
       </h1>
       
       <div class="text-end">
         <% if @last_update %>
-          <small class="text-muted">
-            Letzte Aktualisierung: <%= @last_update.strftime("%d.%m.%Y %H:%M") %>
-          </small><br>
-        <% end %>
-        <%= link_to refresh_data_cryptocurrencies_path, method: :post, 
-            class: "btn btn-primary" do %>
-          <i class="bi bi-arrow-clockwise"></i> Daten aktualisieren
+          <div class="mb-2">
+            <small class="text-muted">
+              <i class="bi bi-clock"></i> Letzte Aktualisierung: 
+              <strong><%= @last_update.strftime("%d.%m.%Y %H:%M:%S") %></strong>
+            </small>
+          </div>
+          <div class="mb-2">
+            <small class="text-success">
+              <i class="bi bi-check-circle"></i> Live-Daten von Binance API
+            </small>
+          </div>
+        <% else %>
+          <div class="mb-2">
+            <small class="text-warning">
+              <i class="bi bi-exclamation-triangle"></i> Keine aktuellen Daten verfügbar
+            </small>
+          </div>
         <% end %>
       </div>
     </div>
@@ -34,8 +45,8 @@
             <th>Preis</th>
             <th>24h Änderung</th>
             <th>Market Cap</th>
-            <th>Volumen 24h</th>
-            <th>RSI</th>
+            <th>Volumen 24h (USD)</th>
+            <th>RSI (1h)</th>
           </tr>
         </thead>
         <tbody>
@@ -63,11 +74,7 @@
               </td>
               <td><%= crypto.formatted_market_cap %></td>
               <td>
-                <% if crypto.volume_24h %>
-                  <%= number_to_currency(crypto.volume_24h, unit: "€", precision: 0) %>
-                <% else %>
-                  N/A
-                <% end %>
+                <%= crypto.formatted_volume_24h %>
               </td>
               <td>
                 <% if crypto.rsi %>
@@ -125,7 +132,7 @@
                   </span>
                 </div>
                 <div class="col-6">
-                  <small class="text-muted">RSI</small><br>
+                  <small class="text-muted">RSI (1h)</small><br>
                   <% if crypto.rsi %>
                     <% rsi_class = if crypto.rsi <= 30
                                      "rsi-oversold"
@@ -144,9 +151,13 @@
               </div>
               
               <div class="row mt-2">
-                <div class="col-12">
+                <div class="col-6">
                   <small class="text-muted">Market Cap</small><br>
                   <strong><%= crypto.formatted_market_cap %></strong>
+                </div>
+                <div class="col-6">
+                  <small class="text-muted">Volumen 24h</small><br>
+                  <strong><%= crypto.formatted_volume_24h %></strong>
                 </div>
               </div>
             </div>
@@ -161,7 +172,7 @@
     <div class="col-12">
       <div class="card">
         <div class="card-header">
-          <h5 class="mb-0">RSI Legende</h5>
+          <h5 class="mb-0">RSI Legende (1h Timeframe)</h5>
         </div>
         <div class="card-body">
           <div class="row">

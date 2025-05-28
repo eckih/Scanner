@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Krypto Scanner</title>
+    <title>Krypto Scanner - Live USDC Pairs</title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -42,14 +42,106 @@
         background-color: #fff3cd;
         color: #856404;
       }
+      .auto-refresh-panel {
+        position: fixed;
+        top: 160px;
+        right: 20px;
+        z-index: 1000;
+        background: rgba(0,0,0,0.9);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 12px;
+        display: none;
+        min-width: 250px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        cursor: move;
+        user-select: none;
+      }
+      .auto-refresh-panel.dragging {
+        opacity: 0.8;
+        transform: scale(1.02);
+        transition: none;
+      }
+      .panel-header {
+        cursor: move;
+        padding: 5px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.2);
+        margin-bottom: 10px;
+      }
+      .panel-header:hover {
+        background-color: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        margin: -5px -5px 10px -5px;
+        padding: 10px;
+      }
+      .live-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background-color: #28a745;
+        border-radius: 50%;
+        margin-right: 5px;
+        animation: pulse 2s infinite;
+      }
+      .countdown-display {
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        font-weight: bold;
+        color: #ffc107;
+      }
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+      }
+      .spin {
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
     </style>
   </head>
 
   <body>
+    <!-- Auto-refresh panel -->
+    <div id="auto-refresh-panel" class="auto-refresh-panel">
+      <div class="panel-header" id="panel-drag-handle">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center">
+            <span class="live-indicator"></span>
+            <strong>Auto-Refresh Aktiv</strong>
+          </div>
+          <small class="text-muted">
+            <i class="bi bi-arrows-move"></i>
+          </small>
+        </div>
+      </div>
+      <div class="mb-2">
+        <small>Update-Intervall:</small>
+        <select id="refresh-interval" class="form-select form-select-sm">
+          <option value="60">1 Minute</option>
+          <option value="120">2 Minuten</option>
+          <option value="300" selected>5 Minuten</option>
+          <option value="600">10 Minuten</option>
+          <option value="900">15 Minuten</option>
+        </select>
+      </div>
+      <div class="countdown-display" id="refresh-countdown">
+        Nächste Aktualisierung in: 5:00
+      </div>
+      <div class="mt-2">
+        <small class="text-muted">Letzte Aktualisierung: <span id="last-update-time">-</span></small>
+      </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container">
         <%= link_to "Krypto Scanner", root_path, class: "navbar-brand" %>
+        <small class="text-muted ms-2">Live USDC Pairs • 1h RSI</small>
         
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
           <span class="navbar-toggler-icon"></span>
@@ -64,6 +156,11 @@
               <%= link_to refresh_data_cryptocurrencies_path, method: :post, class: "nav-link" do %>
                 <i class="bi bi-arrow-clockwise"></i> Daten aktualisieren
               <% end %>
+            </li>
+            <li class="nav-item">
+              <button id="toggle-auto-refresh" class="btn btn-outline-light btn-sm ms-2">
+                <i class="bi bi-play-circle"></i> Auto-Refresh
+              </button>
             </li>
           </ul>
         </div>
@@ -90,7 +187,7 @@
     <!-- Footer -->
     <footer class="bg-dark text-light py-4 mt-5">
       <div class="container text-center">
-        <p>&copy; 2024 Krypto Scanner. Daten von Freqtrade API und CoinGecko.</p>
+        <p>&copy; 2024 Krypto Scanner. Daten von Binance API mit USDC-Paaren und 1h RSI.</p>
       </div>
     </footer>
 
@@ -103,6 +200,12 @@
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
     
     <script>
+      let autoRefreshInterval;
+      let countdownInterval;
+      let isAutoRefreshActive = false;
+      let timeLeft = 300; // Default 5 Minuten in Sekunden
+      let refreshIntervalSeconds = 300; // Default 5 Minuten
+
       document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('crypto-table')) {
           // Custom sorting function for RSI column (extracts number from badge)
@@ -115,6 +218,30 @@
           $.fn.dataTable.ext.type.order['rank-pre'] = function(data) {
             var match = data.match(/#(\d+)/);
             return match ? parseInt(match[1]) : 0;
+          };
+
+          // Custom sorting function for market cap and volume (handles B, M, K suffixes)
+          $.fn.dataTable.ext.type.order['currency-pre'] = function(data) {
+            if (!data || data === 'N/A') return 0;
+            
+            var number = data.replace(/[$€,\s]/g, '');
+            var multiplier = 1;
+            
+            if (number.includes('T')) {
+              multiplier = 1000000000000;
+              number = number.replace('T', '');
+            } else if (number.includes('B')) {
+              multiplier = 1000000000;
+              number = number.replace('B', '');
+            } else if (number.includes('M')) {
+              multiplier = 1000000;
+              number = number.replace('M', '');
+            } else if (number.includes('K')) {
+              multiplier = 1000;
+              number = number.replace('K', '');
+            }
+            
+            return parseFloat(number) * multiplier || 0;
           };
           
           $('#crypto-table').DataTable({
@@ -140,7 +267,11 @@
                 "type": "rank"
               },
               {
-                "targets": [3, 5], // Preis und Market Cap Spalten
+                "targets": [3], // Preis Spalte
+                "type": "num"
+              },
+              {
+                "targets": [5, 6], // Market Cap und Volume Spalten
                 "type": "currency"
               },
               {
@@ -149,6 +280,337 @@
               }
             ]
           });
+        }
+
+        // Auto-refresh functionality
+        const toggleButton = document.getElementById('toggle-auto-refresh');
+        const panel = document.getElementById('auto-refresh-panel');
+        const countdownElement = document.getElementById('refresh-countdown');
+        const intervalSelect = document.getElementById('refresh-interval');
+        const lastUpdateElement = document.getElementById('last-update-time');
+
+        if (toggleButton) {
+          toggleButton.addEventListener('click', function() {
+            if (isAutoRefreshActive) {
+              stopAutoRefresh();
+            } else {
+              startAutoRefresh();
+            }
+          });
+        }
+
+        if (intervalSelect) {
+          intervalSelect.addEventListener('change', function() {
+            refreshIntervalSeconds = parseInt(this.value);
+            if (isAutoRefreshActive) {
+              // Restart with new interval
+              stopAutoRefresh();
+              startAutoRefresh();
+            }
+          });
+        }
+
+        function startAutoRefresh() {
+          isAutoRefreshActive = true;
+          timeLeft = refreshIntervalSeconds;
+          
+          toggleButton.innerHTML = '<i class="bi bi-pause-circle"></i> Stop Auto-Refresh';
+          toggleButton.classList.remove('btn-outline-light');
+          toggleButton.classList.add('btn-outline-warning');
+          panel.style.display = 'block';
+          
+          updateLastUpdateTime();
+          
+          // Start countdown
+          countdownInterval = setInterval(updateCountdown, 1000);
+          
+          // Start auto-refresh
+          autoRefreshInterval = setInterval(function() {
+            refreshData();
+            timeLeft = refreshIntervalSeconds; // Reset countdown
+          }, refreshIntervalSeconds * 1000);
+        }
+
+        function stopAutoRefresh() {
+          isAutoRefreshActive = false;
+          
+          clearInterval(autoRefreshInterval);
+          clearInterval(countdownInterval);
+          
+          toggleButton.innerHTML = '<i class="bi bi-play-circle"></i> Auto-Refresh';
+          toggleButton.classList.remove('btn-outline-warning');
+          toggleButton.classList.add('btn-outline-light');
+          panel.style.display = 'none';
+        }
+
+        function updateCountdown() {
+          if (timeLeft <= 0) {
+            timeLeft = refreshIntervalSeconds;
+            return;
+          }
+          
+          const minutes = Math.floor(timeLeft / 60);
+          const seconds = timeLeft % 60;
+          countdownElement.textContent = `Nächste Aktualisierung in: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+          timeLeft--;
+        }
+
+        function updateLastUpdateTime() {
+          const now = new Date();
+          const timeString = now.toLocaleTimeString('de-DE', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+          });
+          lastUpdateElement.textContent = timeString;
+        }
+
+        function refreshData() {
+          // Zeige Loading-Indikator
+          const originalText = countdownElement.textContent;
+          countdownElement.textContent = 'Aktualisiere Daten...';
+          
+          // Sende AJAX-Request für Datenaktualisierung
+          fetch('<%= refresh_data_cryptocurrencies_path %>', {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+              'Content-Type': 'application/json',
+              'Accept': 'text/html'
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              updateLastUpdateTime();
+              // Seite neu laden um neue Daten anzuzeigen
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
+            } else {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+          })
+          .catch(error => {
+            console.error('Fehler beim Aktualisieren der Daten:', error);
+            countdownElement.textContent = 'Fehler beim Aktualisieren';
+            setTimeout(() => {
+              countdownElement.textContent = originalText;
+            }, 3000);
+          });
+        }
+
+        // Manual refresh button functionality
+        const manualRefreshLinks = document.querySelectorAll('a[href*="refresh_data"]');
+        manualRefreshLinks.forEach(link => {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Zeige Loading-Zustand
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Aktualisiere...';
+            this.classList.add('disabled');
+            
+            // Führe Refresh aus
+            fetch('<%= refresh_data_cryptocurrencies_path %>', {
+              method: 'POST',
+              headers: {
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'text/html'
+              }
+            })
+            .then(response => {
+              if (response.ok) {
+                // Seite neu laden
+                window.location.reload();
+              } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              }
+            })
+            .catch(error => {
+              console.error('Fehler beim manuellen Refresh:', error);
+              this.innerHTML = originalText;
+              this.classList.remove('disabled');
+              alert('Fehler beim Aktualisieren der Daten. Bitte versuchen Sie es erneut.');
+            });
+          });
+        });
+        
+        // Automatische Datenaktualisierung beim Seitenaufruf
+        // Prüfe ob Daten älter als 5 Minuten sind und aktualisiere automatisch
+        checkAndRefreshDataOnLoad();
+        
+        function checkAndRefreshDataOnLoad() {
+          // Nur auf der Hauptseite ausführen
+          if (window.location.pathname === '/' || window.location.pathname === '/cryptocurrencies') {
+            // Suche nach dem Element mit "Letzte Aktualisierung"
+            const allSmallElements = document.querySelectorAll('small');
+            let lastUpdateElement = null;
+            
+            for (let element of allSmallElements) {
+              if (element.textContent.includes('Letzte Aktualisierung')) {
+                lastUpdateElement = element;
+                break;
+              }
+            }
+            
+            if (lastUpdateElement) {
+              // Extrahiere das Datum aus dem Text
+              const updateText = lastUpdateElement.textContent;
+              const dateMatch = updateText.match(/(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})/);
+              
+              if (dateMatch) {
+                const lastUpdateStr = dateMatch[1];
+                const lastUpdate = parseGermanDateTime(lastUpdateStr);
+                const now = new Date();
+                const diffMinutes = (now - lastUpdate) / (1000 * 60);
+                
+                // Wenn Daten älter als 5 Minuten sind, automatisch aktualisieren
+                if (diffMinutes > 5) {
+                  console.log('Daten sind älter als 5 Minuten, automatische Aktualisierung...');
+                  setTimeout(() => {
+                    refreshDataSilently();
+                  }, 1000); // Kurze Verzögerung für bessere UX
+                }
+              }
+            } else {
+              // Keine Daten vorhanden, sofort laden
+              console.log('Keine Daten vorhanden, lade Daten...');
+              setTimeout(() => {
+                refreshDataSilently();
+              }, 1000);
+            }
+          }
+        }
+        
+        function parseGermanDateTime(dateStr) {
+          // Format: "28.05.2024 11:35:06"
+          const parts = dateStr.split(' ');
+          const dateParts = parts[0].split('.');
+          const timeParts = parts[1].split(':');
+          
+          return new Date(
+            parseInt(dateParts[2]), // Jahr
+            parseInt(dateParts[1]) - 1, // Monat (0-basiert)
+            parseInt(dateParts[0]), // Tag
+            parseInt(timeParts[0]), // Stunde
+            parseInt(timeParts[1]), // Minute
+            parseInt(timeParts[2])  // Sekunde
+          );
+        }
+        
+        function refreshDataSilently() {
+          // Stille Aktualisierung ohne UI-Feedback
+          fetch('<%= refresh_data_cryptocurrencies_path %>', {
+            method: 'POST',
+            headers: {
+              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+              'Content-Type': 'application/json',
+              'Accept': 'text/html'
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              // Seite neu laden um neue Daten anzuzeigen
+              window.location.reload();
+            }
+          })
+          .catch(error => {
+            console.error('Fehler beim automatischen Refresh:', error);
+          });
+        }
+
+        // Drag and Drop Funktionalität für das Auto-refresh Panel
+        makePanelDraggable();
+        
+        function makePanelDraggable() {
+          const panel = document.getElementById('auto-refresh-panel');
+          const dragHandle = document.getElementById('panel-drag-handle');
+          let isDragging = false;
+          let currentX;
+          let currentY;
+          let initialX;
+          let initialY;
+          let xOffset = 0;
+          let yOffset = 0;
+
+          if (dragHandle && panel) {
+            dragHandle.addEventListener('mousedown', dragStart);
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', dragEnd);
+            
+            // Touch events für mobile Geräte
+            dragHandle.addEventListener('touchstart', dragStart);
+            document.addEventListener('touchmove', drag);
+            document.addEventListener('touchend', dragEnd);
+          }
+
+          function dragStart(e) {
+            if (e.type === "touchstart") {
+              initialX = e.touches[0].clientX - xOffset;
+              initialY = e.touches[0].clientY - yOffset;
+            } else {
+              initialX = e.clientX - xOffset;
+              initialY = e.clientY - yOffset;
+            }
+
+            if (e.target === dragHandle || dragHandle.contains(e.target)) {
+              isDragging = true;
+              panel.classList.add('dragging');
+            }
+          }
+
+          function drag(e) {
+            if (isDragging) {
+              e.preventDefault();
+              
+              if (e.type === "touchmove") {
+                currentX = e.touches[0].clientX - initialX;
+                currentY = e.touches[0].clientY - initialY;
+              } else {
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+              }
+
+              xOffset = currentX;
+              yOffset = currentY;
+
+              // Begrenze die Position innerhalb des Viewports
+              const rect = panel.getBoundingClientRect();
+              const maxX = window.innerWidth - rect.width;
+              const maxY = window.innerHeight - rect.height;
+              
+              xOffset = Math.max(0, Math.min(xOffset, maxX));
+              yOffset = Math.max(0, Math.min(yOffset, maxY));
+
+              setTranslate(xOffset, yOffset, panel);
+            }
+          }
+
+          function dragEnd(e) {
+            if (isDragging) {
+              isDragging = false;
+              panel.classList.remove('dragging');
+              
+              // Speichere Position im localStorage
+              localStorage.setItem('autoRefreshPanelX', xOffset);
+              localStorage.setItem('autoRefreshPanelY', yOffset);
+            }
+          }
+
+          function setTranslate(xPos, yPos, el) {
+            el.style.transform = `translate(${xPos}px, ${yPos}px)`;
+          }
+          
+          // Lade gespeicherte Position
+          const savedX = localStorage.getItem('autoRefreshPanelX');
+          const savedY = localStorage.getItem('autoRefreshPanelY');
+          
+          if (savedX !== null && savedY !== null) {
+            xOffset = parseInt(savedX);
+            yOffset = parseInt(savedY);
+            setTranslate(xOffset, yOffset, panel);
+          }
         }
       });
     </script>

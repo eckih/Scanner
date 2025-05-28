@@ -3,14 +3,16 @@ class CryptocurrenciesController < ApplicationController
   
   def index
     @cryptocurrencies = Cryptocurrency.top_50
-    @last_update = Cryptocurrency.maximum(:last_updated)
+    @last_update = Cryptocurrency.maximum(:updated_at)
     
     # Wenn keine Daten vorhanden sind, versuche sie zu laden
     if @cryptocurrencies.empty?
       begin
-        Cryptocurrency.refresh_from_api
+        # Verwende Top 10 USDC-Paare für schnelles Laden
+        top_10_usdc = BinanceService.get_top_usdc_pairs.first(10)
+        BinanceService.fetch_specific_cryptos(top_10_usdc)
         @cryptocurrencies = Cryptocurrency.top_50
-        flash.now[:success] = "Kryptowährungsdaten erfolgreich geladen!"
+        flash.now[:success] = "Kryptowährungsdaten erfolgreich von Binance geladen! (USDC-Paare)"
       rescue StandardError => e
         handle_api_error(e)
         @cryptocurrencies = []
@@ -24,8 +26,10 @@ class CryptocurrenciesController < ApplicationController
   
   def refresh_data
     begin
-      Cryptocurrency.refresh_from_api
-      flash[:success] = "Daten erfolgreich aktualisiert!"
+      # Verwende den neuen BinanceService für Top 50 USDC-Kryptowährungen
+      top_symbols = BinanceService.get_top_usdc_pairs
+      BinanceService.fetch_specific_cryptos(top_symbols)
+      flash[:success] = "Daten erfolgreich von Binance API aktualisiert! (#{top_symbols.length} USDC-Paare, 1h RSI)"
     rescue StandardError => e
       handle_api_error(e)
     end

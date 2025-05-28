@@ -1,165 +1,167 @@
 # Krypto Scanner
 
-Eine Ruby on Rails Anwendung zur Anzeige der Top 50 Kryptowährungen mit Market Cap und RSI-Indikatoren. Die App läuft in einer Docker-Compose Umgebung mit SQLite-Datenbank.
+Eine Ruby on Rails-Anwendung zur Anzeige der Top-Kryptowährungen mit Marktkapitalisierung und RSI-Daten von der Binance API.
 
 ## Features
 
-- **Top 50 Kryptowährungen**: Anzeige der größten Kryptowährungen nach Market Cap
-- **Echtzeitdaten**: Daten von CoinGecko API mit Freqtrade Integration
-- **RSI-Indikatoren**: Relative Strength Index für Trading-Signale
-- **Responsive Design**: Optimiert für Desktop und Mobile
-- **Automatische Updates**: Daten können manuell aktualisiert werden
+- **Live-Daten von Binance API**: Aktuelle Kurse und RSI-Werte direkt von Binance
+- **Top 50 Kryptowährungen**: Anzeige der wichtigsten Kryptowährungen
+- **RSI-Indikator**: Relative Strength Index für technische Analyse
+- **Sortierbare Tabelle**: DataTables-Integration für Sortierung und Suche
+- **Responsive Design**: Bootstrap 5 für moderne UI
+- **Docker-Support**: Vollständige Containerisierung
 
 ## Technologie-Stack
 
-- **Ruby on Rails 7.0**
-- **SQLite3** Datenbank
-- **Docker & Docker Compose**
-- **Bootstrap 5** für UI
-- **HTTParty** für API-Aufrufe
-- **CoinGecko API** für Marktdaten
+- **Backend**: Ruby on Rails 7.1
+- **Datenbank**: SQLite3
+- **Frontend**: Bootstrap 5, jQuery, DataTables
+- **API**: Binance REST API
+- **Container**: Docker & Docker Compose
 
-## Installation und Setup
+## Installation
 
-### Voraussetzungen
-
-- Docker
-- Docker Compose
-
-### Schritt 1: Repository klonen
-
+1. Repository klonen:
 ```bash
 git clone <repository-url>
 cd Scanner
 ```
 
-### Schritt 2: Umgebungsvariablen (Optional)
-
-Erstellen Sie eine `.env` Datei für Freqtrade API-Konfiguration:
-
+2. Mit Docker starten:
 ```bash
-FREQTRADE_API_URL=http://localhost:8080
-FREQTRADE_API_TOKEN=your_api_token_here
-```
-
-### Schritt 3: Docker Container starten
-
-```bash
-docker-compose up --build
+docker-compose up
 ```
 
 Die Anwendung ist dann unter `http://localhost:3000` verfügbar.
 
-## Verwendung
-
-### Dashboard
-
-- Besuchen Sie `http://localhost:3000` für das Haupt-Dashboard
-- Zeigt die Top 50 Kryptowährungen sortiert nach Market Cap
-- Responsive Tabelle für Desktop, Karten-Layout für Mobile
-
-### Daten aktualisieren
-
-- Klicken Sie auf "Daten aktualisieren" um die neuesten Kurse zu laden
-- Daten werden automatisch beim ersten Besuch geladen
-
-### RSI-Indikatoren
-
-- **Grün (≤ 30)**: Überverkauft - Potentieller Kaufsignal
-- **Gelb (31-69)**: Neutral - Normale Marktbedingungen  
-- **Rot (≥ 70)**: Überkauft - Potentieller Verkaufssignal
-
 ## API-Integration
 
-### CoinGecko API
+### Binance API
 
-Die App verwendet die kostenlose CoinGecko API für:
-- Aktuelle Preise
-- Market Cap Daten
-- 24h Preisänderungen
-- Handelsvolumen
+Die Anwendung nutzt die öffentliche Binance REST API:
 
-### Freqtrade API (Optional)
+- **Preise**: `/api/v3/ticker/price` - Aktuelle Kurse aller Handelspaare
+- **Klines**: `/api/v3/klines` - Historische Daten für RSI-Berechnung
+- **Exchange Info**: `/api/v3/exchangeInfo` - Verfügbare Handelspaare
 
-Für erweiterte Trading-Daten können Sie Ihre Freqtrade-Instanz verbinden:
-- RSI-Berechnungen aus echten Candlestick-Daten
-- Trading-Pair Informationen
-- Historische Daten
+### Verfügbare Rake Tasks
+
+```bash
+# Top 50 Kryptowährungen abrufen (empfohlen)
+docker-compose run web rake binance:fetch_top_50
+
+# Alle verfügbaren Kryptowährungen abrufen (dauert länger)
+docker-compose run web rake binance:fetch_all_cryptos
+
+# Datenbank leeren
+docker-compose run web rake binance:clear_data
+```
+
+## RSI-Berechnung
+
+Der Relative Strength Index (RSI) wird basierend auf 1-Stunden-Klines berechnet:
+
+- **Periode**: 14 (Standard)
+- **Datenquelle**: Binance Klines API
+- **Algorithmus**: Smoothed RSI nach Wilder
+
+### RSI-Interpretation
+
+- **RSI < 30**: Überverkauft (grün)
+- **RSI > 70**: Überkauft (rot)
+- **RSI 30-70**: Neutral (gelb)
+
+## Datenaktualisierung
+
+### Automatisch
+- Beim ersten Laden der Seite werden automatisch die Top 10 Kryptowährungen geladen
+
+### Manuell
+- **Web-Interface**: "Daten aktualisieren" Button in der Navigation
+- **Rake Task**: `rake binance:fetch_top_50`
 
 ## Entwicklung
 
 ### Lokale Entwicklung
 
 ```bash
-# Dependencies installieren
-bundle install
+# Container starten
+docker-compose up
 
-# Datenbank erstellen und migrieren
-rails db:create db:migrate
+# Rake Tasks ausführen
+docker-compose run web rake binance:fetch_top_50
 
-# Server starten
-rails server
+# Rails Console
+docker-compose run web rails console
+
+# Tests ausführen
+docker-compose run web rails test
 ```
 
-### Neue Features hinzufügen
+### Service-Architektur
 
-1. Modelle in `app/models/`
-2. Controller in `app/controllers/`
-3. Views in `app/views/`
-4. Services in `app/services/`
+- **BinanceService**: Hauptservice für API-Aufrufe
+  - `fetch_and_update_all_cryptos`: Alle verfügbaren Kryptowährungen
+  - `fetch_specific_cryptos(symbols)`: Spezifische Symbole
+  - `calculate_rsi_for_symbol(symbol)`: RSI-Berechnung
 
-### Datenbank-Migrationen
+### Datenbank-Schema
 
-```bash
-# Neue Migration erstellen
-rails generate migration AddColumnToCryptocurrencies
-
-# Migration ausführen
-rails db:migrate
+```ruby
+# Cryptocurrency Model
+class Cryptocurrency < ApplicationRecord
+  # Attribute:
+  # - symbol: String (z.B. "BTC")
+  # - name: String (z.B. "Bitcoin")
+  # - current_price: Decimal
+  # - market_cap: Decimal
+  # - market_cap_rank: Integer
+  # - rsi: Decimal
+  # - updated_at: DateTime
+end
 ```
+
+## Rate Limits
+
+Die Anwendung berücksichtigt Binance API Rate Limits:
+
+- **Pause zwischen Anfragen**: 0.1 Sekunden
+- **Batch-Verarbeitung**: Preise werden in einem Aufruf abgerufen
+- **Fehlerbehandlung**: Automatische Wiederholung bei Fehlern
 
 ## Deployment
 
-### Production Setup
+### Produktionsumgebung
 
-1. Umgebungsvariablen für Production setzen
-2. Assets precompilieren
-3. Datenbank migrieren
-
+1. Umgebungsvariablen setzen:
 ```bash
-RAILS_ENV=production rails assets:precompile
-RAILS_ENV=production rails db:migrate
+export RAILS_ENV=production
+export SECRET_KEY_BASE=<your-secret-key>
+```
+
+2. Container für Produktion bauen:
+```bash
+docker-compose -f docker-compose.prod.yml up
 ```
 
 ## Troubleshooting
 
 ### Häufige Probleme
 
-1. **API-Fehler**: Überprüfen Sie Ihre Internetverbindung
-2. **Docker-Probleme**: `docker-compose down && docker-compose up --build`
-3. **Datenbank-Fehler**: `docker-compose exec web rails db:reset`
+1. **API-Fehler**: Überprüfen Sie die Internetverbindung und Binance API-Status
+2. **Leere Tabelle**: Führen Sie `rake binance:fetch_top_50` aus
+3. **Docker-Probleme**: `docker-compose down && docker-compose up --build`
 
-### Logs anzeigen
+### Logs
 
 ```bash
-# Container-Logs
+# Container-Logs anzeigen
 docker-compose logs web
 
-# Rails-Logs
-docker-compose exec web tail -f log/development.log
+# Live-Logs verfolgen
+docker-compose logs -f web
 ```
 
 ## Lizenz
 
-MIT License
-
-## Beitragen
-
-1. Fork das Repository
-2. Erstellen Sie einen Feature-Branch
-3. Committen Sie Ihre Änderungen
-4. Erstellen Sie einen Pull Request
-
-## Support
-
-Bei Fragen oder Problemen erstellen Sie bitte ein Issue im Repository. 
+MIT License 
