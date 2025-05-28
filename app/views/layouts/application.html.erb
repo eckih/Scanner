@@ -289,6 +289,15 @@
         const intervalSelect = document.getElementById('refresh-interval');
         const lastUpdateElement = document.getElementById('last-update-time');
 
+        // Lade gespeicherte Auto-refresh Einstellungen
+        const savedAutoRefreshState = localStorage.getItem('autoRefreshActive');
+        const savedInterval = localStorage.getItem('autoRefreshInterval');
+        
+        if (savedInterval) {
+          refreshIntervalSeconds = parseInt(savedInterval);
+          intervalSelect.value = savedInterval;
+        }
+
         if (toggleButton) {
           toggleButton.addEventListener('click', function() {
             if (isAutoRefreshActive) {
@@ -297,11 +306,20 @@
               startAutoRefresh();
             }
           });
+          
+          // Stelle Auto-refresh Status nach Page Reload wieder her
+          if (savedAutoRefreshState === 'true') {
+            setTimeout(() => {
+              startAutoRefresh();
+            }, 2000); // Warte 2 Sekunden nach Page Load
+          }
         }
 
         if (intervalSelect) {
           intervalSelect.addEventListener('change', function() {
             refreshIntervalSeconds = parseInt(this.value);
+            localStorage.setItem('autoRefreshInterval', this.value);
+            
             if (isAutoRefreshActive) {
               // Restart with new interval
               stopAutoRefresh();
@@ -313,6 +331,9 @@
         function startAutoRefresh() {
           isAutoRefreshActive = true;
           timeLeft = refreshIntervalSeconds;
+          
+          // Speichere Auto-refresh Status
+          localStorage.setItem('autoRefreshActive', 'true');
           
           toggleButton.innerHTML = '<i class="bi bi-pause-circle"></i> Stop Auto-Refresh';
           toggleButton.classList.remove('btn-outline-light');
@@ -333,6 +354,9 @@
 
         function stopAutoRefresh() {
           isAutoRefreshActive = false;
+          
+          // Entferne Auto-refresh Status
+          localStorage.removeItem('autoRefreshActive');
           
           clearInterval(autoRefreshInterval);
           clearInterval(countdownInterval);
@@ -370,6 +394,9 @@
           const originalText = countdownElement.textContent;
           countdownElement.textContent = 'Aktualisiere Daten...';
           
+          // Markiere dass ein manueller Refresh stattfindet
+          localStorage.setItem('lastAutoRefresh', Date.now().toString());
+          
           // Sende AJAX-Request für Datenaktualisierung
           fetch('<%= refresh_data_cryptocurrencies_path %>', {
             method: 'POST',
@@ -382,8 +409,12 @@
           .then(response => {
             if (response.ok) {
               updateLastUpdateTime();
-              // Seite neu laden um neue Daten anzuzeigen
+              countdownElement.textContent = 'Daten aktualisiert!';
+              
+              // Kurze Verzögerung, dann Seite neu laden
               setTimeout(() => {
+                // Entferne den noDataRefreshAttempt flag vor dem Reload
+                sessionStorage.removeItem('noDataRefreshAttempt');
                 window.location.reload();
               }, 1000);
             } else {
@@ -393,6 +424,10 @@
           .catch(error => {
             console.error('Fehler beim Aktualisieren der Daten:', error);
             countdownElement.textContent = 'Fehler beim Aktualisieren';
+            
+            // Entferne Auto-refresh Marker bei Fehler
+            localStorage.removeItem('lastAutoRefresh');
+            
             setTimeout(() => {
               countdownElement.textContent = originalText;
             }, 3000);
@@ -410,6 +445,9 @@
             this.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Aktualisiere...';
             this.classList.add('disabled');
             
+            // Markiere dass ein manueller Refresh stattfindet
+            localStorage.setItem('lastAutoRefresh', Date.now().toString());
+            
             // Führe Refresh aus
             fetch('<%= refresh_data_cryptocurrencies_path %>', {
               method: 'POST',
@@ -421,16 +459,30 @@
             })
             .then(response => {
               if (response.ok) {
-                // Seite neu laden
-                window.location.reload();
+                this.innerHTML = '<i class="bi bi-check-circle"></i> Aktualisiert!';
+                
+                // Kurze Verzögerung, dann Seite neu laden
+                setTimeout(() => {
+                  // Entferne den noDataRefreshAttempt flag vor dem Reload
+                  sessionStorage.removeItem('noDataRefreshAttempt');
+                  window.location.reload();
+                }, 1000);
               } else {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
               }
             })
             .catch(error => {
               console.error('Fehler beim manuellen Refresh:', error);
-              this.innerHTML = originalText;
-              this.classList.remove('disabled');
+              this.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Fehler';
+              
+              // Entferne Auto-refresh Marker bei Fehler
+              localStorage.removeItem('lastAutoRefresh');
+              
+              setTimeout(() => {
+                this.innerHTML = originalText;
+                this.classList.remove('disabled');
+              }, 3000);
+              
               alert('Fehler beim Aktualisieren der Daten. Bitte versuchen Sie es erneut.');
             });
           });
@@ -443,6 +495,15 @@
         function checkAndRefreshDataOnLoad() {
           // Nur auf der Hauptseite ausführen
           if (window.location.pathname === '/' || window.location.pathname === '/cryptocurrencies') {
+            // Prüfe ob bereits ein Refresh in den letzten 30 Sekunden stattgefunden hat
+            const lastAutoRefresh = localStorage.getItem('lastAutoRefresh');
+            const now = Date.now();
+            
+            if (lastAutoRefresh && (now - parseInt(lastAutoRefresh)) < 30000) {
+              console.log('Auto-refresh wurde kürzlich ausgeführt, überspringe...');
+              return;
+            }
+            
             // Suche nach dem Element mit "Letzte Aktualisierung"
             const allSmallElements = document.querySelectorAll('small');
             let lastUpdateElement = null;
@@ -465,20 +526,35 @@
                 const now = new Date();
                 const diffMinutes = (now - lastUpdate) / (1000 * 60);
                 
+                console.log(`Daten sind ${diffMinutes.toFixed(1)} Minuten alt`);
+                
                 // Wenn Daten älter als 5 Minuten sind, automatisch aktualisieren
                 if (diffMinutes > 5) {
                   console.log('Daten sind älter als 5 Minuten, automatische Aktualisierung...');
+                  // Markiere dass ein Auto-refresh stattfindet
+                  localStorage.setItem('lastAutoRefresh', Date.now().toString());
+                  
                   setTimeout(() => {
                     refreshDataSilently();
                   }, 1000); // Kurze Verzögerung für bessere UX
+                } else {
+                  console.log('Daten sind aktuell, kein Refresh nötig');
                 }
               }
             } else {
-              // Keine Daten vorhanden, sofort laden
-              console.log('Keine Daten vorhanden, lade Daten...');
-              setTimeout(() => {
-                refreshDataSilently();
-              }, 1000);
+              // Keine Daten vorhanden, prüfe ob bereits versucht wurde zu laden
+              const noDataRefreshAttempt = sessionStorage.getItem('noDataRefreshAttempt');
+              if (!noDataRefreshAttempt) {
+                console.log('Keine Daten vorhanden, lade Daten...');
+                sessionStorage.setItem('noDataRefreshAttempt', 'true');
+                localStorage.setItem('lastAutoRefresh', Date.now().toString());
+                
+                setTimeout(() => {
+                  refreshDataSilently();
+                }, 1000);
+              } else {
+                console.log('Daten-Ladeversuch bereits unternommen');
+              }
             }
           }
         }
@@ -500,7 +576,26 @@
         }
         
         function refreshDataSilently() {
-          // Stille Aktualisierung ohne UI-Feedback
+          console.log('Starte stille Datenaktualisierung...');
+          
+          // Zeige einen subtilen Indikator
+          const indicator = document.createElement('div');
+          indicator.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,123,255,0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 9999;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          `;
+          indicator.textContent = 'Aktualisiere Daten...';
+          document.body.appendChild(indicator);
+          
+          // Stille Aktualisierung
           fetch('<%= refresh_data_cryptocurrencies_path %>', {
             method: 'POST',
             headers: {
@@ -511,12 +606,31 @@
           })
           .then(response => {
             if (response.ok) {
-              // Seite neu laden um neue Daten anzuzeigen
-              window.location.reload();
+              indicator.textContent = 'Daten aktualisiert!';
+              indicator.style.background = 'rgba(40,167,69,0.9)';
+              
+              // Kurz anzeigen, dann Seite neu laden
+              setTimeout(() => {
+                document.body.removeChild(indicator);
+                // Entferne den noDataRefreshAttempt flag vor dem Reload
+                sessionStorage.removeItem('noDataRefreshAttempt');
+                window.location.reload();
+              }, 1500);
+            } else {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
           })
           .catch(error => {
             console.error('Fehler beim automatischen Refresh:', error);
+            indicator.textContent = 'Fehler beim Aktualisieren';
+            indicator.style.background = 'rgba(220,53,69,0.9)';
+            
+            setTimeout(() => {
+              document.body.removeChild(indicator);
+            }, 3000);
+            
+            // Entferne Auto-refresh Marker bei Fehler
+            localStorage.removeItem('lastAutoRefresh');
           });
         }
 
