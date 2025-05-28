@@ -24,7 +24,7 @@ services:
         bundle exec rake db:create RAILS_ENV=development || echo 'Database already exists' &&
         echo 'Running migrations...' &&
         bundle exec rake db:migrate RAILS_ENV=development || echo 'Migration failed' &&
-        echo 'Seeding database with fake data...' &&
+        echo 'Loading real cryptocurrency data from Binance API...' &&
         bundle exec rake db:seed RAILS_ENV=development || echo 'Seeding failed' &&
         echo 'Starting Rails server...' &&
         bundle exec puma -b tcp://0.0.0.0:3000 -e development --pidfile /tmp/puma.pid

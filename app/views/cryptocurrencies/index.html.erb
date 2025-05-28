@@ -57,10 +57,16 @@
                 <strong><%= crypto.name %></strong>
               </td>
               <td>
-                <span class="badge bg-light text-dark"><%= crypto.symbol %></span>
+                <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
               </td>
-              <td>
-                <strong><%= crypto.formatted_current_price %></strong>
+              <td data-sort="<%= crypto.current_price || 0 %>">
+                <strong>
+                  <%= link_to crypto.formatted_current_price, 
+                      chart_cryptocurrency_path(crypto), 
+                      target: '_blank',
+                      class: 'text-decoration-none text-primary chart-link',
+                      title: 'Chart anzeigen' %>
+                </strong>
               </td>
               <td>
                 <span class="<%= crypto.price_change_color_class %>">
@@ -76,7 +82,7 @@
               <td>
                 <%= crypto.formatted_volume_24h %>
               </td>
-              <td>
+              <td data-sort="<%= crypto.rsi || -1 %>">
                 <% if crypto.rsi %>
                   <% rsi_class = if crypto.rsi <= 30
                                    "rsi-oversold"
@@ -85,9 +91,14 @@
                                  else
                                    "rsi-neutral"
                                  end %>
-                  <span class="badge <%= rsi_class %>">
-                    <%= crypto.rsi %>
-                  </span>
+                  <%= link_to chart_cryptocurrency_path(crypto), 
+                      target: '_blank',
+                      class: 'text-decoration-none',
+                      title: 'Chart anzeigen' do %>
+                    <span class="badge <%= rsi_class %> chart-link">
+                      <%= crypto.rsi %>
+                    </span>
+                  <% end %>
                 <% else %>
                   <span class="badge bg-secondary">N/A</span>
                 <% end %>
@@ -112,10 +123,16 @@
                     <span class="badge bg-secondary me-2">#<%= crypto.market_cap_rank %></span>
                     <%= crypto.name %>
                   </h5>
-                  <span class="badge bg-light text-dark"><%= crypto.symbol %></span>
+                  <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
                 </div>
                 <div class="text-end">
-                  <strong class="h5"><%= crypto.formatted_current_price %></strong>
+                  <strong class="h5">
+                    <%= link_to crypto.formatted_current_price, 
+                        chart_cryptocurrency_path(crypto), 
+                        target: '_blank',
+                        class: 'text-decoration-none text-primary chart-link',
+                        title: 'Chart anzeigen' %>
+                  </strong>
                 </div>
               </div>
               
@@ -141,9 +158,14 @@
                                    else
                                      "rsi-neutral"
                                    end %>
-                    <span class="badge <%= rsi_class %>">
-                      <%= crypto.rsi %>
-                    </span>
+                    <%= link_to chart_cryptocurrency_path(crypto), 
+                        target: '_blank',
+                        class: 'text-decoration-none',
+                        title: 'Chart anzeigen' do %>
+                      <span class="badge <%= rsi_class %> chart-link">
+                        <%= crypto.rsi %>
+                      </span>
+                    <% end %>
                   <% else %>
                     <span class="badge bg-secondary">N/A</span>
                   <% end %>

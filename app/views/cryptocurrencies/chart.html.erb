@@ -1,0 +1,724 @@
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1 class="h3 mb-1">
+            <%= @cryptocurrency.name %> 
+            <span class="badge bg-light text-dark"><%= @cryptocurrency.base_symbol %></span>
+          </h1>
+          <p class="text-muted mb-0">
+            Trading Pair: <strong><%= @cryptocurrency.trading_pair %></strong> |
+            Aktueller Preis: <strong class="h5 text-primary"><%= @cryptocurrency.formatted_current_price %></strong>
+            <% if @cryptocurrency.rsi %>
+              | RSI: <span class="badge <%= @cryptocurrency.rsi <= 30 ? 'rsi-oversold' : @cryptocurrency.rsi >= 70 ? 'rsi-overbought' : 'rsi-neutral' %>">
+                <%= @cryptocurrency.rsi %>
+              </span>
+            <% end %>
+          </p>
+        </div>
+        <div>
+          <%= link_to cryptocurrencies_path, class: "btn btn-outline-secondary" do %>
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+          <% end %>
+        </div>
+      </div>
+
+      <!-- Chart Controls -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-6">
+              <h5 class="card-title mb-0">
+                <i class="bi bi-graph-up"></i> Preis-Chart
+              </h5>
+            </div>
+            <div class="col-md-6">
+              <div class="btn-group float-end" role="group">
+                <button type="button" class="btn btn-outline-primary active" data-timeframe="24h">24h</button>
+                <button type="button" class="btn btn-outline-primary" data-timeframe="7d">7 Tage</button>
+                <button type="button" class="btn btn-outline-primary" data-timeframe="30d">30 Tage</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price Chart -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-graph-up"></i> Preis-Chart
+          </h5>
+          <canvas id="priceChart" width="400" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- RSI Chart -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-speedometer2"></i> RSI (Relative Strength Index)
+          </h5>
+          <canvas id="rsiChart" width="400" height="150"></canvas>
+        </div>
+      </div>
+
+      <!-- Volume Chart -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-bar-chart"></i> Volumen
+          </h5>
+          <canvas id="volumeChart" width="400" height="150"></canvas>
+        </div>
+      </div>
+
+      <!-- Statistics -->
+      <div class="row">
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body text-center">
+              <h5 class="card-title">Market Cap</h5>
+              <p class="h4 text-primary"><%= @cryptocurrency.formatted_market_cap %></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body text-center">
+              <h5 class="card-title">24h Volumen</h5>
+              <p class="h4 text-info"><%= @cryptocurrency.formatted_volume_24h %></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body text-center">
+              <h5 class="card-title">24h Änderung</h5>
+              <p class="h4 <%= @cryptocurrency.price_change_color_class %>">
+                <%= @cryptocurrency.price_change_percentage_24h_formatted %>
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card">
+            <div class="card-body text-center">
+              <h5 class="card-title">Rang</h5>
+              <p class="h4 text-secondary">#<%= @cryptocurrency.market_cap_rank %></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Chart-Daten aus dem Controller
+  const chartData = {
+    '24h': <%= raw @chart_data_24h.to_json %>,
+    '7d': <%= raw @chart_data_7d.to_json %>,
+    '30d': <%= raw @chart_data_30d.to_json %>
+  };
+
+  // Debug: Zeige Chart-Daten in der Konsole
+  console.log('Chart Data 24h:', chartData['24h']);
+  console.log('Chart Data 7d:', chartData['7d']);
+  console.log('Chart Data 30d:', chartData['30d']);
+  console.log('Chart Data 24h length:', chartData['24h'] ? chartData['24h'].length : 'undefined');
+  console.log('Chart Data 7d length:', chartData['7d'] ? chartData['7d'].length : 'undefined');
+  console.log('Chart Data 30d length:', chartData['30d'] ? chartData['30d'].length : 'undefined');
+
+  let currentTimeframe = '24h';
+  let priceChart, volumeChart, rsiChart;
+  let isTooltipSyncing = false; // Flag to prevent infinite loops
+
+  // Initialisiere Charts
+  initializeCharts();
+
+  // Timeframe-Buttons
+  document.querySelectorAll('[data-timeframe]').forEach(button => {
+    button.addEventListener('click', function() {
+      // Update active button
+      document.querySelectorAll('[data-timeframe]').forEach(btn => btn.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Update timeframe
+      currentTimeframe = this.dataset.timeframe;
+      updateCharts();
+    });
+  });
+
+  // Synchronized tooltip function
+  function syncTooltips(activeChart, activeElements) {
+    if (isTooltipSyncing || !activeElements || activeElements.length === 0) return;
+    
+    isTooltipSyncing = true;
+    
+    const activeIndex = activeElements[0].index;
+    const charts = [priceChart, volumeChart, rsiChart];
+    
+    charts.forEach(chart => {
+      if (chart !== activeChart && chart.data.datasets[0].data[activeIndex]) {
+        // Set tooltip to show at the same index
+        chart.tooltip.setActiveElements([{
+          datasetIndex: 0,
+          index: activeIndex
+        }]);
+        chart.update('none');
+      }
+    });
+    
+    isTooltipSyncing = false;
+  }
+
+  // Clear all tooltips when mouse leaves
+  function clearAllTooltips(exceptChart) {
+    if (isTooltipSyncing) return;
+    
+    isTooltipSyncing = true;
+    
+    const charts = [priceChart, volumeChart, rsiChart];
+    
+    charts.forEach(chart => {
+      if (chart !== exceptChart) {
+        chart.tooltip.setActiveElements([]);
+        chart.update('none');
+      }
+    });
+    
+    isTooltipSyncing = false;
+  }
+
+  function initializeCharts() {
+    // Price Chart
+    const priceCtx = document.getElementById('priceChart').getContext('2d');
+    priceChart = new Chart(priceCtx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'Preis (USDC)',
+          data: [],
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'EMA 20',
+          data: [],
+          borderColor: 'rgb(255, 159, 64)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'EMA 200',
+          data: [],
+          borderColor: 'rgb(153, 102, 255)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        onHover: (event, activeElements) => {
+          syncTooltips(priceChart, activeElements);
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              displayFormats: {
+                hour: 'HH:mm',
+                day: 'MMM dd',
+                week: 'MMM dd'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Zeit'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Preis (USDC)'
+            },
+            ticks: {
+              callback: function(value) {
+                return '$' + value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                // Konvertiere zu deutscher Zeit (MEZ/MESZ)
+                const date = new Date(context[0].parsed.x);
+                return date.toLocaleString('de-DE', {
+                  timeZone: 'Europe/Berlin',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                }) + ' MEZ/MESZ';
+              },
+              label: function(context) {
+                return 'Preis: $' + context.parsed.y.toLocaleString();
+              }
+            }
+          },
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          annotation: {
+            annotations: {
+              priceReference: {
+                type: 'line',
+                yMin: <%= @cryptocurrency.current_price %>,
+                yMax: <%= @cryptocurrency.current_price %>,
+                borderColor: 'rgba(255, 99, 132, 0.8)',
+                borderWidth: 2,
+                borderDash: [10, 5],
+                label: {
+                  content: 'Aktueller Preis: $<%= @cryptocurrency.current_price %>',
+                  enabled: true,
+                  position: 'start',
+                  backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                  color: 'white'
+                }
+              },
+              priceUp1Percent: {
+                type: 'line',
+                yMin: <%= @cryptocurrency.current_price * 1.01 %>,
+                yMax: <%= @cryptocurrency.current_price * 1.01 %>,
+                borderColor: 'rgba(40, 167, 69, 0.6)',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                label: {
+                  content: '+1% ($<%= (@cryptocurrency.current_price * 1.01).round(2) %>)',
+                  enabled: true,
+                  position: 'end',
+                  backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                  color: 'white'
+                }
+              },
+              priceDown1Percent: {
+                type: 'line',
+                yMin: <%= @cryptocurrency.current_price * 0.99 %>,
+                yMax: <%= @cryptocurrency.current_price * 0.99 %>,
+                borderColor: 'rgba(220, 53, 69, 0.6)',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                label: {
+                  content: '-1% ($<%= (@cryptocurrency.current_price * 0.99).round(2) %>)',
+                  enabled: true,
+                  position: 'end',
+                  backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                  color: 'white'
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Add mouse leave event for price chart
+    priceCtx.canvas.addEventListener('mouseleave', () => {
+      clearAllTooltips(priceChart);
+    });
+
+    // Volume Chart
+    const volumeCtx = document.getElementById('volumeChart').getContext('2d');
+    volumeChart = new Chart(volumeCtx, {
+      type: 'bar',
+      data: {
+        datasets: [{
+          label: 'Volumen',
+          data: [],
+          backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'SMA 20',
+          type: 'line',
+          data: [],
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        onHover: (event, activeElements) => {
+          syncTooltips(volumeChart, activeElements);
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              displayFormats: {
+                hour: 'HH:mm',
+                day: 'MMM dd',
+                week: 'MMM dd'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Zeit'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Volumen'
+            },
+            ticks: {
+              callback: function(value) {
+                if (value >= 1000000) {
+                  return (value / 1000000).toFixed(1) + 'M';
+                } else if (value >= 1000) {
+                  return (value / 1000).toFixed(1) + 'K';
+                }
+                return value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                // Konvertiere zu deutscher Zeit (MEZ/MESZ)
+                const date = new Date(context[0].parsed.x);
+                return date.toLocaleString('de-DE', {
+                  timeZone: 'Europe/Berlin',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                }) + ' MEZ/MESZ';
+              },
+              label: function(context) {
+                return 'Volumen: ' + context.parsed.y.toLocaleString();
+              }
+            }
+          },
+          legend: {
+            display: true,
+            position: 'top'
+          }
+        }
+      }
+    });
+
+    // Add mouse leave event for volume chart
+    volumeCtx.canvas.addEventListener('mouseleave', () => {
+      clearAllTooltips(volumeChart);
+    });
+
+    // RSI Chart
+    const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+    rsiChart = new Chart(rsiCtx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'RSI',
+          data: [],
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'rgba(255, 99, 132, 0.1)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          intersect: false,
+          mode: 'index'
+        },
+        onHover: (event, activeElements) => {
+          syncTooltips(rsiChart, activeElements);
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              displayFormats: {
+                hour: 'HH:mm',
+                day: 'MMM dd',
+                week: 'MMM dd'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Zeit'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'RSI'
+            },
+            min: 0,
+            max: 100,
+            ticks: {
+              callback: function(value) {
+                return value.toLocaleString();
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                // Konvertiere zu deutscher Zeit (MEZ/MESZ)
+                const date = new Date(context[0].parsed.x);
+                return date.toLocaleString('de-DE', {
+                  timeZone: 'Europe/Berlin',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                }) + ' MEZ/MESZ';
+              },
+              label: function(context) {
+                return 'RSI: ' + context.parsed.y.toLocaleString();
+              }
+            }
+          },
+          legend: {
+            display: false
+          },
+          annotation: {
+            annotations: {
+              oversold: {
+                type: 'line',
+                yMin: 30,
+                yMax: 30,
+                borderColor: 'rgba(40, 167, 69, 0.8)',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                label: {
+                  content: 'Überverkauft (30)',
+                  enabled: true,
+                  position: 'end'
+                }
+              },
+              overbought: {
+                type: 'line',
+                yMin: 70,
+                yMax: 70,
+                borderColor: 'rgba(220, 53, 69, 0.8)',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                label: {
+                  content: 'Überkauft (70)',
+                  enabled: true,
+                  position: 'end'
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Add mouse leave event for RSI chart
+    rsiCtx.canvas.addEventListener('mouseleave', () => {
+      clearAllTooltips(rsiChart);
+    });
+
+    // Initial chart update
+    updateCharts();
+  }
+
+  function updateCharts() {
+    const data = chartData[currentTimeframe];
+    
+    console.log('updateCharts called with timeframe:', currentTimeframe);
+    console.log('Data for timeframe:', data);
+    
+    if (!data || data.length === 0) {
+      console.warn('Keine Daten für Timeframe:', currentTimeframe);
+      return;
+    }
+
+    console.log('First data item:', data[0]);
+    console.log('Data length:', data.length);
+
+    // Prepare price data - handle both timestamp and time fields
+    const priceData = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.close
+      };
+    });
+
+    console.log('Price data sample:', priceData.slice(0, 3));
+
+    // Prepare EMA data
+    const ema20Data = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.ema_20
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    const ema200Data = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.ema_200
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    // Prepare volume data
+    const volumeData = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.volume
+      };
+    });
+
+    // Prepare SMA volume data
+    const smaVolumeData = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.sma_20_volume
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    // Prepare RSI data
+    const rsiData = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.rsi
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    console.log('RSI data sample:', rsiData.slice(0, 3));
+
+    // Update price chart
+    if (priceChart) {
+      priceChart.data.datasets[0].data = priceData;
+      priceChart.data.datasets[1].data = ema20Data;
+      priceChart.data.datasets[2].data = ema200Data;
+      priceChart.update('none');
+    }
+
+    // Update volume chart
+    if (volumeChart) {
+      volumeChart.data.datasets[0].data = volumeData;
+      volumeChart.data.datasets[1].data = smaVolumeData;
+      volumeChart.update('none');
+    }
+
+    // Update RSI chart
+    if (rsiChart) {
+      rsiChart.data.datasets[0].data = rsiData;
+      rsiChart.update('none');
+    }
+
+    // Update time format based on timeframe
+    const timeFormat = currentTimeframe === '24h' ? 'hour' : 
+                      currentTimeframe === '7d' ? 'day' : 'day';
+    
+    if (priceChart) {
+      priceChart.options.scales.x.time.unit = timeFormat;
+      priceChart.update();
+    }
+    if (volumeChart) {
+      volumeChart.options.scales.x.time.unit = timeFormat;
+      volumeChart.update();
+    }
+    if (rsiChart) {
+      rsiChart.options.scales.x.time.unit = timeFormat;
+      rsiChart.update();
+    }
+
+    console.log('Charts updated successfully');
+  }
+});
+</script>
+
+<style>
+  .rsi-oversold {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  .rsi-overbought {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+  .rsi-neutral {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+  
+  #priceChart {
+    height: 400px !important;
+  }
+  
+  #rsiChart {
+    height: 250px !important;
+  }
+  
+  #volumeChart {
+    height: 200px !important;
+  }
+</style> 

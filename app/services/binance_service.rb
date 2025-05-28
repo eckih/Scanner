@@ -122,6 +122,103 @@ class BinanceService
     ]
   end
 
+  def self.get_historical_data(symbol, interval, start_time)
+    puts "Fetching historical data for #{symbol}, interval: #{interval}, start_time: #{start_time}"
+    
+    # Konvertiere start_time zu Timestamp
+    start_timestamp = case start_time
+                     when /(\d+) day ago/
+                       (Time.current - $1.to_i.days).to_i * 1000
+                     when /(\d+) days ago/
+                       (Time.current - $1.to_i.days).to_i * 1000
+                     else
+                       (Time.current - 1.day).to_i * 1000
+                     end
+
+    puts "Calculated start_timestamp: #{start_timestamp} (#{Time.at(start_timestamp / 1000)})"
+
+    response = get("/api/v3/klines", query: {
+      symbol: symbol,
+      interval: interval,
+      startTime: start_timestamp,
+      limit: 1000
+    })
+
+    puts "Binance API response status: #{response.code}"
+
+    if response.success?
+      klines = response.parsed_response
+      puts "Received #{klines.length} klines for #{symbol}"
+      
+      if klines.empty?
+        puts "No klines data received for #{symbol}"
+        return []
+      end
+      
+      # Formatiere Daten für Chart.js
+      chart_data = klines.map do |kline|
+        {
+          time: Time.at(kline[0] / 1000).strftime('%Y-%m-%d %H:%M'),
+          timestamp: kline[0],
+          open: kline[1].to_f,
+          high: kline[2].to_f,
+          low: kline[3].to_f,
+          close: kline[4].to_f,
+          volume: kline[5].to_f
+        }
+      end
+      
+      # Berechne RSI für jeden Datenpunkt
+      closes = chart_data.map { |data| data[:close] }
+      volumes = chart_data.map { |data| data[:volume] }
+      rsi_values = calculate_historical_rsi(closes)
+      
+      # Berechne Moving Averages
+      ema_20 = calculate_ema(closes, 20)
+      ema_200 = calculate_ema(closes, 200)
+      sma_20_volume = calculate_sma(volumes, 20)
+      
+      # Füge alle Indikatoren zu den Chart-Daten hinzu
+      chart_data.each_with_index do |data, index|
+        data[:rsi] = rsi_values[index]
+        data[:ema_20] = ema_20[index]
+        data[:ema_200] = ema_200[index]
+        data[:sma_20_volume] = sma_20_volume[index]
+      end
+      
+      puts "Successfully processed #{chart_data.length} data points for #{symbol}"
+      chart_data
+    else
+      puts "Error fetching historical data for #{symbol}: #{response.code} - #{response.message}"
+      puts "Response body: #{response.body}" if response.body
+      []
+    end
+  rescue => e
+    puts "Exception in get_historical_data for #{symbol}: #{e.message}"
+    puts e.backtrace.first(5)
+    []
+  end
+
+  def self.calculate_historical_rsi(closes, period = 14)
+    return [] if closes.length < period + 1
+    
+    rsi_values = []
+    
+    # Für die ersten period-1 Werte gibt es keinen RSI
+    (period - 1).times { rsi_values << nil }
+    
+    # Berechne RSI für jeden möglichen Punkt
+    (period - 1...closes.length).each do |i|
+      subset = closes[0..i]
+      next if subset.length < period + 1
+      
+      rsi = calculate_rsi_wilders(subset, period)
+      rsi_values << rsi
+    end
+    
+    rsi_values
+  end
+
   private
 
   def self.fetch_all_symbols
@@ -369,5 +466,43 @@ class BinanceService
     }
 
     name_mapping[symbol.upcase] || symbol.capitalize
+  end
+
+  def self.calculate_ema(closes, period)
+    return [] if closes.length < period
+    
+    ema = []
+    smoothing = 2.0 / (period + 1)
+    
+    # Für die ersten period-1 Werte gibt es keinen EMA
+    (period - 1).times { ema << nil }
+    
+    # Erste EMA ist der SMA der ersten period Werte
+    first_sma = closes[0...period].sum / period.to_f
+    ema << first_sma
+    
+    # Berechne EMA für die restlichen Werte
+    (period...closes.length).each do |i|
+      ema << (closes[i] - ema.last) * smoothing + ema.last
+    end
+    
+    ema
+  end
+
+  def self.calculate_sma(values, period)
+    return [] if values.length < period
+    
+    sma = []
+    
+    # Für die ersten period-1 Werte gibt es keinen SMA
+    (period - 1).times { sma << nil }
+    
+    # Berechne SMA für jeden möglichen Punkt
+    (period - 1...values.length).each do |i|
+      subset = values[(i - period + 1)..i]
+      sma << subset.sum / period.to_f
+    end
+    
+    sma
   end
 end 

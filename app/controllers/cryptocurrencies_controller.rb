@@ -1,5 +1,5 @@
 class CryptocurrenciesController < ApplicationController
-  before_action :set_cryptocurrency, only: [:show]
+  before_action :set_cryptocurrency, only: [:show, :chart]
   
   def index
     @cryptocurrencies = Cryptocurrency.top_50
@@ -22,6 +22,32 @@ class CryptocurrenciesController < ApplicationController
   
   def show
     @cryptocurrency = Cryptocurrency.find(params[:id])
+  end
+  
+  def chart
+    @cryptocurrency = Cryptocurrency.find(params[:id])
+    
+    begin
+      # Hole historische Daten von Binance für verschiedene Zeiträume
+      # Das Symbol ist bereits im Format BTCUSDC, also verwende es direkt
+      symbol = @cryptocurrency.symbol
+      
+      # 24h Daten (5-Minuten-Intervall)
+      @chart_data_24h = BinanceService.get_historical_data(symbol, '5m', '1 day ago UTC')
+      
+      # 7 Tage Daten (1-Stunden-Intervall)
+      @chart_data_7d = BinanceService.get_historical_data(symbol, '1h', '7 days ago UTC')
+      
+      # 30 Tage Daten (4-Stunden-Intervall)
+      @chart_data_30d = BinanceService.get_historical_data(symbol, '4h', '30 days ago UTC')
+      
+    rescue StandardError => e
+      Rails.logger.error "Chart data error: #{e.message}"
+      flash.now[:alert] = "Fehler beim Laden der Chart-Daten: #{e.message}"
+      @chart_data_24h = []
+      @chart_data_7d = []
+      @chart_data_30d = []
+    end
   end
   
   def refresh_data

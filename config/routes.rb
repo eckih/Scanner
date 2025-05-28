@@ -5,6 +5,9 @@ Rails.application.routes.draw do
     collection do
       post :refresh_data
     end
+    member do
+      get :chart
+    end
   end
   
   # API routes

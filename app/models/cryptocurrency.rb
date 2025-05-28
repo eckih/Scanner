@@ -12,6 +12,14 @@ class Cryptocurrency < ApplicationRecord
     FreqtradeApiService.new.fetch_top_cryptocurrencies
   end
   
+  def base_symbol
+    symbol.gsub('USDC', '')
+  end
+  
+  def trading_pair
+    symbol
+  end
+  
   def price_change_percentage_24h_formatted
     return "0.00%" if price_change_percentage_24h.nil?
     
