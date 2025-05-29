@@ -142,6 +142,29 @@ document.addEventListener('DOMContentLoaded', function() {
   let priceChart, volumeChart, rsiChart;
   let isTooltipSyncing = false; // Flag to prevent infinite loops
 
+  // Event-Listener für automatisches Reload bei Datenaktualisierung
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'dataUpdated' && e.newValue === 'true') {
+      console.log('Datenaktualisierung erkannt - lade Chart-Seite neu...');
+      
+      // Kurze Verzögerung, damit die Datenaktualisierung abgeschlossen ist
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    }
+  });
+
+  // Prüfe beim Laden der Seite, ob eine Aktualisierung stattgefunden hat
+  const lastUpdate = localStorage.getItem('lastAutoRefresh');
+  const pageLoadTime = Date.now();
+  
+  if (lastUpdate && (pageLoadTime - parseInt(lastUpdate)) < 10000) {
+    console.log('Kürzliche Datenaktualisierung erkannt - lade Chart-Seite neu...');
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  }
+
   // Initialisiere Charts
   initializeCharts();
 
@@ -297,7 +320,11 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           legend: {
             display: true,
-            position: 'top'
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'line'
+            }
           },
           annotation: {
             annotations: {
@@ -313,7 +340,11 @@ document.addEventListener('DOMContentLoaded', function() {
                   enabled: true,
                   position: 'start',
                   backgroundColor: 'rgba(255, 99, 132, 0.8)',
-                  color: 'white'
+                  color: 'white',
+                  padding: 4,
+                  font: {
+                    size: 11
+                  }
                 }
               },
               priceUp1Percent: {
@@ -324,11 +355,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 borderWidth: 1,
                 borderDash: [5, 5],
                 label: {
-                  content: '+1% ($<%= (@cryptocurrency.current_price * 1.01).round(2) %>)',
+                  content: '+1%',
                   enabled: true,
                   position: 'end',
                   backgroundColor: 'rgba(40, 167, 69, 0.8)',
-                  color: 'white'
+                  color: 'white',
+                  padding: 4,
+                  font: {
+                    size: 10
+                  },
+                  xAdjust: -10,
+                  yAdjust: 0
                 }
               },
               priceDown1Percent: {
@@ -339,11 +376,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 borderWidth: 1,
                 borderDash: [5, 5],
                 label: {
-                  content: '-1% ($<%= (@cryptocurrency.current_price * 0.99).round(2) %>)',
+                  content: '-1%',
                   enabled: true,
                   position: 'end',
                   backgroundColor: 'rgba(220, 53, 69, 0.8)',
-                  color: 'white'
+                  color: 'white',
+                  padding: 4,
+                  font: {
+                    size: 10
+                  },
+                  xAdjust: -10,
+                  yAdjust: 0
                 }
               }
             }
@@ -448,7 +491,11 @@ document.addEventListener('DOMContentLoaded', function() {
           },
           legend: {
             display: true,
-            position: 'top'
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'line'
+            }
           }
         }
       }
@@ -465,12 +512,32 @@ document.addEventListener('DOMContentLoaded', function() {
       type: 'line',
       data: {
         datasets: [{
-          label: 'RSI',
+          label: 'RSI 1m',
           data: [],
           borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'rgba(255, 99, 132, 0.1)',
+          backgroundColor: 'transparent',
           borderWidth: 2,
-          fill: true,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'RSI 15m',
+          data: [],
+          borderColor: 'rgb(54, 162, 235)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'RSI 1h',
+          data: [],
+          borderColor: 'rgb(255, 206, 86)',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          fill: false,
           tension: 0.1,
           pointRadius: 0,
           pointHoverRadius: 4
@@ -480,8 +547,8 @@ document.addEventListener('DOMContentLoaded', function() {
         responsive: true,
         maintainAspectRatio: false,
         interaction: {
-          intersect: false,
-          mode: 'index'
+          mode: 'index',
+          intersect: false
         },
         onHover: (event, activeElements) => {
           syncTooltips(rsiChart, activeElements);
@@ -492,26 +559,21 @@ document.addEventListener('DOMContentLoaded', function() {
             time: {
               displayFormats: {
                 hour: 'HH:mm',
-                day: 'MMM dd',
-                week: 'MMM dd'
+                day: 'dd.MM'
               }
             },
             title: {
               display: true,
-              text: 'Zeit'
+              text: 'Zeit (MEZ/MESZ)'
             }
           },
           y: {
+            beginAtZero: false,
+            min: 0,
+            max: 100,
             title: {
               display: true,
               text: 'RSI'
-            },
-            min: 0,
-            max: 100,
-            ticks: {
-              callback: function(value) {
-                return value.toLocaleString();
-              }
             }
           }
         },
@@ -532,16 +594,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 }) + ' MEZ/MESZ';
               },
               label: function(context) {
-                return 'RSI: ' + context.parsed.y.toLocaleString();
+                const timeframe = context.dataset.label.split(' ')[1]; // Extrahiere Zeitrahmen
+                return `RSI ${timeframe}: ${context.parsed.y.toFixed(2)}`;
               }
             }
           },
           legend: {
-            display: false
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'line'
+            }
           },
           annotation: {
             annotations: {
-              oversold: {
+              oversoldLine: {
                 type: 'line',
                 yMin: 30,
                 yMax: 30,
@@ -551,20 +619,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 label: {
                   content: 'Überverkauft (30)',
                   enabled: true,
-                  position: 'end'
+                  position: 'start',
+                  backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                  color: 'white',
+                  padding: 4,
+                  font: {
+                    size: 11
+                  }
                 }
               },
-              overbought: {
+              overboughtLine: {
                 type: 'line',
                 yMin: 70,
                 yMax: 70,
-                borderColor: 'rgba(220, 53, 69, 0.8)',
+                borderColor: 'rgba(255, 99, 132, 0.8)',
                 borderWidth: 2,
                 borderDash: [5, 5],
                 label: {
                   content: 'Überkauft (70)',
                   enabled: true,
-                  position: 'end'
+                  position: 'start',
+                  backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                  color: 'white',
+                  padding: 4,
+                  font: {
+                    size: 11
+                  }
                 }
               }
             }
@@ -642,16 +722,53 @@ document.addEventListener('DOMContentLoaded', function() {
       };
     }).filter(item => item.y !== null && item.y !== undefined);
 
-    // Prepare RSI data
-    const rsiData = data.map(item => {
+    // Prepare RSI data - drei verschiedene Zeitrahmen
+    const rsiData1m = data.map(item => {
       const timeValue = item.timestamp || new Date(item.time).getTime();
       return {
         x: new Date(timeValue),
-        y: item.rsi
+        y: item.rsi_1m
+      };
+    });
+    
+    const rsiData1mFiltered = rsiData1m.filter(item => item.y !== null && item.y !== undefined);
+
+    const rsiData15m = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.rsi_15m
       };
     }).filter(item => item.y !== null && item.y !== undefined);
 
-    console.log('RSI data sample:', rsiData.slice(0, 3));
+    const rsiData1h = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.rsi_1h
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    console.log('RSI 1m data sample (before filter):', rsiData1m.slice(0, 3));
+    console.log('RSI 1m data sample (after filter):', rsiData1mFiltered.slice(0, 3));
+    console.log('RSI 15m data sample:', rsiData15m.slice(0, 3));
+    console.log('RSI 1h data sample:', rsiData1h.slice(0, 3));
+    console.log('RSI 1m data length:', rsiData1mFiltered.length);
+    console.log('RSI 15m data length:', rsiData15m.length);
+    console.log('RSI 1h data length:', rsiData1h.length);
+    
+    // Debug: Prüfe ob RSI-Werte vorhanden sind
+    console.log('First data item RSI values:', {
+      rsi_1m: data[0]?.rsi_1m,
+      rsi_15m: data[0]?.rsi_15m,
+      rsi_1h: data[0]?.rsi_1h
+    });
+    
+    // Debug: Zähle null/undefined Werte
+    const nullCount1m = rsiData1m.filter(item => item.y === null || item.y === undefined).length;
+    const nullCount15m = data.filter(item => item.rsi_15m === null || item.rsi_15m === undefined).length;
+    const nullCount1h = data.filter(item => item.rsi_1h === null || item.rsi_1h === undefined).length;
+    console.log('Null/undefined counts:', { '1m': nullCount1m, '15m': nullCount15m, '1h': nullCount1h });
 
     // Update price chart
     if (priceChart) {
@@ -670,7 +787,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update RSI chart
     if (rsiChart) {
-      rsiChart.data.datasets[0].data = rsiData;
+      rsiChart.data.datasets[0].data = rsiData1mFiltered;
+      rsiChart.data.datasets[1].data = rsiData15m;
+      rsiChart.data.datasets[2].data = rsiData1h;
       rsiChart.update('none');
     }
 

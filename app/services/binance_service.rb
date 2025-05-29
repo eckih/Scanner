@@ -168,19 +168,21 @@ class BinanceService
         }
       end
       
-      # Berechne RSI für jeden Datenpunkt
+      # Berechne RSI für mehrere Zeitrahmen (1m, 15m, 1h)
+      multi_rsi_values = get_multi_timeframe_rsi_for_chart_data(symbol, chart_data)
+      
+      # Berechne Moving Averages basierend auf Chart-Daten
       closes = chart_data.map { |data| data[:close] }
       volumes = chart_data.map { |data| data[:volume] }
-      rsi_values = calculate_historical_rsi(closes)
-      
-      # Berechne Moving Averages
       ema_20 = calculate_ema(closes, 20)
       ema_200 = calculate_ema(closes, 200)
       sma_20_volume = calculate_sma(volumes, 20)
       
       # Füge alle Indikatoren zu den Chart-Daten hinzu
       chart_data.each_with_index do |data, index|
-        data[:rsi] = rsi_values[index]
+        data[:rsi_1m] = multi_rsi_values['1m'][index]
+        data[:rsi_15m] = multi_rsi_values['15m'][index]
+        data[:rsi_1h] = multi_rsi_values['1h'][index]
         data[:ema_20] = ema_20[index]
         data[:ema_200] = ema_200[index]
         data[:sma_20_volume] = sma_20_volume[index]
@@ -197,6 +199,63 @@ class BinanceService
     puts "Exception in get_historical_data for #{symbol}: #{e.message}"
     puts e.backtrace.first(5)
     []
+  end
+
+  # Neue Methode: Hole 1h RSI-Daten und mappe sie auf Chart-Zeitpunkte
+  def self.get_1h_rsi_for_chart_data(symbol, chart_data)
+    puts "Fetching 1h RSI data for #{symbol}"
+    
+    # Hole 1h-Daten für RSI-Berechnung (mehr Daten für bessere Genauigkeit)
+    start_time_1h = (Time.current - 30.days).to_i * 1000
+    
+    response = get("/api/v3/klines", query: {
+      symbol: symbol,
+      interval: '1h',
+      startTime: start_time_1h,
+      limit: 1000
+    })
+
+    if response.success?
+      klines_1h = response.parsed_response
+      puts "Received #{klines_1h.length} 1h klines for RSI calculation"
+      
+      # Berechne RSI auf 1h-Basis
+      closes_1h = klines_1h.map { |kline| kline[4].to_f }
+      rsi_1h_values = calculate_historical_rsi(closes_1h)
+      
+      # Erstelle Mapping von Zeitstempel zu RSI-Werten
+      rsi_map = {}
+      klines_1h.each_with_index do |kline, index|
+        timestamp_1h = kline[0]
+        rsi_map[timestamp_1h] = rsi_1h_values[index]
+      end
+      
+      # Mappe RSI-Werte auf Chart-Datenpunkte
+      chart_data.map do |data_point|
+        chart_timestamp = data_point[:timestamp]
+        
+        # Finde den nächstgelegenen 1h-Zeitstempel
+        closest_1h_timestamp = find_closest_1h_timestamp(chart_timestamp, rsi_map.keys)
+        rsi_map[closest_1h_timestamp]
+      end
+    else
+      puts "Error fetching 1h data for RSI: #{response.code}"
+      # Fallback: Verwende Chart-Daten für RSI (nicht ideal, aber besser als nichts)
+      closes = chart_data.map { |data| data[:close] }
+      calculate_historical_rsi(closes)
+    end
+  rescue => e
+    puts "Exception in get_1h_rsi_for_chart_data: #{e.message}"
+    # Fallback: Verwende Chart-Daten für RSI
+    closes = chart_data.map { |data| data[:close] }
+    calculate_historical_rsi(closes)
+  end
+
+  # Hilfsmethode: Finde den nächstgelegenen 1h-Zeitstempel
+  def self.find_closest_1h_timestamp(target_timestamp, available_timestamps)
+    return available_timestamps.first if available_timestamps.empty?
+    
+    available_timestamps.min_by { |ts| (ts - target_timestamp).abs }
   end
 
   def self.calculate_historical_rsi(closes, period = 14)
@@ -217,6 +276,120 @@ class BinanceService
     end
     
     rsi_values
+  end
+
+  # Neue Methode: Hole RSI-Daten für mehrere Zeitrahmen (1m, 15m, 1h)
+  def self.get_multi_timeframe_rsi_for_chart_data(symbol, chart_data)
+    puts "Fetching multi-timeframe RSI data for #{symbol} (1m, 15m, 1h)"
+    
+    rsi_data = {}
+    timeframes = ['1m', '15m', '1h']
+    
+    timeframes.each do |timeframe|
+      puts "Fetching #{timeframe} RSI data for #{symbol}"
+      
+      # Bestimme wie viele Tage zurück wir gehen müssen
+      days_back = case timeframe
+                  when '1m' then 3   # 3 Tage für 1m (genug Daten)
+                  when '15m' then 7  # 7 Tage für 15m
+                  when '1h' then 30  # 30 Tage für 1h
+                  end
+      
+      start_time_tf = (Time.current - days_back.days).to_i * 1000
+      
+      response = get("/api/v3/klines", query: {
+        symbol: symbol,
+        interval: timeframe,
+        startTime: start_time_tf,
+        limit: 1000
+      })
+
+      if response.success?
+        klines_tf = response.parsed_response
+        puts "Received #{klines_tf.length} #{timeframe} klines for RSI calculation"
+        
+        # Berechne RSI für diesen Zeitrahmen
+        closes_tf = klines_tf.map { |kline| kline[4].to_f }
+        rsi_tf_values = calculate_historical_rsi(closes_tf)
+        
+        # Debug für 1m-Daten
+        if timeframe == '1m'
+          valid_rsi_count = rsi_tf_values.compact.length
+          puts "1m RSI calculation: #{rsi_tf_values.length} total values, #{valid_rsi_count} valid (non-null) values"
+          puts "First 5 RSI values: #{rsi_tf_values.first(5)}"
+          puts "Last 5 RSI values: #{rsi_tf_values.last(5)}"
+        end
+        
+        # Erstelle Mapping von Zeitstempel zu RSI-Werten
+        rsi_map_tf = {}
+        klines_tf.each_with_index do |kline, index|
+          timestamp_tf = kline[0]
+          rsi_map_tf[timestamp_tf] = rsi_tf_values[index]
+        end
+        
+        # Mappe RSI-Werte auf Chart-Datenpunkte
+        rsi_data[timeframe] = chart_data.map do |data_point|
+          chart_timestamp = data_point[:timestamp]
+          
+          # Für 1m-Daten: Verwende Interpolation wenn nötig
+          if timeframe == '1m'
+            rsi_value = interpolate_rsi_value(chart_timestamp, rsi_map_tf, timeframe)
+          else
+            # Für 15m und 1h: Normale Zuordnung
+            closest_timestamp = find_closest_timestamp_for_timeframe(chart_timestamp, rsi_map_tf.keys, timeframe)
+            rsi_value = rsi_map_tf[closest_timestamp]
+          end
+          
+          # Debug für 1m-Daten
+          if timeframe == '1m' && chart_data.index(data_point) < 3
+            puts "1m RSI mapping #{chart_data.index(data_point)}: chart_ts=#{Time.at(chart_timestamp/1000)}, rsi=#{rsi_value}"
+          end
+          
+          rsi_value
+        end
+        
+        puts "Successfully mapped #{timeframe} RSI data - #{rsi_data[timeframe].compact.length} valid values out of #{rsi_data[timeframe].length} total"
+      else
+        puts "Error fetching #{timeframe} data for RSI: #{response.code}"
+        # Fallback: Verwende Chart-Daten für RSI
+        closes = chart_data.map { |data| data[:close] }
+        rsi_data[timeframe] = calculate_historical_rsi(closes)
+      end
+    end
+    
+    rsi_data
+  rescue => e
+    puts "Exception in get_multi_timeframe_rsi_for_chart_data: #{e.message}"
+    # Fallback: Verwende Chart-Daten für alle Zeitrahmen
+    closes = chart_data.map { |data| data[:close] }
+    fallback_rsi = calculate_historical_rsi(closes)
+    {
+      '1m' => fallback_rsi,
+      '15m' => fallback_rsi,
+      '1h' => fallback_rsi
+    }
+  end
+
+  # Hilfsmethode: Finde den nächstgelegenen Zeitstempel für einen bestimmten Zeitrahmen
+  def self.find_closest_timestamp_for_timeframe(target_timestamp, available_timestamps, timeframe)
+    return available_timestamps.first if available_timestamps.empty?
+    
+    # Für verschiedene Zeitrahmen unterschiedliche Toleranzen (erhöht für bessere Zuordnung)
+    tolerance = case timeframe
+                when '1m' then 300_000     # 5 Minuten Toleranz für 1m (erhöht)
+                when '15m' then 1_800_000  # 30 Minuten Toleranz für 15m (erhöht)
+                when '1h' then 7_200_000   # 2 Stunden Toleranz für 1h (erhöht)
+                end
+    
+    # Finde den nächstgelegenen Zeitstempel
+    closest = available_timestamps.min_by { |ts| (ts - target_timestamp).abs }
+    time_diff = (closest - target_timestamp).abs
+    
+    puts "#{timeframe} mapping: target=#{Time.at(target_timestamp/1000)}, closest=#{Time.at(closest/1000)}, diff=#{time_diff/1000}s, tolerance=#{tolerance/1000}s"
+    
+    # Gib immer den nächstgelegenen Zeitstempel zurück, auch wenn er außerhalb der Toleranz liegt
+    # Das verhindert, dass RSI-Werte komplett fehlen
+    closest
   end
 
   private
@@ -504,5 +677,27 @@ class BinanceService
     end
     
     sma
+  end
+
+  def self.interpolate_rsi_value(target_timestamp, rsi_map, timeframe)
+    return nil if rsi_map.empty?
+    
+    # Filtere nur gültige RSI-Werte (nicht null/nil)
+    valid_rsi_map = rsi_map.select { |timestamp, rsi| rsi && rsi.is_a?(Numeric) && !rsi.nan? }
+    
+    if valid_rsi_map.empty?
+      puts "1m interpolation: No valid RSI values found in map"
+      return nil
+    end
+    
+    # Finde den zeitlich nächstgelegenen Zeitstempel mit gültigem RSI-Wert
+    closest_timestamp = valid_rsi_map.keys.min_by { |ts| (ts - target_timestamp).abs }
+    time_diff = (closest_timestamp - target_timestamp).abs
+    rsi_value = valid_rsi_map[closest_timestamp]
+    
+    puts "1m interpolation: target=#{Time.at(target_timestamp/1000)}, closest=#{Time.at(closest_timestamp/1000)}, diff=#{time_diff/1000}s, rsi=#{rsi_value}"
+    
+    # Gib den gültigen RSI-Wert zurück
+    rsi_value
   end
 end 
