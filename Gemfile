@@ -6,6 +6,9 @@ ruby '3.2.8'
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails', branch: 'main'
 gem 'rails', '~> 7.1.0'
 
+# Ensure compatible ActiveSupport version
+gem 'activesupport', '~> 7.1.0'
+
 # Use sqlite3 as the database for Active Record
 gem 'sqlite3', '~> 1.4'
 
@@ -37,6 +40,9 @@ gem 'jbuilder', '~> 2.7'
 # HTTP client for API calls
 gem 'httparty'
 
+# For environment variables
+gem 'dotenv-rails'
+
 # For background jobs
 gem 'sidekiq', '~> 6.5'
 
@@ -50,9 +56,8 @@ gem 'jquery-rails'
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', '>= 1.4.4', require: false
 
-gem 'concurrent-ruby', '< 1.3.5'
-# Oder explizit:
-# gem 'concurrent-ruby', '1.3.4'
+# Lock concurrent-ruby to compatible version
+gem 'concurrent-ruby', '~> 1.3.4'
 
 
 group :development, :test do

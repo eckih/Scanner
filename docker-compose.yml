@@ -2,9 +2,10 @@
 
 services:
   web:
+    restart: unless-stopped
     build: .
     ports:
-      - "3000:3000"
+      - "3005:3000"
     volumes:
       - .:/app
       - bundle_cache:/usr/local/bundle

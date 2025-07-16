@@ -3,6 +3,11 @@ require 'httparty'
 class BinanceService
   include HTTParty
   base_uri 'https://api.binance.com'
+  
+  # Konfiguration direkt im Service
+  ROC_PERIOD = 14
+  RSI_PERIOD = 14
+  DEFAULT_INTERVAL = '1h'
 
   def self.fetch_and_update_all_cryptos
     puts "Starting to fetch cryptocurrency data from Binance..."
@@ -258,7 +263,7 @@ class BinanceService
     available_timestamps.min_by { |ts| (ts - target_timestamp).abs }
   end
 
-  def self.calculate_historical_rsi(closes, period = 14)
+  def self.calculate_historical_rsi(closes, period = RSI_PERIOD)
     return [] if closes.length < period + 1
     
     rsi_values = []
@@ -392,6 +397,25 @@ class BinanceService
     closest
   end
 
+  def self.update_roc_for_all_cryptocurrencies
+    Cryptocurrency.find_each do |crypto|
+      begin
+        roc = calculate_roc_for_symbol(crypto.symbol, '1h')
+        
+        if roc
+          Cryptocurrency.where(id: crypto.id).update_all(roc: roc)
+        end
+        
+        # Kleine Pause um Rate Limits zu vermeiden
+        sleep(0.1)
+        
+      rescue => e
+        # Stille Fehlerbehandlung
+        next
+      end
+    end
+  end
+
   private
 
   def self.fetch_all_symbols
@@ -427,7 +451,7 @@ class BinanceService
     end
   end
 
-  def self.calculate_rsi_for_symbol(symbol, interval = '1h', period = 14)
+  def self.calculate_rsi_for_symbol(symbol, interval = DEFAULT_INTERVAL, period = RSI_PERIOD)
     # Mehr Kline-Daten für genauere RSI-Berechnung abrufen
     response = get("/api/v3/klines", query: {
       symbol: symbol,
@@ -448,7 +472,7 @@ class BinanceService
     end
   end
 
-  def self.calculate_rsi(closes, period = 14)
+  def self.calculate_rsi(closes, period = RSI_PERIOD)
     return nil if closes.length < period + 1
 
     gains = []
@@ -487,7 +511,7 @@ class BinanceService
   end
 
   # Wilder's RSI-Berechnung (Standard-Methode, genauer)
-  def self.calculate_rsi_wilders(closes, period = 14)
+  def self.calculate_rsi_wilders(closes, period = RSI_PERIOD)
     return nil if closes.length < period + 1
 
     gains = []
@@ -521,10 +545,52 @@ class BinanceService
     rsi.round(2)
   end
 
+  # ROC (Rate of Change) Berechnung
+  def self.calculate_roc(closes, period = ROC_PERIOD)
+    return nil if closes.length < period + 1
+    
+    # ROC = ((Current Price - Price n periods ago) / Price n periods ago) * 100
+    current_price = closes.last
+    price_n_periods_ago = closes[closes.length - period - 1]
+    
+    return nil if price_n_periods_ago.nil? || price_n_periods_ago == 0
+    
+    roc = ((current_price - price_n_periods_ago) / price_n_periods_ago) * 100
+    roc.round(2)
+  end
+
+  def self.calculate_roc_for_symbol(symbol, interval = DEFAULT_INTERVAL, period = ROC_PERIOD)
+    # Mehr Kline-Daten für genauere ROC-Berechnung abrufen
+    response = get("/api/v3/klines", query: {
+      symbol: symbol,
+      interval: interval,
+      limit: 100  # Mehr Daten für bessere Berechnung
+    })
+
+    if response.success?
+      klines = response.parsed_response
+      closes = klines.map { |kline| kline[4].to_f }  # Close price ist Index 4
+      
+      if closes.length >= period + 1
+        roc = calculate_roc(closes, period)
+        return roc
+      else
+        return nil
+      end
+    else
+      return nil
+    end
+  rescue => e
+    return nil
+  end
+
   def self.find_or_create_cryptocurrency(name, symbol, price, rsi, volume_24h = 0)
     # Market Cap berechnen basierend auf geschätzter Coin Supply
     estimated_supply = estimate_coin_supply(name.upcase)
     market_cap_usd = price * estimated_supply
+
+    # ROC berechnen (14-Perioden)
+    roc = calculate_roc_for_symbol(symbol, '1h')
 
     # Verwende das vollständige Trading-Pair als Symbol
     crypto = Cryptocurrency.find_or_initialize_by(symbol: symbol.upcase)
@@ -535,6 +601,7 @@ class BinanceService
       current_price: price,
       market_cap: market_cap_usd,
       rsi: rsi,
+      roc: roc,
       volume_24h: volume_24h * price, # Volumen in USD
       market_cap_rank: crypto.persisted? ? crypto.market_cap_rank : Cryptocurrency.count + 1,
       updated_at: Time.current

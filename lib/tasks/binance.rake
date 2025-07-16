@@ -1,4 +1,13 @@
 namespace :binance do
+  # Hilfsmethode für deutsche Zeitformatierung
+  def format_german_time(time)
+    return nil unless time
+    
+    # Prüfe ob Sommerzeit (MESZ) oder Winterzeit (MEZ)
+    timezone_abbr = time.in_time_zone('Europe/Berlin').dst? ? 'MESZ' : 'MEZ'
+    time.in_time_zone('Europe/Berlin').strftime("%Y-%m-%d %H:%M:%S #{timezone_abbr}")
+  end
+
   desc "Fetch all cryptocurrency prices and RSI from Binance and update database"
   task fetch_all_cryptos: :environment do
     puts "=" * 50
@@ -17,7 +26,7 @@ namespace :binance do
       puts "SUMMARY:"
       puts "Total cryptocurrencies in database: #{Cryptocurrency.count}"
       puts "Duration: #{duration} seconds"
-      puts "Last updated: #{Time.current.strftime('%Y-%m-%d %H:%M:%S')}"
+      puts "Last updated: #{format_german_time(Time.current)}"
       puts "=" * 50
       
     rescue => e
@@ -47,7 +56,7 @@ namespace :binance do
       puts "SUMMARY:"
       puts "Total cryptocurrencies in database: #{Cryptocurrency.count}"
       puts "Duration: #{duration} seconds"
-      puts "Last updated: #{Time.current.strftime('%Y-%m-%d %H:%M:%S')}"
+      puts "Last updated: #{format_german_time(Time.current)}"
       puts "=" * 50
       
     rescue => e
@@ -64,7 +73,7 @@ namespace :binance do
     
     loop do
       begin
-        puts "[#{Time.current.strftime('%Y-%m-%d %H:%M:%S')}] Fetching latest cryptocurrency data..."
+        puts "[#{format_german_time(Time.current)}] Fetching latest cryptocurrency data..."
         
         start_time = Time.current
         top_symbols = BinanceService.get_top_usdc_pairs
@@ -73,13 +82,13 @@ namespace :binance do
         end_time = Time.current
         duration = (end_time - start_time).round(2)
         
-        puts "[#{Time.current.strftime('%Y-%m-%d %H:%M:%S')}] Update completed in #{duration}s. Next update in 5 minutes..."
+        puts "[#{format_german_time(Time.current)}] Update completed in #{duration}s. Next update in 5 minutes..."
         
         # Warte 5 Minuten (300 Sekunden)
         sleep(300)
         
       rescue => e
-        puts "[#{Time.current.strftime('%Y-%m-%d %H:%M:%S')}] ERROR: #{e.message}"
+        puts "[#{format_german_time(Time.current)}] ERROR: #{e.message}"
         puts "Retrying in 1 minute..."
         sleep(60)
       end

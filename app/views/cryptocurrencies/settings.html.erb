@@ -1,0 +1,163 @@
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="display-4">
+        <i class="bi bi-gear text-primary"></i>
+        Einstellungen
+      </h1>
+      
+      <div class="text-end">
+        <%= link_to cryptocurrencies_path, class: "btn btn-outline-secondary" do %>
+          <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-sliders"></i>
+          Indikator-Einstellungen
+        </h5>
+      </div>
+      <div class="card-body">
+        <%= form_with url: update_settings_cryptocurrencies_path, method: :patch, local: true do |form| %>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="roc_period" class="form-label">
+                  <strong>ROC-Periode</strong>
+                  <small class="text-muted d-block">
+                    Anzahl der Perioden für die Rate of Change Berechnung
+                  </small>
+                </label>
+                <%= form.number_field :roc_period, 
+                    value: CryptocurrenciesController::ROC_PERIOD,
+                    min: 1, 
+                    max: 50,
+                    class: "form-control",
+                    id: "roc_period" %>
+                <div class="form-text">
+                  Standard: 14 Perioden. Höhere Werte = weniger empfindlich, niedrigere Werte = empfindlicher.
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="rsi_period" class="form-label">
+                  <strong>RSI-Periode</strong>
+                  <small class="text-muted d-block">
+                    Anzahl der Perioden für den Relative Strength Index
+                  </small>
+                </label>
+                <%= form.number_field :rsi_period, 
+                    value: CryptocurrenciesController::RSI_PERIOD,
+                    min: 1, 
+                    max: 50,
+                    class: "form-control",
+                    id: "rsi_period" %>
+                <div class="form-text">
+                  Standard: 14 Perioden. Höhere Werte = weniger empfindlich, niedrigere Werte = empfindlicher.
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="auto_roc_count" class="form-label">
+                  <strong>Automatische ROC-Berechnung</strong>
+                  <small class="text-muted d-block">
+                    Anzahl der Coins für automatische ROC-Berechnung
+                  </small>
+                </label>
+                <%= form.number_field :auto_roc_count, 
+                    value: CryptocurrenciesController::AUTO_ROC_COUNT,
+                    min: 1, 
+                    max: 20,
+                    class: "form-control",
+                    id: "auto_roc_count" %>
+                <div class="form-text">
+                  Anzahl der Coins, für die ROC automatisch berechnet wird (bei Seitenaufruf).
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="default_interval" class="form-label">
+                  <strong>Standard-Zeitrahmen</strong>
+                  <small class="text-muted d-block">
+                    Standard-Zeitrahmen für Indikatoren
+                  </small>
+                </label>
+                <%= form.select :default_interval, 
+                    options_for_select([
+                      ['1 Minute', '1m'],
+                      ['5 Minuten', '5m'],
+                      ['15 Minuten', '15m'],
+                      ['30 Minuten', '30m'],
+                      ['1 Stunde', '1h'],
+                      ['4 Stunden', '4h'],
+                      ['1 Tag', '1d']
+                    ], CryptocurrenciesController::DEFAULT_INTERVAL),
+                    {},
+                    { class: "form-select", id: "default_interval" } %>
+                <div class="form-text">
+                  Standard-Zeitrahmen für RSI und ROC Berechnungen.
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="d-flex gap-2">
+            <%= form.submit "Einstellungen speichern", class: "btn btn-primary" %>
+            <%= link_to "Abbrechen", cryptocurrencies_path, class: "btn btn-outline-secondary" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <i class="bi bi-info-circle"></i>
+          Informationen
+        </h5>
+      </div>
+      <div class="card-body">
+        <h6>ROC (Rate of Change)</h6>
+        <p class="small text-muted">
+          Der ROC-Indikator misst die prozentuale Änderung des Preises über einen bestimmten Zeitraum. 
+          Positive Werte zeigen steigende Preise, negative Werte fallende Preise.
+        </p>
+        
+        <h6>RSI (Relative Strength Index)</h6>
+        <p class="small text-muted">
+          Der RSI misst die Geschwindigkeit und das Ausmaß von Preisänderungen. 
+          Werte über 70 deuten auf Überkauftheit hin, Werte unter 30 auf Überverkauftheit.
+        </p>
+        
+        <h6>Periode</h6>
+        <p class="small text-muted">
+          Die Periode bestimmt, wie viele Datenpunkte für die Berechnung verwendet werden. 
+          Eine höhere Periode macht den Indikator weniger empfindlich, aber stabiler.
+        </p>
+        
+        <div class="alert alert-info mt-3">
+          <i class="bi bi-lightbulb"></i>
+          <strong>Tipp:</strong> Änderungen an den Einstellungen werden sofort wirksam. 
+          Für beste Ergebnisse verwenden Sie die Standardwerte (14 Perioden).
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 

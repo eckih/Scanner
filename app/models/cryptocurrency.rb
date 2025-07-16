@@ -5,6 +5,9 @@ class Cryptocurrency < ApplicationRecord
   validates :market_cap, presence: true, numericality: { greater_than: 0 }
   validates :market_cap_rank, presence: true, numericality: { greater_than: 0 }
   
+  # Explizit roc-Attribut definieren
+  attribute :roc, :decimal, default: nil
+  
   scope :top_50, -> { order(:market_cap_rank).limit(50) }
   scope :by_market_cap, -> { order(market_cap: :desc) }
   
@@ -94,5 +97,36 @@ class Cryptocurrency < ApplicationRecord
     else
       "Neutral"
     end
+  end
+
+  def roc_color_class
+    return "roc-neutral" if roc.nil?
+    
+    if roc >= 5
+      "roc-positive"
+    elsif roc <= -5
+      "roc-negative"
+    else
+      "roc-neutral"
+    end
+  end
+
+  def roc_signal
+    return "Neutral" if roc.nil?
+    
+    if roc >= 5
+      "Positiv"
+    elsif roc <= -5
+      "Negativ"
+    else
+      "Neutral"
+    end
+  end
+
+  def roc_formatted
+    return "N/A" if roc.nil?
+    
+    sign = roc >= 0 ? "+" : ""
+    "#{sign}#{roc}%"
   end
 end 

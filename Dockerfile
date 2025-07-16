@@ -17,7 +17,7 @@ RUN apt-get update -qq && \
 WORKDIR /app
 
 # Copy Gemfile and install gems
-COPY Gemfile Gemfile.lock ./
+COPY Gemfile ./
 RUN bundle config set --local deployment 'false' && \
     bundle install
 

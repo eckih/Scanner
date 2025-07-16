@@ -42,6 +42,18 @@
         background-color: #fff3cd;
         color: #856404;
       }
+      .roc-positive {
+        background-color: #d1ecf1;
+        color: #0c5460;
+      }
+      .roc-negative {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .roc-neutral {
+        background-color: #e2e3e5;
+        color: #383d41;
+      }
       .live-indicator {
         display: inline-block;
         width: 8px;
@@ -114,6 +126,9 @@
           <ul class="navbar-nav ms-auto">
             <li class="nav-item">
               <%= link_to "Dashboard", root_path, class: "nav-link" %>
+            </li>
+            <li class="nav-item">
+              <%= link_to "Balance", balances_path, class: "nav-link" %>
             </li>
             <li class="nav-item">
               <%= link_to refresh_data_cryptocurrencies_path, method: :post, class: "nav-link" do %>
@@ -486,17 +501,28 @@
           // Benachrichtige alle Chart-Seiten über bevorstehende Aktualisierung
           localStorage.setItem('dataUpdateInProgress', 'true');
           
-          // Sende AJAX-Request für Datenaktualisierung
-          fetch('<%= refresh_data_cryptocurrencies_path %>', {
-            method: 'POST',
-            headers: {
-              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-              'Content-Type': 'application/json',
-              'Accept': 'text/html'
-            }
-          })
-          .then(response => {
-            if (response.ok) {
+          // Sende AJAX-Requests für Datenaktualisierung (Cryptocurrency + Balance)
+          Promise.all([
+            fetch('<%= refresh_data_cryptocurrencies_path %>', {
+              method: 'POST',
+              headers: {
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'text/html'
+              }
+            }),
+            fetch('<%= refresh_data_balances_path %>', {
+              method: 'POST',
+              headers: {
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'text/html'
+              }
+            })
+          ])
+          .then(responses => {
+            // Prüfe ob alle Requests erfolgreich waren
+            if (responses.every(response => response.ok)) {
               updateLastUpdateTime();
               if (countdownElement) {
                 countdownElement.textContent = 'Daten aktualisiert!';
@@ -513,7 +539,7 @@
                 window.location.reload();
               }, 1000);
             } else {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              throw new Error('Einer oder mehrere Requests fehlgeschlagen');
             }
           })
           .catch(error => {
@@ -618,17 +644,27 @@
               // Benachrichtige alle Chart-Seiten über bevorstehende Aktualisierung
               localStorage.setItem('dataUpdateInProgress', 'true');
               
-              // Führe Refresh aus
-              fetch('<%= refresh_data_cryptocurrencies_path %>', {
-                method: 'POST',
-                headers: {
-                  'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                  'Content-Type': 'application/json',
-                  'Accept': 'text/html'
-                }
-              })
-              .then(response => {
-                if (response.ok) {
+              // Führe Refresh aus (Cryptocurrency + Balance)
+              Promise.all([
+                fetch('<%= refresh_data_cryptocurrencies_path %>', {
+                  method: 'POST',
+                  headers: {
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/html'
+                  }
+                }),
+                fetch('<%= refresh_data_balances_path %>', {
+                  method: 'POST',
+                  headers: {
+                    'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/html'
+                  }
+                })
+              ])
+              .then(responses => {
+                if (responses.every(response => response.ok)) {
                   this.innerHTML = '<i class="bi bi-check-circle"></i> Aktualisiert!';
                   
                   // Benachrichtige alle Chart-Seiten über erfolgreiche Aktualisierung
@@ -642,7 +678,7 @@
                     window.location.reload();
                   }, 1000);
                 } else {
-                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                  throw new Error('Einer oder mehrere Requests fehlgeschlagen');
                 }
               })
               .catch(error => {
@@ -754,7 +790,8 @@
           const timeParts = timePart.split(':');
           
           if (dateParts.length === 3 && timeParts.length === 3) {
-            return new Date(
+            // Erstelle ein Datum in der deutschen Zeitzone
+            const germanDate = new Date(
               parseInt(dateParts[2]), // Jahr
               parseInt(dateParts[1]) - 1, // Monat (0-basiert)
               parseInt(dateParts[0]), // Tag
@@ -762,6 +799,9 @@
               parseInt(timeParts[1]), // Minute
               parseInt(timeParts[2])  // Sekunde
             );
+            
+            // Konvertiere zu lokaler Zeit in Deutschland
+            return new Date(germanDate.toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
           }
           
           return new Date(); // Fallback
@@ -790,17 +830,27 @@
           indicator.textContent = 'Aktualisiere Daten...';
           document.body.appendChild(indicator);
           
-          // Stille Aktualisierung
-          fetch('<%= refresh_data_cryptocurrencies_path %>', {
-            method: 'POST',
-            headers: {
-              'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-              'Content-Type': 'application/json',
-              'Accept': 'text/html'
-            }
-          })
-          .then(response => {
-            if (response.ok) {
+          // Stille Aktualisierung (Cryptocurrency + Balance)
+          Promise.all([
+            fetch('<%= refresh_data_cryptocurrencies_path %>', {
+              method: 'POST',
+              headers: {
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'text/html'
+              }
+            }),
+            fetch('<%= refresh_data_balances_path %>', {
+              method: 'POST',
+              headers: {
+                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Content-Type': 'application/json',
+                'Accept': 'text/html'
+              }
+            })
+          ])
+          .then(responses => {
+            if (responses.every(response => response.ok)) {
               indicator.textContent = 'Daten aktualisiert!';
               indicator.style.background = 'rgba(40,167,69,0.9)';
               
@@ -816,7 +866,7 @@
                 window.location.reload();
               }, 1500);
             } else {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              throw new Error('Einer oder mehrere Requests fehlgeschlagen');
             }
           })
           .catch(error => {

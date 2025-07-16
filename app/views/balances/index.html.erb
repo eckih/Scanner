@@ -1,0 +1,570 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-wallet2"></i> Balance Übersicht</h1>
+  <div class="d-flex gap-2">
+    <%= form_with url: refresh_data_balances_path, method: :post, class: "d-inline" do |form| %>
+      <%= form.submit "Daten aktualisieren", class: "btn btn-primary" %>
+    <% end %>
+    <button class="btn btn-outline-secondary" onclick="toggleAutoRefresh()">
+      <i class="bi bi-play-circle" id="auto-refresh-icon"></i> Auto-Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Status und Warnung -->
+<% if @update_needed %>
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>Daten sind veraltet!</strong> Die letzte Aktualisierung war vor mehr als 5 Minuten.
+    <%= form_with url: refresh_data_balances_path, method: :post, class: "d-inline" do |form| %>
+      <%= form.submit "Jetzt aktualisieren", class: "btn btn-sm btn-warning ms-2" %>
+    <% end %>
+  </div>
+<% end %>
+
+<!-- Gesamt-Balance Cards -->
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card bg-primary text-white">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-currency-dollar"></i> Gesamt USD</h5>
+        <h3 class="card-text">
+          <%= @total_balance&.formatted_usd || "$0.00" %>
+        </h3>
+        <small class="text-light opacity-75">
+          Letzte Aktualisierung: <%= format_german_time_short(@last_update) || 'Nie' %>
+        </small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="card bg-warning text-dark">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-currency-bitcoin"></i> Gesamt BTC</h5>
+        <h3 class="card-text">
+          <%= @total_balance&.formatted_btc || "0.00000000 BTC" %>
+        </h3>
+        <small class="text-dark opacity-75">
+          Bitcoin-Äquivalent
+        </small>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="card bg-success text-white">
+      <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-graph-up"></i> Assets</h5>
+        <h3 class="card-text">
+          <%= @assets_with_balance.size %>
+        </h3>
+        <small class="text-light opacity-75">
+          Assets mit Balance > 0
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart-Bereich -->
+<div class="row mb-4">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5><i class="bi bi-graph-up"></i> Balance-Verlauf (USD)</h5>
+          <div class="d-flex gap-2">
+            <select id="assetSelect" class="form-select form-select-sm" style="width: auto;">
+              <option value="TOTAL">Gesamt-Balance</option>
+              <% @assets_with_balance.each do |asset| %>
+                <option value="<%= asset %>"><%= asset %></option>
+              <% end %>
+            </select>
+            <select id="timeRangeSelect" class="form-select form-select-sm" style="width: auto;">
+              <option value="6">6 Stunden</option>
+              <option value="12">12 Stunden</option>
+              <option value="24" selected>24 Stunden</option>
+              <option value="72">3 Tage</option>
+              <option value="168">1 Woche</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="chart-container" style="position: relative; height: 400px;">
+          <canvas id="balanceChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Asset-Verteilungs-Kuchendiagramm -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="bi bi-pie-chart"></i> Asset-Verteilung</h5>
+        <small class="text-muted">Anteil nach USD-Wert</small>
+      </div>
+      <div class="card-body">
+        <% if @asset_balances.any? %>
+          <div class="chart-container" style="position: relative; height: 350px;">
+            <canvas id="assetPieChart"></canvas>
+          </div>
+          
+          <!-- Legende -->
+          <div class="mt-3">
+            <div class="row" id="pieChartLegend">
+              <!-- Wird dynamisch gefüllt -->
+            </div>
+          </div>
+        <% else %>
+          <div class="text-center py-4">
+            <i class="bi bi-pie-chart text-muted" style="font-size: 3rem;"></i>
+            <p class="text-muted mt-2">Keine Assets verfügbar</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Assets-Übersicht -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="bi bi-list-ul"></i> Asset-Details</h5>
+      </div>
+      <div class="card-body">
+        <% if @asset_balances.any? %>
+          <div class="table-responsive">
+            <table class="table table-hover" id="balanceTable">
+              <thead>
+                <tr>
+                  <th>Asset</th>
+                  <th data-type="num">Gesamt</th>
+                  <th data-type="num">Verfügbar</th>
+                  <th data-type="num">Gesperrt</th>
+                  <th data-type="num">BTC-Wert</th>
+                  <th data-type="num">USD-Wert</th>
+                  <th data-orderable="false">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @asset_balances.each do |balance| %>
+                  <tr>
+                    <td>
+                      <strong><%= balance.asset %></strong>
+                    </td>
+                    <td data-sort="<%= balance.total_balance.to_f %>">
+                      <%= balance.formatted_balance_detailed %>
+                    </td>
+                    <td data-sort="<%= balance.free_balance.to_f %>">
+                      <%= balance.formatted_free_balance_detailed %>
+                    </td>
+                    <td data-sort="<%= balance.locked_balance.to_f %>">
+                      <%= balance.formatted_locked_balance_detailed %>
+                    </td>
+                    <td data-sort="<%= balance.total_btc.to_f %>">
+                      <% if balance.total_btc > 0.01 %>
+                        <%= balance.total_btc.round(2) %> BTC
+                      <% else %>
+                        <%= balance.total_btc.round(8).to_s.sub(/\.?0+$/, '') %> BTC
+                      <% end %>
+                    </td>
+                    <td data-sort="<%= balance.total_usd.to_f %>">
+                      <%= balance.formatted_usd %>
+                    </td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary" onclick="showAssetChart('<%= balance.asset %>')">
+                        <i class="bi bi-graph-up"></i> Chart
+                      </button>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <div class="text-center py-4">
+            <i class="bi bi-wallet2 text-muted" style="font-size: 3rem;"></i>
+            <p class="text-muted mt-2">Keine Balance-Daten verfügbar</p>
+            <%= form_with url: refresh_data_balances_path, method: :post, class: "d-inline" do |form| %>
+              <%= form.submit "Daten laden", class: "btn btn-primary" %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let balanceChart = null;
+let assetPieChart = null;
+
+// Asset-Daten für Pie-Chart
+const assetData = [
+  <% @asset_balances.each do |balance| %>
+  {
+    asset: '<%= balance.asset %>',
+    usd: <%= balance.total_usd.to_f %>,
+    percentage: 0 // Wird berechnet
+  },
+  <% end %>
+];
+
+// Farben für Asset-Pie-Chart
+const assetColors = [
+  '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+  '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384',
+  '#36A2EB', '#FFCE56', '#9966FF', '#FF9F40', '#C9CBCF'
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+  initializeChart();
+  initializePieChart();
+  
+  // Event-Listener für Selects
+  document.getElementById('assetSelect').addEventListener('change', updateChart);
+  document.getElementById('timeRangeSelect').addEventListener('change', updateChart);
+});
+
+function initializeChart() {
+  const ctx = document.getElementById('balanceChart').getContext('2d');
+  
+  balanceChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Gesamt USD-Wert',
+          data: [],
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          tension: 0.1,
+          fill: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false,
+      },
+      scales: {
+        x: {
+          display: true,
+          title: {
+            display: true,
+            text: 'Zeit'
+          }
+        },
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'USD-Wert'
+          },
+          ticks: {
+            callback: function(value, index, values) {
+              return '$' + value.toFixed(2);
+            }
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) {
+                label += ': ';
+              }
+              label += '$' + context.parsed.y.toFixed(2);
+              return label;
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  // Lade initiale Daten
+  updateChart();
+}
+
+function initializePieChart() {
+  <% if @asset_balances.any? %>
+    const ctx = document.getElementById('assetPieChart').getContext('2d');
+    
+    // Berechne Gesamtwert
+    const totalUSD = assetData.reduce((sum, asset) => sum + asset.usd, 0);
+    
+    // Berechne Prozentanteile
+    assetData.forEach(asset => {
+      asset.percentage = totalUSD > 0 ? (asset.usd / totalUSD * 100) : 0;
+    });
+    
+    // Sortiere nach USD-Wert (größte zuerst)
+    assetData.sort((a, b) => b.usd - a.usd);
+    
+    // Nehme nur Assets mit > 1% Anteil für bessere Lesbarkeit
+    const significantAssets = assetData.filter(asset => asset.percentage >= 1);
+    const otherAssets = assetData.filter(asset => asset.percentage < 1);
+    
+    let chartData = [...significantAssets];
+    
+    // Füge "Andere" Kategorie hinzu, wenn es kleine Assets gibt
+    if (otherAssets.length > 0) {
+      const otherSum = otherAssets.reduce((sum, asset) => sum + asset.usd, 0);
+      chartData.push({
+        asset: `Andere (${otherAssets.length})`,
+        usd: otherSum,
+        percentage: totalUSD > 0 ? (otherSum / totalUSD * 100) : 0
+      });
+    }
+    
+    assetPieChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: chartData.map(asset => asset.asset),
+        datasets: [{
+          data: chartData.map(asset => asset.usd),
+          backgroundColor: assetColors.slice(0, chartData.length),
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false // Wir erstellen eine eigene Legende
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const asset = chartData[context.dataIndex];
+                return `${asset.asset}: $${asset.usd.toFixed(2)} (${asset.percentage.toFixed(1)}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Erstelle eigene Legende
+    createPieChartLegend(chartData);
+  <% end %>
+}
+
+function createPieChartLegend(data) {
+  const legendContainer = document.getElementById('pieChartLegend');
+  legendContainer.innerHTML = '';
+  
+  data.forEach((asset, index) => {
+    const legendItem = document.createElement('div');
+    legendItem.className = 'col-12 mb-1';
+    
+    const color = assetColors[index];
+    legendItem.innerHTML = `
+      <div class="d-flex align-items-center">
+        <div style="width: 12px; height: 12px; background-color: ${color}; margin-right: 8px; border-radius: 2px;"></div>
+        <small class="flex-grow-1">
+          <strong>${asset.asset}</strong><br>
+          $${asset.usd.toFixed(2)} (${asset.percentage.toFixed(1)}%)
+        </small>
+      </div>
+    `;
+    
+    legendContainer.appendChild(legendItem);
+  });
+}
+
+function updateChart() {
+  const asset = document.getElementById('assetSelect').value;
+  const hours = document.getElementById('timeRangeSelect').value;
+  
+  fetch(`/balances/chart_data?asset=${asset}&hours=${hours}`)
+    .then(response => response.json())
+    .then(data => {
+      const labels = data.data.map(point => {
+        const date = new Date(point.timestamp);
+        return date.toLocaleString('de-DE', {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      });
+      
+      const usdData = data.data.map(point => point.usd);
+      
+      // Aktualisiere die Legende basierend auf dem ausgewählten Asset
+      if (asset === 'TOTAL') {
+        balanceChart.data.datasets[0].label = 'Gesamt USD-Wert';
+      } else {
+        balanceChart.data.datasets[0].label = `${asset} USD-Wert`;
+      }
+      
+      balanceChart.data.labels = labels;
+      balanceChart.data.datasets[0].data = usdData;
+      
+      balanceChart.update();
+    })
+    .catch(error => {
+      console.error('Fehler beim Laden der Chart-Daten:', error);
+    });
+}
+
+function showAssetChart(asset) {
+  document.getElementById('assetSelect').value = asset;
+  updateChart();
+  
+  // Scrolle zum Chart
+  document.getElementById('balanceChart').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Lausche auf localStorage Events für Datenaktualisierungen von der Hauptseite
+window.addEventListener('storage', function(e) {
+  if (e.key === 'dataUpdated') {
+    console.log('Datenaktualisierung erkannt, aktualisiere Balance-Daten...');
+    
+    // Zeige kurzen Hinweis
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(40,167,69,0.95);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 9999;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      animation: slideIn 0.3s ease-out;
+    `;
+    notification.innerHTML = '<i class="bi bi-check-circle me-2"></i>Daten aktualisiert - Lade Balance neu...';
+    
+    // CSS Animation hinzufügen
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(notification);
+    
+    // Nach kurzer Verzögerung Seite neu laden
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  }
+});
+
+// Prüfe beim Laden der Balance-Seite, ob gerade eine Aktualisierung läuft
+if (localStorage.getItem('dataUpdateInProgress') === 'true') {
+  console.log('Datenaktualisierung läuft, warte auf Abschluss...');
+  
+  const waitingNotification = document.createElement('div');
+  waitingNotification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0,123,255,0.95);
+    color: white;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 9999;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  `;
+  waitingNotification.innerHTML = '<i class="bi bi-arrow-clockwise spin me-2"></i>Datenaktualisierung läuft...';
+  document.body.appendChild(waitingNotification);
+}
+
+// DataTables Initialisierung für Balance-Tabelle - warte auf jQuery
+function initializeBalanceTable() {
+  <% if @asset_balances.any? %>
+    if (typeof $ !== 'undefined' && $('#balanceTable').length) {
+      $('#balanceTable').DataTable({
+        "language": {
+          "lengthMenu": "Zeige _MENU_ Einträge pro Seite",
+          "zeroRecords": "Keine Einträge gefunden",
+          "info": "Zeige _START_ bis _END_ von _TOTAL_ Einträgen",
+          "infoEmpty": "Keine Einträge verfügbar",
+          "infoFiltered": "(gefiltert von _MAX_ Einträgen)",
+          "search": "Suchen:",
+          "paginate": {
+            "first": "Erste",
+            "last": "Letzte",
+            "next": "Nächste",
+            "previous": "Vorherige"
+          }
+        },
+        "order": [[ 5, "desc" ]], // Sortiere nach USD-Wert absteigend
+        "pageLength": 25,
+        "responsive": true,
+        "columnDefs": [
+          {
+            "targets": [1, 2, 3, 4, 5], // Numerische Spalten
+            "type": "num"
+          },
+          {
+            "targets": [6], // Aktionen-Spalte
+            "orderable": false,
+            "searchable": false
+          }
+        ],
+        "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+               '<"row"<"col-sm-12"tr>>' +
+               '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        "initComplete": function () {
+          // Bootstrap-Styling für DataTables Elemente
+          $('#balanceTable_wrapper .dataTables_filter input').addClass('form-control form-control-sm');
+          $('#balanceTable_wrapper .dataTables_length select').addClass('form-select form-select-sm');
+          
+          // Zusätzliche Styling-Verbesserungen
+          $('#balanceTable_wrapper .dataTables_filter label').addClass('form-label');
+          $('#balanceTable_wrapper .dataTables_length label').addClass('form-label');
+        }
+      });
+    }
+  <% end %>
+}
+
+// Initialisiere die Tabelle, wenn jQuery verfügbar ist
+if (typeof $ !== 'undefined') {
+  $(document).ready(initializeBalanceTable);
+} else {
+  // Warte auf jQuery, falls es noch nicht geladen ist
+  document.addEventListener('DOMContentLoaded', function() {
+    // Warte eine kurze Zeit für jQuery
+    setTimeout(function() {
+      if (typeof $ !== 'undefined') {
+        initializeBalanceTable();
+      } else {
+        console.warn('jQuery not available for DataTables initialization');
+      }
+    }, 100);
+  });
+}
+</script> 

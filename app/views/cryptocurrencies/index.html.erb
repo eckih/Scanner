@@ -4,15 +4,28 @@
       <h1 class="display-4">
         <i class="bi bi-currency-bitcoin text-warning"></i>
         Top 50 Kryptowährungen
-        <small class="text-muted fs-6">USDC-Paare • 1h RSI</small>
+        <small class="text-muted fs-6">USDC-Paare • 1h RSI • <%= CryptocurrenciesController::ROC_PERIOD %>h ROC</small>
       </h1>
       
       <div class="text-end">
+        <div class="mb-2">
+          <div class="d-flex gap-2 justify-content-end">
+            <%= form_with url: refresh_data_cryptocurrencies_path, method: :post, class: "d-inline" do |form| %>
+              <%= form.submit "Daten aktualisieren", class: "btn btn-primary btn-sm" %>
+            <% end %>
+            <%= form_with url: update_roc_cryptocurrencies_path, method: :post, class: "d-inline" do |form| %>
+              <%= form.submit "ROC aktualisieren", class: "btn btn-warning btn-sm" %>
+            <% end %>
+            <%= link_to settings_cryptocurrencies_path, class: "btn btn-outline-secondary btn-sm" do %>
+              <i class="bi bi-gear"></i> Einstellungen
+            <% end %>
+          </div>
+        </div>
         <% if @last_update %>
           <div class="mb-2">
             <small class="text-muted">
               <i class="bi bi-clock"></i> Letzte Aktualisierung: 
-              <strong><%= @last_update.strftime("%d.%m.%Y %H:%M:%S") %></strong>
+              <strong><%= format_german_time(@last_update) %></strong>
             </small>
           </div>
           <div class="mb-2">
@@ -47,6 +60,7 @@
             <th>Market Cap</th>
             <th>Volumen 24h (USD)</th>
             <th>RSI (1h)</th>
+            <th>ROC (<%= CryptocurrenciesController::ROC_PERIOD %>h)</th>
           </tr>
         </thead>
         <tbody>
@@ -103,6 +117,20 @@
                   <span class="badge bg-secondary">N/A</span>
                 <% end %>
               </td>
+              <td data-sort="<%= crypto.roc || -1 %>">
+                <% if crypto.roc %>
+                  <%= link_to chart_cryptocurrency_path(crypto), 
+                      target: '_blank',
+                      class: 'text-decoration-none',
+                      title: 'Chart anzeigen' do %>
+                    <span class="badge <%= crypto.roc_color_class %> chart-link">
+                      <%= crypto.roc_formatted %>
+                    </span>
+                  <% end %>
+                <% else %>
+                  <span class="badge bg-secondary">N/A</span>
+                <% end %>
+              </td>
             </tr>
           <% end %>
         </tbody>
@@ -137,7 +165,7 @@
               </div>
               
               <div class="row">
-                <div class="col-6">
+                <div class="col-4">
                   <small class="text-muted">24h Änderung</small><br>
                   <span class="<%= crypto.price_change_color_class %>">
                     <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
@@ -148,7 +176,7 @@
                     <%= crypto.price_change_percentage_24h_formatted %>
                   </span>
                 </div>
-                <div class="col-6">
+                <div class="col-4">
                   <small class="text-muted">RSI (1h)</small><br>
                   <% if crypto.rsi %>
                     <% rsi_class = if crypto.rsi <= 30
@@ -164,6 +192,21 @@
                         title: 'Chart anzeigen' do %>
                       <span class="badge <%= rsi_class %> chart-link">
                         <%= crypto.rsi %>
+                      </span>
+                    <% end %>
+                  <% else %>
+                    <span class="badge bg-secondary">N/A</span>
+                  <% end %>
+                </div>
+                <div class="col-4">
+                  <small class="text-muted">ROC (<%= CryptocurrenciesController::ROC_PERIOD %>h)</small><br>
+                  <% if crypto.roc %>
+                    <%= link_to chart_cryptocurrency_path(crypto), 
+                        target: '_blank',
+                        class: 'text-decoration-none',
+                        title: 'Chart anzeigen' do %>
+                      <span class="badge <%= crypto.roc_color_class %> chart-link">
+                        <%= crypto.roc_formatted %>
                       </span>
                     <% end %>
                   <% else %>
@@ -189,26 +232,48 @@
     </div>
   </div>
 
-  <!-- RSI Legend -->
+  <!-- RSI & ROC Legend -->
   <div class="row mt-4">
     <div class="col-12">
       <div class="card">
         <div class="card-header">
-          <h5 class="mb-0">RSI Legende (1h Timeframe)</h5>
+          <h5 class="mb-0">Indikator Legende</h5>
         </div>
         <div class="card-body">
           <div class="row">
-            <div class="col-md-4">
-              <span class="badge rsi-oversold me-2">≤ 30</span>
-              <strong>Überverkauft</strong> - Potentieller Kaufsignal
+            <div class="col-md-6">
+              <h6>RSI (1h Timeframe)</h6>
+              <div class="row">
+                <div class="col-md-4">
+                  <span class="badge rsi-oversold me-2">≤ 30</span>
+                  <strong>Überverkauft</strong> - Potentieller Kaufsignal
+                </div>
+                <div class="col-md-4">
+                  <span class="badge rsi-neutral me-2">31-69</span>
+                  <strong>Neutral</strong> - Normale Marktbedingungen
+                </div>
+                <div class="col-md-4">
+                  <span class="badge rsi-overbought me-2">≥ 70</span>
+                  <strong>Überkauft</strong> - Potentieller Verkaufssignal
+                </div>
+              </div>
             </div>
-            <div class="col-md-4">
-              <span class="badge rsi-neutral me-2">31-69</span>
-              <strong>Neutral</strong> - Normale Marktbedingungen
-            </div>
-            <div class="col-md-4">
-              <span class="badge rsi-overbought me-2">≥ 70</span>
-              <strong>Überkauft</strong> - Potentieller Verkaufssignal
+            <div class="col-md-6">
+              <h6>ROC (14h Timeframe)</h6>
+              <div class="row">
+                <div class="col-md-4">
+                  <span class="badge roc-positive me-2">≥ +5%</span>
+                  <strong>Positiv</strong> - Starke Aufwärtsbewegung
+                </div>
+                <div class="col-md-4">
+                  <span class="badge roc-neutral me-2">-5% bis +5%</span>
+                  <strong>Neutral</strong> - Normale Volatilität
+                </div>
+                <div class="col-md-4">
+                  <span class="badge roc-negative me-2">≤ -5%</span>
+                  <strong>Negativ</strong> - Starke Abwärtsbewegung
+                </div>
+              </div>
             </div>
           </div>
         </div>
