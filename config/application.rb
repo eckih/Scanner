@@ -10,7 +10,7 @@ Bundler.require(*Rails.groups)
 module Scanner
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 7.0
+    config.load_defaults 7.1
 
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
@@ -20,16 +20,13 @@ module Scanner
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
-    # in config/environments/, which are processed later.
+    # in config/environments, which are processed later.
     #
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
     
-    # Lade das CryptoConfig Modul global
-    config.autoload_paths << Rails.root.join('app', 'models', 'concerns')
-    
-    # Setze die Zeitzone auf Berlin (MEZ/MESZ)
-    config.time_zone = 'Europe/Berlin'
+    # Configure Active Job to use Sidekiq
+    config.active_job.queue_adapter = :sidekiq
   end
 end
 

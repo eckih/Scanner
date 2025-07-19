@@ -1,0 +1,10 @@
+:concurrency: 5
+:queues:
+  - [default, 1]
+  - [mailers, 2]
+  - [crypto_updates, 3]
+
+:redis:
+  :url: <%= ENV.fetch("REDIS_URL") { "redis://localhost:6379/0" } %>
+
+:logfile: ./log/sidekiq.log 

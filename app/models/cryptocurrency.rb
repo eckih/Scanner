@@ -7,12 +7,27 @@ class Cryptocurrency < ApplicationRecord
   
   # Explizit roc-Attribut definieren
   attribute :roc, :decimal, default: nil
+  attribute :roc_derivative, :decimal, default: nil
+  
+  # Beziehungen - temporär deaktiviert um Seeds-Fehler zu beheben
+  # has_many :crypto_history_data, class_name: 'CryptoHistoryDatum', dependent: :destroy
+  # has_many :rsi_histories, dependent: :destroy
+  # has_many :roc_histories, dependent: :destroy
+  # has_many :roc_derivative_histories, dependent: :destroy
   
   scope :top_50, -> { order(:market_cap_rank).limit(50) }
   scope :by_market_cap, -> { order(market_cap: :desc) }
   
   def self.refresh_from_api
     FreqtradeApiService.new.fetch_top_cryptocurrencies
+  end
+  
+  def calculate_trends
+    # Berechne Trends basierend auf aktuellen Werten
+    # Für jetzt simulieren wir es
+    @rsi_trend_icon = "bi-arrow-right text-muted"
+    @roc_trend_icon = "bi-arrow-right text-muted"
+    @roc_derivative_trend_icon = "bi-arrow-right text-muted"
   end
   
   def base_symbol
@@ -128,5 +143,49 @@ class Cryptocurrency < ApplicationRecord
     
     sign = roc >= 0 ? "+" : ""
     "#{sign}#{roc}%"
+  end
+
+  def roc_derivative_color_class
+    return "roc-derivative-neutral" if roc_derivative.nil?
+    
+    if roc_derivative >= 1
+      "roc-derivative-positive"
+    elsif roc_derivative <= -1
+      "roc-derivative-negative"
+    else
+      "roc-derivative-neutral"
+    end
+  end
+
+  def roc_derivative_signal
+    return "Neutral" if roc_derivative.nil?
+    
+    if roc_derivative >= 1
+      "Beschleunigung"
+    elsif roc_derivative <= -1
+      "Verlangsamung"
+    else
+      "Stabil"
+    end
+  end
+
+  def roc_derivative_formatted
+    return "N/A" if roc_derivative.nil?
+    
+    sign = roc_derivative >= 0 ? "+" : ""
+    "#{sign}#{roc_derivative.round(2)}"
+  end
+
+  # Einfache Hilfsmethoden für Trend-Anzeige
+  def has_rsi?
+    rsi.present? && rsi > 0
+  end
+
+  def has_roc?
+    roc.present? && roc != 0
+  end
+
+  def has_roc_derivative?
+    roc_derivative.present? && roc_derivative != 0
   end
 end 

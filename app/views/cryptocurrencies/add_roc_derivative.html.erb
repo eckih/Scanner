@@ -1,0 +1,44 @@
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-md-6 offset-md-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="bi bi-database"></i>
+            Datenbank-Spalte hinzufügen
+          </h5>
+        </div>
+        <div class="card-body">
+          <p class="text-muted">
+            Diese Seite fügt die <code>roc_derivative</code> Spalte zur <code>cryptocurrencies</code> Tabelle hinzu.
+          </p>
+          
+          <% if @column_exists %>
+            <div class="alert alert-success">
+              <i class="bi bi-check-circle"></i>
+              <strong>Erfolg!</strong> Die Spalte <code>roc_derivative</code> existiert bereits in der Datenbank.
+            </div>
+          <% elsif @column_added %>
+            <div class="alert alert-success">
+              <i class="bi bi-check-circle"></i>
+              <strong>Erfolg!</strong> Die Spalte <code>roc_derivative</code> wurde erfolgreich hinzugefügt.
+            </div>
+          <% else %>
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle"></i>
+              Die Spalte <code>roc_derivative</code> existiert noch nicht. Klicken Sie auf den Button, um sie hinzuzufügen.
+            </div>
+            
+            <%= form_with url: add_roc_derivative_cryptocurrencies_path, method: :post, local: true do |form| %>
+              <%= form.submit "Spalte hinzufügen", class: "btn btn-primary" %>
+            <% end %>
+          <% end %>
+          
+          <div class="mt-3">
+            <%= link_to "Zurück zur Übersicht", cryptocurrencies_path, class: "btn btn-outline-secondary" %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 

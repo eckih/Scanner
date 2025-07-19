@@ -4,12 +4,23 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   root "cryptocurrencies#index"
   
+  # Database viewer route (nur in Development)
+  if Rails.env.development?
+    get '/database', to: 'database#index'
+    # Sidekiq Web Interface
+    require 'sidekiq/web'
+    mount Sidekiq::Web => '/sidekiq'
+  end
+  
   resources :cryptocurrencies, only: [:index, :show] do
     collection do
       post :refresh_data
       post :update_roc
       get :settings
       patch :update_settings
+      get :add_roc_derivative
+      post :add_roc_derivative
+      get :averages_chart
     end
     member do
       get :chart

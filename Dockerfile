@@ -1,13 +1,10 @@
-FROM ruby:3.2.8-slim
+FROM ruby:3.3.0-slim
 
 # Install system dependencies
-RUN apt-get update -qq && \
-    apt-get install -y \
-    build-essential \
+RUN apt-get update -qq && apt-get install -y \
+    sqlite3 \
     nodejs \
     npm \
-    sqlite3 \
-    libsqlite3-dev \
     git \
     curl \
     libyaml-dev \
@@ -17,22 +14,20 @@ RUN apt-get update -qq && \
 WORKDIR /app
 
 # Copy Gemfile and install gems
-COPY Gemfile ./
-RUN bundle config set --local deployment 'false' && \
-    bundle install
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
 
 # Copy application code
 COPY . .
 
-# Create necessary directories and set permissions
-RUN mkdir -p tmp/pids tmp/cache tmp/sockets log db && \
-    chmod -R 755 tmp log db
+# Create necessary directories
+RUN mkdir -p tmp/pids tmp/sockets log
 
-# Precompile assets (if needed)
-RUN RAILS_ENV=development bundle exec rails assets:precompile || true
+# Set permissions
+RUN chmod -R 755 /app
 
 # Expose port
 EXPOSE 3000
 
-# Start command
-CMD ["bash", "-c", "bundle exec rails db:create RAILS_ENV=development || true && bundle exec rails db:migrate RAILS_ENV=development || true && bundle exec rails server -b 0.0.0.0 -e development"] 
+# Start the application
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-e", "development"] 

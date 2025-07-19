@@ -1,26 +1,135 @@
-<div class="row">
-  <div class="col-12">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h1 class="display-4">
-        <i class="bi bi-currency-bitcoin text-warning"></i>
-        Top 50 Kryptowährungen
-        <small class="text-muted fs-6">USDC-Paare • 1h RSI • <%= CryptocurrenciesController::ROC_PERIOD %>h ROC</small>
-      </h1>
-      
-      <div class="text-end">
-        <div class="mb-2">
-          <div class="d-flex gap-2 justify-content-end">
-            <%= form_with url: refresh_data_cryptocurrencies_path, method: :post, class: "d-inline" do |form| %>
-              <%= form.submit "Daten aktualisieren", class: "btn btn-primary btn-sm" %>
-            <% end %>
-            <%= form_with url: update_roc_cryptocurrencies_path, method: :post, class: "d-inline" do |form| %>
-              <%= form.submit "ROC aktualisieren", class: "btn btn-warning btn-sm" %>
-            <% end %>
-            <%= link_to settings_cryptocurrencies_path, class: "btn btn-outline-secondary btn-sm" do %>
-              <i class="bi bi-gear"></i> Einstellungen
-            <% end %>
-          </div>
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Kryptowährungen Scanner</h1>
+        <div class="btn-group" role="group">
+          <%= link_to "Daten aktualisieren", refresh_data_cryptocurrencies_path, method: :post, class: "btn btn-primary", data: { confirm: "Datenaktualisierung im Hintergrund starten?" } %>
+          <%= link_to "ROC berechnen", update_roc_cryptocurrencies_path, method: :post, class: "btn btn-secondary", data: { confirm: "ROC-Berechnung im Hintergrund starten?" } %>
+          <%= link_to "Einstellungen", settings_cryptocurrencies_path, class: "btn btn-outline-secondary" %>
         </div>
+      </div>
+
+      <!-- Background Job Status -->
+      <div class="alert alert-info" id="job-status" style="display: none;">
+        <i class="bi bi-arrow-clockwise spin"></i>
+        <span id="job-message">Background-Job läuft...</span>
+      </div>
+
+      <!-- Success/Error Messages -->
+      <% if notice %>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <%= notice %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% end %>
+
+      <% if alert %>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <%= alert %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% end %>
+        
+        <!-- Durchschnittswerte -->
+        <% if @average_rsi || @average_roc || @average_roc_derivative %>
+          <div class="mb-2">
+            <div class="d-flex gap-3 justify-content-end">
+              <% if @average_rsi %>
+                <% rsi_trend_icon = case @rsi_trend
+                                     when 'up' then 'bi-arrow-up-right text-success'
+                                     when 'down' then 'bi-arrow-down-right text-danger'
+                                     else 'bi-arrow-right text-muted'
+                                   end %>
+                <small class="text-info averages-tooltip" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-html="true"
+                       data-bs-placement="bottom"
+                       data-bs-custom-class="chart-tooltip"
+                       data-chart-type="rsi"
+                       title="<div class='text-center'>
+                         <strong>RSI Durchschnitt</strong><br>
+                         <span class='h5 text-info'><%= @average_rsi %></span><br>
+                         <small class='text-muted'>Relative Strength Index</small><br>
+                         <div class='mt-2'>
+                           <i class='bi <%= rsi_trend_icon %>'></i>
+                           <small class='text-muted ms-1'>Trend: <%= @rsi_trend == 'up' ? 'Anstieg' : (@rsi_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
+                         </div>
+                         <div class='mt-2'>
+                           <canvas id='rsi-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
+                         </div>
+                       </div>">
+                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-info' do %>
+                    <i class="bi bi-speedometer2"></i> RSI Ø: <strong><%= @average_rsi %></strong>
+                    <i class="bi <%= rsi_trend_icon %> ms-1"></i>
+                  <% end %>
+                </small>
+              <% end %>
+              <% if @average_roc %>
+                <% roc_trend_icon = case @roc_trend
+                                     when 'up' then 'bi-arrow-up-right text-success'
+                                     when 'down' then 'bi-arrow-down-right text-danger'
+                                     else 'bi-arrow-right text-muted'
+                                   end %>
+                <small class="text-warning averages-tooltip" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-html="true"
+                       data-bs-placement="bottom"
+                       data-bs-custom-class="chart-tooltip"
+                       data-chart-type="roc"
+                       title="<div class='text-center'>
+                         <strong>ROC Durchschnitt</strong><br>
+                         <span class='h5 text-warning'><%= @average_roc %>%</span><br>
+                         <small class='text-muted'>Rate of Change</small><br>
+                         <div class='mt-2'>
+                           <i class='bi <%= roc_trend_icon %>'></i>
+                           <small class='text-muted ms-1'>Trend: <%= @roc_trend == 'up' ? 'Anstieg' : (@roc_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
+                         </div>
+                         <div class='mt-2'>
+                           <canvas id='roc-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
+                         </div>
+                       </div>">
+                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-warning' do %>
+                    <i class="bi bi-arrow-up-right"></i> ROC Ø: <strong><%= @average_roc %>%</strong>
+                    <i class="bi <%= roc_trend_icon %> ms-1"></i>
+                  <% end %>
+                </small>
+              <% end %>
+              <% if @average_roc_derivative %>
+                <% roc_derivative_trend_icon = case @roc_derivative_trend
+                                                 when 'up' then 'bi-arrow-up-right text-success'
+                                                 when 'down' then 'bi-arrow-down-right text-danger'
+                                                 else 'bi-arrow-right text-muted'
+                                               end %>
+                <small class="text-success averages-tooltip" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-html="true"
+                       data-bs-placement="bottom"
+                       data-bs-custom-class="chart-tooltip"
+                       data-chart-type="roc-derivative"
+                       title="<div class='text-center'>
+                         <strong>ROC' Durchschnitt</strong><br>
+                         <span class='h5 text-success'><%= @average_roc_derivative %>%</span><br>
+                         <small class='text-muted'>ROC-Ableitung</small><br>
+                         <div class='mt-2'>
+                           <i class='bi <%= roc_derivative_trend_icon %>'></i>
+                           <small class='text-muted ms-1'>Trend: <%= @roc_derivative_trend == 'up' ? 'Anstieg' : (@roc_derivative_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
+                         </div>
+                         <div class='mt-2'>
+                           <canvas id='roc-derivative-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
+                         </div>
+                       </div>">
+                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-success' do %>
+                    <i class="bi bi-arrow-up-right"></i> ROC' Ø: <strong><%= @average_roc_derivative %>%</strong>
+                    <i class="bi <%= roc_derivative_trend_icon %> ms-1"></i>
+                  <% end %>
+                </small>
+              <% end %>
+            </div>
+          </div>
+          
+
+        <% end %>
         <% if @last_update %>
           <div class="mb-2">
             <small class="text-muted">
@@ -46,190 +155,207 @@
 </div>
 
 <% if @cryptocurrencies.any? %>
-  <!-- Desktop Table View -->
-  <div class="d-none d-lg-block">
-    <div class="table-responsive">
-      <table id="crypto-table" class="table table-hover">
-        <thead class="table-dark">
+  <!-- Responsive Table View (alle Bildschirmgrößen) -->
+  <div class="table-responsive">
+    <table id="crypto-table" class="table table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th class="d-none d-md-table-cell">Rang</th>
+          <th class="d-none d-lg-table-cell">Name</th>
+          <th>Symbol</th>
+          <th>Preis</th>
+          <th class="d-none d-lg-table-cell">24h Änderung</th>
+          <th class="d-none d-xl-table-cell">Market Cap</th>
+          <th class="d-none d-xl-table-cell">Volumen 24h (USD)</th>
+          <th>
+            RSI (1h)
+            <% if @average_rsi %>
+              <br><small class="text-info d-none d-md-inline">Ø <%= @average_rsi %></small>
+            <% end %>
+          </th>
+          <th>
+            ROC (<%= CryptocurrenciesController::ROC_PERIOD %>h)
+            <% if @average_roc %>
+              <br><small class="text-info d-none d-md-inline">Ø <%= @average_roc %>%</small>
+            <% end %>
+          </th>
+          <th>
+            ROC' (<%= CryptocurrenciesController::ROC_PERIOD %>h)
+            <% if @average_roc_derivative %>
+              <br><small class="text-info d-none d-md-inline">Ø <%= @average_roc_derivative %>%</small>
+            <% end %>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @cryptocurrencies.each_with_index do |crypto, crypto_index| %>
           <tr>
-            <th>Rang</th>
-            <th>Name</th>
-            <th>Symbol</th>
-            <th>Preis</th>
-            <th>24h Änderung</th>
-            <th>Market Cap</th>
-            <th>Volumen 24h (USD)</th>
-            <th>RSI (1h)</th>
-            <th>ROC (<%= CryptocurrenciesController::ROC_PERIOD %>h)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @cryptocurrencies.each do |crypto| %>
-            <tr>
-              <td><span class="badge bg-secondary">#<%= crypto.market_cap_rank %></span></td>
-              <td>
-                <strong><%= crypto.name %></strong>
-              </td>
-              <td>
+            <td class="d-none d-md-table-cell">
+              <span class="badge bg-secondary">#<%= crypto.market_cap_rank %></span>
+            </td>
+            <td class="d-none d-lg-table-cell">
+              <strong><%= crypto.name %></strong>
+            </td>
+            <td>
+              <%= link_to "https://www.binance.com/en/trade/#{crypto.base_symbol}_USDC?_from=markets&type=spot", 
+                  target: '_blank',
+                  class: 'text-decoration-none',
+                  title: "#{crypto.name} auf Binance handeln" do %>
                 <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
-              </td>
-              <td data-sort="<%= crypto.current_price || 0 %>">
-                <strong>
-                  <%= link_to crypto.formatted_current_price, 
-                      chart_cryptocurrency_path(crypto), 
-                      target: '_blank',
-                      class: 'text-decoration-none text-primary chart-link',
-                      title: 'Chart anzeigen' %>
-                </strong>
-              </td>
-              <td>
-                <span class="<%= crypto.price_change_color_class %>">
-                  <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
-                    <i class="bi bi-arrow-up"></i>
-                  <% elsif crypto.price_change_percentage_24h %>
-                    <i class="bi bi-arrow-down"></i>
-                  <% end %>
-                  <%= crypto.price_change_percentage_24h_formatted %>
-                </span>
-              </td>
-              <td><%= crypto.formatted_market_cap %></td>
-              <td>
-                <%= crypto.formatted_volume_24h %>
-              </td>
-              <td data-sort="<%= crypto.rsi || -1 %>">
-                <% if crypto.rsi %>
-                  <% rsi_class = if crypto.rsi <= 30
-                                   "rsi-oversold"
-                                 elsif crypto.rsi >= 70
-                                   "rsi-overbought"
-                                 else
-                                   "rsi-neutral"
-                                 end %>
-                  <%= link_to chart_cryptocurrency_path(crypto), 
-                      target: '_blank',
-                      class: 'text-decoration-none',
-                      title: 'Chart anzeigen' do %>
-                    <span class="badge <%= rsi_class %> chart-link">
-                      <%= crypto.rsi %>
-                    </span>
-                  <% end %>
-                <% else %>
-                  <span class="badge bg-secondary">N/A</span>
+              <% end %>
+              <span class="d-md-none">
+                <br><small class="text-muted">#<%= crypto.market_cap_rank %></small>
+              </span>
+            </td>
+            <td data-sort="<%= crypto.current_price || 0 %>">
+              <strong>
+                <%= link_to crypto.formatted_current_price, 
+                    chart_cryptocurrency_path(crypto), 
+                    target: '_blank',
+                    class: 'text-decoration-none text-primary chart-link',
+                    title: 'Chart anzeigen' %>
+              </strong>
+            </td>
+            <td class="d-none d-lg-table-cell">
+              <span class="<%= crypto.price_change_color_class %>">
+                <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
+                  <i class="bi bi-arrow-up"></i>
+                <% elsif crypto.price_change_percentage_24h %>
+                  <i class="bi bi-arrow-down"></i>
                 <% end %>
-              </td>
-              <td data-sort="<%= crypto.roc || -1 %>">
-                <% if crypto.roc %>
-                  <%= link_to chart_cryptocurrency_path(crypto), 
-                      target: '_blank',
-                      class: 'text-decoration-none',
-                      title: 'Chart anzeigen' do %>
-                    <span class="badge <%= crypto.roc_color_class %> chart-link">
-                      <%= crypto.roc_formatted %>
-                    </span>
-                  <% end %>
-                <% else %>
-                  <span class="badge bg-secondary">N/A</span>
-                <% end %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Mobile Card View -->
-  <div class="d-lg-none">
-    <div class="row">
-      <% @cryptocurrencies.each do |crypto| %>
-        <div class="col-12 mb-3">
-          <div class="card crypto-card">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-start mb-2">
-                <div>
-                  <h5 class="card-title mb-1">
-                    <span class="badge bg-secondary me-2">#<%= crypto.market_cap_rank %></span>
-                    <%= crypto.name %>
-                  </h5>
-                  <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
-                </div>
-                <div class="text-end">
-                  <strong class="h5">
-                    <%= link_to crypto.formatted_current_price, 
-                        chart_cryptocurrency_path(crypto), 
-                        target: '_blank',
-                        class: 'text-decoration-none text-primary chart-link',
-                        title: 'Chart anzeigen' %>
-                  </strong>
-                </div>
-              </div>
-              
-              <div class="row">
-                <div class="col-4">
-                  <small class="text-muted">24h Änderung</small><br>
-                  <span class="<%= crypto.price_change_color_class %>">
-                    <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
-                      <i class="bi bi-arrow-up"></i>
-                    <% elsif crypto.price_change_percentage_24h %>
-                      <i class="bi bi-arrow-down"></i>
-                    <% end %>
-                    <%= crypto.price_change_percentage_24h_formatted %>
-                  </span>
-                </div>
-                <div class="col-4">
-                  <small class="text-muted">RSI (1h)</small><br>
-                  <% if crypto.rsi %>
-                    <% rsi_class = if crypto.rsi <= 30
-                                     "rsi-oversold"
-                                   elsif crypto.rsi >= 70
-                                     "rsi-overbought"
-                                   else
-                                     "rsi-neutral"
+                <%= crypto.price_change_percentage_24h_formatted %>
+              </span>
+            </td>
+            <td class="d-none d-xl-table-cell"><%= crypto.formatted_market_cap %></td>
+            <td class="d-none d-xl-table-cell">
+              <%= crypto.formatted_volume_24h %>
+            </td>
+            <td data-sort="<%= crypto.rsi || -1 %>">
+              <% if crypto.rsi %>
+                <% rsi_class = if crypto.rsi <= 30
+                                 "rsi-oversold"
+                               elsif crypto.rsi >= 70
+                                 "rsi-overbought"
+                               else
+                                 "rsi-neutral"
+                               end %>
+                <%# Verwende echte Trend-Daten aus dem Controller %>
+                <% rsi_trend_icon = crypto.instance_variable_get(:@rsi_trend_icon) || "bi-arrow-right text-muted" %>
+                <% rsi_trend_text = case rsi_trend_icon
+                                     when /text-success/ then "Anstieg"
+                                     when /text-danger/ then "Rückgang"
+                                     else "Gleichbleibend"
                                    end %>
-                    <%= link_to chart_cryptocurrency_path(crypto), 
-                        target: '_blank',
-                        class: 'text-decoration-none',
-                        title: 'Chart anzeigen' do %>
-                      <span class="badge <%= rsi_class %> chart-link">
-                        <%= crypto.rsi %>
-                      </span>
-                    <% end %>
-                  <% else %>
-                    <span class="badge bg-secondary">N/A</span>
-                  <% end %>
-                </div>
-                <div class="col-4">
-                  <small class="text-muted">ROC (<%= CryptocurrenciesController::ROC_PERIOD %>h)</small><br>
-                  <% if crypto.roc %>
-                    <%= link_to chart_cryptocurrency_path(crypto), 
-                        target: '_blank',
-                        class: 'text-decoration-none',
-                        title: 'Chart anzeigen' do %>
-                      <span class="badge <%= crypto.roc_color_class %> chart-link">
-                        <%= crypto.roc_formatted %>
-                      </span>
-                    <% end %>
-                  <% else %>
-                    <span class="badge bg-secondary">N/A</span>
-                  <% end %>
-                </div>
-              </div>
-              
-              <div class="row mt-2">
-                <div class="col-6">
-                  <small class="text-muted">Market Cap</small><br>
-                  <strong><%= crypto.formatted_market_cap %></strong>
-                </div>
-                <div class="col-6">
-                  <small class="text-muted">Volumen 24h</small><br>
-                  <strong><%= crypto.formatted_volume_24h %></strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      <% end %>
-    </div>
+                <%# Hole vorherigen Wert aus dem Cache %>
+                <% cache_key = "crypto_history_#{crypto.id}" %>
+                <% historical_data = Rails.cache.read(cache_key) %>
+                <% previous_rsi = historical_data&.last&.dig(:rsi) %>
+                <% tooltip_text = if previous_rsi
+                                   rsi_difference = crypto.rsi - previous_rsi
+                                   difference_text = if rsi_difference > 0
+                                                      "(+#{rsi_difference.round(2)})"
+                                                    elsif rsi_difference < 0
+                                                      "(#{rsi_difference.round(2)})"
+                                                    else
+                                                      "(0.00)"
+                                                    end
+                                   "Vorheriger Wert: #{previous_rsi.round(2)} #{difference_text}"
+                                 else
+                                   "Keine historischen Daten verfügbar"
+                                 end %>
+                <%= link_to chart_cryptocurrency_path(crypto), 
+                    target: '_blank',
+                    class: 'text-decoration-none',
+                    title: tooltip_text do %>
+                  <i class="bi <%= rsi_trend_icon %> me-1"></i>
+                  <span class="badge <%= rsi_class %> chart-link">
+                    <%= crypto.rsi %>
+                  </span>
+                <% end %>
+              <% else %>
+                <span class="badge bg-secondary">N/A</span>
+              <% end %>
+            </td>
+            
+            <td data-sort="<%= crypto.roc || -1 %>">
+              <% if crypto.roc %>
+                <%# Verwende echte Trend-Daten aus dem Controller %>
+                <% roc_trend_icon = crypto.instance_variable_get(:@roc_trend_icon) || "bi-arrow-right text-muted" %>
+                <% roc_trend_text = case roc_trend_icon
+                                     when /text-success/ then "Anstieg"
+                                     when /text-danger/ then "Rückgang"
+                                     else "Gleichbleibend"
+                                   end %>
+                <%# Hole vorherigen Wert aus dem Cache %>
+                <% previous_roc = historical_data&.last&.dig(:roc) %>
+                <% tooltip_text = if previous_roc
+                                   roc_difference = crypto.roc - previous_roc
+                                   difference_text = if roc_difference > 0
+                                                      "(+#{roc_difference.round(2)}%)"
+                                                    elsif roc_difference < 0
+                                                      "(#{roc_difference.round(2)}%)"
+                                                    else
+                                                      "(0.00%)"
+                                                    end
+                                   "Vorheriger Wert: #{previous_roc.round(2)}% #{difference_text}"
+                                 else
+                                   "Keine historischen Daten verfügbar"
+                                 end %>
+                <%= link_to chart_cryptocurrency_path(crypto), 
+                    target: '_blank',
+                    class: 'text-decoration-none',
+                    title: tooltip_text do %>
+                  <i class="bi <%= roc_trend_icon %> me-1"></i>
+                  <span class="badge <%= crypto.roc_color_class %> chart-link">
+                    <%= crypto.roc_formatted %>
+                  </span>
+                <% end %>
+              <% else %>
+                <span class="badge bg-secondary">N/A</span>
+              <% end %>
+            </td>
+            
+            <td data-sort="<%= crypto.roc_derivative || -1 %>">
+              <% if crypto.roc_derivative %>
+                <%# Verwende echte Trend-Daten aus dem Controller %>
+                <% roc_derivative_trend_icon = crypto.instance_variable_get(:@roc_derivative_trend_icon) || "bi-arrow-right text-muted" %>
+                <% roc_derivative_trend_text = case roc_derivative_trend_icon
+                                                 when /text-success/ then "Anstieg"
+                                                 when /text-danger/ then "Rückgang"
+                                                 else "Gleichbleibend"
+                                               end %>
+                <%# Hole vorherigen Wert aus dem Cache %>
+                <% previous_roc_derivative = historical_data&.last&.dig(:roc_derivative) %>
+                <% tooltip_text = if previous_roc_derivative
+                                   roc_derivative_difference = crypto.roc_derivative - previous_roc_derivative
+                                   difference_text = if roc_derivative_difference > 0
+                                                      "(+#{roc_derivative_difference.round(3)})"
+                                                    elsif roc_derivative_difference < 0
+                                                      "(#{roc_derivative_difference.round(3)})"
+                                                    else
+                                                      "(0.000)"
+                                                    end
+                                   "Vorheriger Wert: #{previous_roc_derivative.round(3)} #{difference_text}"
+                                 else
+                                   "Keine historischen Daten verfügbar"
+                                 end %>
+                <%= link_to chart_cryptocurrency_path(crypto), 
+                    target: '_blank',
+                    class: 'text-decoration-none',
+                    title: tooltip_text do %>
+                  <i class="bi <%= roc_derivative_trend_icon %> me-1"></i>
+                  <span class="badge <%= crypto.roc_derivative_color_class %> chart-link">
+                    <%= crypto.roc_derivative_formatted %>
+                  </span>
+                <% end %>
+              <% else %>
+                <span class="badge bg-secondary">N/A</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
   </div>
 
   <!-- RSI & ROC Legend -->
@@ -276,6 +402,42 @@
               </div>
             </div>
           </div>
+          <div class="row mt-3">
+            <div class="col-md-6">
+              <h6>ROC' (14h Timeframe)</h6>
+              <div class="row">
+                <div class="col-md-4">
+                  <span class="badge roc-derivative-positive me-2">≥ +1</span>
+                  <strong>Beschleunigung</strong> - Zunehmende Dynamik
+                </div>
+                <div class="col-md-4">
+                  <span class="badge roc-derivative-neutral me-2">-1 bis +1</span>
+                  <strong>Stabil</strong> - Gleichbleibende Dynamik
+                </div>
+                <div class="col-md-4">
+                  <span class="badge roc-derivative-negative me-2">≤ -1</span>
+                  <strong>Verlangsamung</strong> - Abnehmende Dynamik
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <h6>Trend-Pfeile</h6>
+              <div class="row">
+                <div class="col-md-4">
+                  <i class="bi bi-arrow-up-right text-success me-2"></i>
+                  <strong>Anstieg</strong> - Höherer Wert
+                </div>
+                <div class="col-md-4">
+                  <i class="bi bi-arrow-down-right text-danger me-2"></i>
+                  <strong>Rückgang</strong> - Niedrigerer Wert
+                </div>
+                <div class="col-md-4">
+                  <i class="bi bi-arrow-right text-muted me-2"></i>
+                  <strong>Gleich</strong> - Gleicher Wert
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -295,4 +457,153 @@
       <i class="bi bi-arrow-clockwise"></i> Daten laden
     <% end %>
   </div>
-<% end %> 
+<% end %>
+
+<!-- Tooltip-Initialisierung für Durchschnittswerte -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Chart-Daten für Tooltips
+  var chartData = {
+    rsi: <%= raw @rsi_chart_data.to_json %>,
+    roc: <%= raw @roc_chart_data.to_json %>,
+    rocDerivative: <%= raw @roc_derivative_chart_data.to_json %>
+  };
+  
+  console.log('Chart-Daten geladen:', chartData);
+
+  // Initialisiere Bootstrap Tooltips
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('.averages-tooltip'));
+  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl, {
+      html: true,
+      placement: 'bottom',
+      trigger: 'hover',
+      customClass: 'chart-tooltip',
+      template: '<div class="tooltip chart-tooltip" role="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
+    });
+  });
+
+  // Event-Listener für Tooltip-Anzeige
+  document.addEventListener('show.bs.tooltip', function (event) {
+    var tooltip = event.target;
+    var chartType = tooltip.getAttribute('data-chart-type');
+    
+    console.log('Tooltip geöffnet für Chart-Typ:', chartType);
+    
+    setTimeout(function() {
+      var tooltipElement = document.querySelector('.tooltip-inner');
+      
+      if (tooltipElement) {
+        console.log('Tooltip-Element gefunden, erstelle Chart...');
+        
+        var chartId = '';
+        var chartDataArray = [];
+        var chartColor = '';
+        
+        switch(chartType) {
+          case 'rsi':
+            chartId = 'rsi-chart';
+            chartDataArray = chartData.rsi;
+            chartColor = '#17a2b8';
+            break;
+          case 'roc':
+            chartId = 'roc-chart';
+            chartDataArray = chartData.roc;
+            chartColor = '#ffc107';
+            break;
+          case 'roc-derivative':
+            chartId = 'roc-derivative-chart';
+            chartDataArray = chartData.rocDerivative;
+            chartColor = '#28a745';
+            break;
+        }
+        
+        console.log('Suche nach Canvas mit ID:', chartId);
+        
+        if (chartId && chartDataArray && chartDataArray.length > 0) {
+          var chartCanvas = tooltipElement.querySelector('#' + chartId);
+          if (chartCanvas) {
+            console.log('Chart Canvas gefunden für', chartType, 'Daten:', chartDataArray);
+            createMiniChart(chartCanvas, chartDataArray, chartColor);
+          } else {
+            console.log('Chart Canvas nicht gefunden für', chartType);
+            console.log('Verfügbare Canvas-Elemente im Tooltip:');
+            var allCanvases = tooltipElement.querySelectorAll('canvas');
+            allCanvases.forEach(function(canvas, index) {
+              console.log('Canvas', index, 'ID:', canvas.id, 'Element:', canvas);
+            });
+          }
+        } else {
+          console.log('Keine Daten für Chart-Typ:', chartType);
+        }
+      } else {
+        console.log('Tooltip-Element nicht gefunden');
+      }
+    }, 300);
+  });
+});
+
+// Funktion zum Erstellen von Mini-Charts
+function createMiniChart(canvas, data, color) {
+  console.log('Erstelle Mini-Chart mit Daten:', data, 'Farbe:', color);
+  
+  var ctx = canvas.getContext('2d');
+  var width = canvas.width;
+  var height = canvas.height;
+  
+  console.log('Canvas Dimensionen:', width, 'x', height);
+  
+  // Lösche vorherige Zeichnung
+  ctx.clearRect(0, 0, width, height);
+  
+  if (!data || data.length < 2) {
+    console.log('Nicht genügend Daten für Chart');
+    return;
+  }
+  
+  // Berechne Skalierung
+  var min = Math.min(...data);
+  var max = Math.max(...data);
+  var range = max - min;
+  if (range === 0) range = 1;
+  
+  console.log('Chart Skalierung - Min:', min, 'Max:', max, 'Range:', range);
+  
+  // Zeichne Hintergrund
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  ctx.fillRect(0, 0, width, height);
+  
+  // Zeichne Linie
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  
+  data.forEach(function(value, index) {
+    var x = (index / (data.length - 1)) * width;
+    var y = height - ((value - min) / range) * height;
+    
+    console.log(`Punkt ${index}: (${x}, ${y}) - Wert: ${value}`);
+    
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  
+  ctx.stroke();
+  
+  // Zeichne Punkte
+  ctx.fillStyle = color;
+  data.forEach(function(value, index) {
+    var x = (index / (data.length - 1)) * width;
+    var y = height - ((value - min) / range) * height;
+    
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, 2 * Math.PI);
+    ctx.fill();
+  });
+  
+  console.log('Mini-Chart erstellt');
+}
+</script> 

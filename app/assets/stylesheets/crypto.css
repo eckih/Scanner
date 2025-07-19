@@ -1,0 +1,76 @@
+/* Kryptowährungs-Styles */
+
+/* RSI Badge Styles */
+.rsi-oversold {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+.rsi-overbought {
+  background-color: #fd7e14 !important;
+  color: white !important;
+}
+
+.rsi-neutral {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+/* ROC Badge Styles */
+.roc-positive {
+  background-color: #28a745 !important;
+  color: white !important;
+}
+
+.roc-negative {
+  background-color: #dc3545 !important;
+  color: white !important;
+}
+
+.roc-neutral {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+/* ROC Derivative Badge Styles */
+.roc-derivative-positive {
+  background-color: #20c997 !important;
+  color: white !important;
+}
+
+.roc-derivative-negative {
+  background-color: #e83e8c !important;
+  color: white !important;
+}
+
+.roc-derivative-neutral {
+  background-color: #6c757d !important;
+  color: white !important;
+}
+
+/* Chart Link Hover Effect */
+.chart-link:hover {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+/* Crypto Card Styles */
+.crypto-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.crypto-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Table Hover Effect */
+.table-hover tbody tr:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+/* Badge Hover Effect */
+.badge:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+} 

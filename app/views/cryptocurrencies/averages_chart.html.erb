@@ -1,0 +1,452 @@
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="display-4">
+          <i class="bi bi-graph-up text-primary"></i>
+          Historische Durchschnittswerte
+          <small class="text-muted fs-6">RSI • ROC • ROC'</small>
+        </h1>
+        
+        <div class="text-end">
+          <div class="mb-2">
+            <%= link_to cryptocurrencies_path, class: "btn btn-outline-secondary btn-sm" do %>
+              <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+            <% end %>
+          </div>
+          
+          <% if @current_averages[:rsi] || @current_averages[:roc] || @current_averages[:roc_derivative] %>
+            <div class="mb-2">
+              <div class="d-flex gap-3 justify-content-end">
+                <% if @current_averages[:rsi] %>
+                  <small class="text-info">
+                    <i class="bi bi-speedometer2"></i> Aktueller RSI Ø: <strong><%= @current_averages[:rsi] %></strong>
+                  </small>
+                <% end %>
+                <% if @current_averages[:roc] %>
+                  <small class="text-warning">
+                    <i class="bi bi-arrow-up-right"></i> Aktueller ROC Ø: <strong><%= @current_averages[:roc] %>%</strong>
+                  </small>
+                <% end %>
+                <% if @current_averages[:roc_derivative] %>
+                  <small class="text-success">
+                    <i class="bi bi-arrow-up-right"></i> Aktueller ROC' Ø: <strong><%= @current_averages[:roc_derivative] %></strong>
+                  </small>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zeitrahmen-Auswahl -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-center">
+            <div class="btn-group" role="group">
+              <button type="button" class="btn btn-outline-primary active" data-timeframe="24h">24 Stunden</button>
+              <button type="button" class="btn btn-outline-primary" data-timeframe="7d">7 Tage</button>
+              <button type="button" class="btn btn-outline-primary" data-timeframe="30d">30 Tage</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if @chart_data && @chart_data[:labels].any? %>
+    <div class="row">
+      <!-- RSI Chart -->
+      <% if @chart_data[:rsi_data].compact.any? %>
+        <div class="col-lg-4 mb-4">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
+                <i class="bi bi-speedometer2 text-info"></i> RSI Durchschnitt
+              </h5>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="rsiAutoScale" checked>
+                <label class="form-check-label small" for="rsiAutoScale">
+                  Auto-Scale
+                </label>
+              </div>
+            </div>
+            <div class="card-body">
+              <canvas id="rsi-chart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- ROC Chart -->
+      <% if @chart_data[:roc_data].compact.any? %>
+        <div class="col-lg-4 mb-4">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
+                <i class="bi bi-graph-up text-warning"></i> ROC Durchschnitt
+              </h5>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="rocAutoScale" checked>
+                <label class="form-check-label small" for="rocAutoScale">
+                  Auto-Scale
+                </label>
+              </div>
+            </div>
+            <div class="card-body">
+              <canvas id="roc-chart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <!-- ROC' Chart -->
+      <% if @chart_data[:roc_derivative_data].compact.any? %>
+        <div class="col-lg-4 mb-4">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
+                <i class="bi bi-graph-up text-success"></i> ROC' Durchschnitt
+              </h5>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="rocDerivativeAutoScale" checked>
+                <label class="form-check-label small" for="rocDerivativeAutoScale">
+                  Auto-Scale
+                </label>
+              </div>
+            </div>
+            <div class="card-body">
+              <canvas id="roc-derivative-chart" width="400" height="200"></canvas>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Chart JavaScript -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        let rsiChart, rocChart, rocDerivativeChart;
+        let currentTimeframe = '24h';
+        
+        // Auto-Scale Variablen
+        let rsiAutoScale = true;
+        let rocAutoScale = true;
+        let rocDerivativeAutoScale = true;
+
+        // Chart-Daten für verschiedene Zeitrahmen
+        const chartDataByTimeframe = {
+          '24h': <%= raw @chart_data.to_json %>,
+          '7d': <%= raw @chart_data_7d&.to_json || 'null' %>,
+          '30d': <%= raw @chart_data_30d&.to_json || 'null' %>
+        };
+
+        // Chart-Konfiguration
+        const chartConfig = {
+          type: 'line',
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+                borderWidth: 1
+              }
+            },
+            scales: {
+              x: {
+                type: 'time',
+                time: {
+                  unit: 'hour',
+                  displayFormats: {
+                    hour: 'MMM dd, HH:mm'
+                  }
+                },
+                display: true,
+                title: {
+                  display: true,
+                  text: 'Zeit',
+                  color: '#333'
+                },
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                  color: '#333',
+                  maxRotation: 45
+                }
+              },
+              y: {
+                display: true,
+                grid: {
+                  color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                  color: '#333',
+                  callback: function(value, index, values) {
+                    return value.toFixed(2);
+                  }
+                }
+              }
+            },
+            interaction: {
+              mode: 'nearest',
+              axis: 'x',
+              intersect: false
+            }
+          }
+        };
+
+        // Initialisiere Charts
+        function initializeCharts() {
+          const data = chartDataByTimeframe[currentTimeframe];
+          if (!data) return;
+
+          // RSI Chart
+          if (data.rsi_data && data.rsi_data.compact && data.rsi_data.compact.any) {
+            const rsiCtx = document.getElementById('rsi-chart').getContext('2d');
+            rsiChart = new Chart(rsiCtx, {
+              ...chartConfig,
+              data: {
+                labels: data.labels,
+                datasets: [{
+                  label: 'RSI Durchschnitt',
+                  data: data.rsi_data,
+                  borderColor: '#17a2b8',
+                  backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.4,
+                  pointRadius: 0,
+                  pointHoverRadius: 4
+                }]
+              },
+              options: {
+                ...chartConfig.options,
+                scales: {
+                  ...chartConfig.options.scales,
+                  y: {
+                    ...chartConfig.options.scales.y,
+                    title: {
+                      display: true,
+                      text: 'RSI',
+                      color: '#333'
+                    },
+                    min: 0,
+                    max: 100,
+                    grid: {
+                      color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    ticks: {
+                      color: '#333',
+                      callback: function(value, index, values) {
+                        return value.toFixed(1);
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+
+          // ROC Chart
+          if (data.roc_data && data.roc_data.compact && data.roc_data.compact.any) {
+            const rocCtx = document.getElementById('roc-chart').getContext('2d');
+            rocChart = new Chart(rocCtx, {
+              ...chartConfig,
+              data: {
+                labels: data.labels,
+                datasets: [{
+                  label: 'ROC Durchschnitt',
+                  data: data.roc_data,
+                  borderColor: '#ffc107',
+                  backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.4,
+                  pointRadius: 0,
+                  pointHoverRadius: 4
+                }]
+              },
+              options: {
+                ...chartConfig.options,
+                scales: {
+                  ...chartConfig.options.scales,
+                  y: {
+                    ...chartConfig.options.scales.y,
+                    title: {
+                      display: true,
+                      text: 'ROC (%)',
+                      color: '#333'
+                    },
+                    min: undefined,
+                    max: undefined,
+                    grid: {
+                      color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    ticks: {
+                      color: '#333',
+                      callback: function(value, index, values) {
+                        return value.toFixed(2) + '%';
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+
+          // ROC' Chart
+          if (data.roc_derivative_data && data.roc_derivative_data.compact && data.roc_derivative_data.compact.any) {
+            const rocDerivativeCtx = document.getElementById('roc-derivative-chart').getContext('2d');
+            rocDerivativeChart = new Chart(rocDerivativeCtx, {
+              ...chartConfig,
+              data: {
+                labels: data.labels,
+                datasets: [{
+                  label: 'ROC\' Durchschnitt',
+                  data: data.roc_derivative_data,
+                  borderColor: '#28a745',
+                  backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                  borderWidth: 2,
+                  fill: true,
+                  tension: 0.4,
+                  pointRadius: 0,
+                  pointHoverRadius: 4
+                }]
+              },
+              options: {
+                ...chartConfig.options,
+                scales: {
+                  ...chartConfig.options.scales,
+                  y: {
+                    ...chartConfig.options.scales.y,
+                    title: {
+                      display: true,
+                      text: 'ROC\'',
+                      color: '#333'
+                    },
+                    min: undefined,
+                    max: undefined,
+                    grid: {
+                      color: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    ticks: {
+                      color: '#333',
+                      callback: function(value, index, values) {
+                        return value.toFixed(3);
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+        }
+
+        // Zeitrahmen-Event-Listener
+        document.querySelectorAll('[data-timeframe]').forEach(button => {
+          button.addEventListener('click', function() {
+            // Aktive Klasse entfernen
+            document.querySelectorAll('[data-timeframe]').forEach(btn => btn.classList.remove('active'));
+            // Aktive Klasse hinzufügen
+            this.classList.add('active');
+            
+            // Zeitrahmen aktualisieren
+            currentTimeframe = this.dataset.timeframe;
+            
+            // Charts zerstören und neu erstellen
+            if (rsiChart) rsiChart.destroy();
+            if (rocChart) rocChart.destroy();
+            if (rocDerivativeChart) rocDerivativeChart.destroy();
+            
+            // Charts neu initialisieren
+            initializeCharts();
+          });
+        });
+
+        // Auto-Scale Event Listeners
+        document.getElementById('rsiAutoScale')?.addEventListener('change', function() {
+          rsiAutoScale = this.checked;
+          updateRsiChartScale();
+        });
+
+        document.getElementById('rocAutoScale')?.addEventListener('change', function() {
+          rocAutoScale = this.checked;
+          updateRocChartScale();
+        });
+
+        document.getElementById('rocDerivativeAutoScale')?.addEventListener('change', function() {
+          rocDerivativeAutoScale = this.checked;
+          updateRocDerivativeChartScale();
+        });
+
+        // Auto-Scale Funktionen
+        function updateRsiChartScale() {
+          if (rsiChart) {
+            if (rsiAutoScale) {
+              rsiChart.options.scales.y.min = undefined;
+              rsiChart.options.scales.y.max = undefined;
+            } else {
+              rsiChart.options.scales.y.min = 0;
+              rsiChart.options.scales.y.max = 100;
+            }
+            rsiChart.update();
+          }
+        }
+
+        function updateRocChartScale() {
+          if (rocChart) {
+            if (rocAutoScale) {
+              rocChart.options.scales.y.min = undefined;
+              rocChart.options.scales.y.max = undefined;
+            } else {
+              rocChart.options.scales.y.min = -100;
+              rocChart.options.scales.y.max = 100;
+            }
+            rocChart.update();
+          }
+        }
+
+        function updateRocDerivativeChartScale() {
+          if (rocDerivativeChart) {
+            if (rocDerivativeAutoScale) {
+              rocDerivativeChart.options.scales.y.min = undefined;
+              rocDerivativeChart.options.scales.y.max = undefined;
+            } else {
+              rocDerivativeChart.options.scales.y.min = -100;
+              rocDerivativeChart.options.scales.y.max = 100;
+            }
+            rocDerivativeChart.update();
+          }
+        }
+
+        // Initialisiere Charts beim Laden
+        initializeCharts();
+      });
+    </script>
+  <% else %>
+    <div class="row">
+      <div class="col-12">
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i>
+          <strong>Keine historischen Daten verfügbar</strong><br>
+          Es sind noch keine Durchschnittswerte in der Datenbank gespeichert. 
+          Die Durchschnittswerte werden automatisch bei jedem Seitenaufruf der Hauptseite gespeichert.
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div> 

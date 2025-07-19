@@ -52,6 +52,16 @@ class BinanceService
         
         puts "Updated #{crypto.name} - Price: $#{crypto.current_price}, RSI: #{crypto.rsi}, Volume: $#{crypto.volume_24h}"
         
+        # Speichere historische Daten (nur für die ersten 10 Coins um Performance zu optimieren)
+        if index < 10
+          begin
+            store_historical_data_for_crypto(crypto, 100) # 100 Perioden
+            puts "Stored historical data for #{crypto.name}"
+          rescue => e
+            puts "Error storing historical data for #{crypto.name}: #{e.message}"
+          end
+        end
+        
         # Kleine Pause um Rate Limits zu vermeiden
         sleep(0.1)
         
@@ -173,8 +183,14 @@ class BinanceService
         }
       end
       
-      # Berechne RSI für mehrere Zeitrahmen (1m, 15m, 1h)
-      multi_rsi_values = get_multi_timeframe_rsi_for_chart_data(symbol, chart_data)
+          # Berechne RSI für mehrere Zeitrahmen (15m, 1h)
+    multi_rsi_values = get_multi_timeframe_rsi_for_chart_data(symbol, chart_data)
+    
+    # Berechne ROC für mehrere Zeitrahmen (15m, 1h)
+    multi_roc_values = get_multi_timeframe_roc_for_chart_data(symbol, chart_data)
+    
+    # Berechne ROC-Ableitung für mehrere Zeitrahmen (15m, 1h)
+    multi_roc_derivative_values = get_multi_timeframe_roc_derivative_for_chart_data(symbol, chart_data)
       
       # Berechne Moving Averages basierend auf Chart-Daten
       closes = chart_data.map { |data| data[:close] }
@@ -185,9 +201,12 @@ class BinanceService
       
       # Füge alle Indikatoren zu den Chart-Daten hinzu
       chart_data.each_with_index do |data, index|
-        data[:rsi_1m] = multi_rsi_values['1m'][index]
         data[:rsi_15m] = multi_rsi_values['15m'][index]
         data[:rsi_1h] = multi_rsi_values['1h'][index]
+        data[:roc_15m] = multi_roc_values['15m'][index]
+        data[:roc_1h] = multi_roc_values['1h'][index]
+        data[:roc_derivative_15m] = multi_roc_derivative_values['15m'][index]
+        data[:roc_derivative_1h] = multi_roc_derivative_values['1h'][index]
         data[:ema_20] = ema_20[index]
         data[:ema_200] = ema_200[index]
         data[:sma_20_volume] = sma_20_volume[index]
@@ -283,19 +302,18 @@ class BinanceService
     rsi_values
   end
 
-  # Neue Methode: Hole RSI-Daten für mehrere Zeitrahmen (1m, 15m, 1h)
+  # Neue Methode: Hole RSI-Daten für mehrere Zeitrahmen (15m, 1h)
   def self.get_multi_timeframe_rsi_for_chart_data(symbol, chart_data)
-    puts "Fetching multi-timeframe RSI data for #{symbol} (1m, 15m, 1h)"
+    puts "Fetching multi-timeframe RSI data for #{symbol} (15m, 1h)"
     
     rsi_data = {}
-    timeframes = ['1m', '15m', '1h']
+    timeframes = ['15m', '1h']
     
     timeframes.each do |timeframe|
       puts "Fetching #{timeframe} RSI data for #{symbol}"
       
       # Bestimme wie viele Tage zurück wir gehen müssen
       days_back = case timeframe
-                  when '1m' then 3   # 3 Tage für 1m (genug Daten)
                   when '15m' then 7  # 7 Tage für 15m
                   when '1h' then 30  # 30 Tage für 1h
                   end
@@ -401,9 +419,13 @@ class BinanceService
     Cryptocurrency.find_each do |crypto|
       begin
         roc = calculate_roc_for_symbol(crypto.symbol, '1h')
+        roc_derivative = calculate_roc_derivative_for_symbol(crypto.symbol, '1h')
         
-        if roc
-          Cryptocurrency.where(id: crypto.id).update_all(roc: roc)
+        if roc || roc_derivative
+          Cryptocurrency.where(id: crypto.id).update_all(
+            roc: roc,
+            roc_derivative: roc_derivative
+          )
         end
         
         # Kleine Pause um Rate Limits zu vermeiden
@@ -559,6 +581,23 @@ class BinanceService
     roc.round(2)
   end
 
+  def self.calculate_roc_derivative(closes, period = ROC_PERIOD)
+    return nil if closes.length < period + 2
+    
+    # Berechne ROC für aktuelle Periode
+    current_roc = calculate_roc(closes, period)
+    return nil if current_roc.nil?
+    
+    # Berechne ROC für vorherige Periode (um 1 Periode verschoben)
+    previous_closes = closes[0...-1]
+    previous_roc = calculate_roc(previous_closes, period)
+    return nil if previous_roc.nil?
+    
+    # ROC-Ableitung = Differenz zwischen aktuellem und vorherigem ROC
+    roc_derivative = current_roc - previous_roc
+    roc_derivative.round(2)
+  end
+
   def self.calculate_roc_for_symbol(symbol, interval = DEFAULT_INTERVAL, period = ROC_PERIOD)
     # Mehr Kline-Daten für genauere ROC-Berechnung abrufen
     response = get("/api/v3/klines", query: {
@@ -584,13 +623,112 @@ class BinanceService
     return nil
   end
 
+  def self.calculate_roc_derivative_for_symbol(symbol, interval = DEFAULT_INTERVAL, period = ROC_PERIOD)
+    # Mehr Kline-Daten für genauere ROC-Ableitungs-Berechnung abrufen
+    response = get("/api/v3/klines", query: {
+      symbol: symbol,
+      interval: interval,
+      limit: 150  # Mehr Daten für Ableitungs-Berechnung
+    })
+
+    if response.success?
+      klines = response.parsed_response
+      closes = klines.map { |kline| kline[4].to_f }  # Close price ist Index 4
+      
+      if closes.length >= period + 2
+        roc_derivative = calculate_roc_derivative(closes, period)
+        return roc_derivative
+      else
+        return nil
+      end
+    else
+      return nil
+    end
+  rescue => e
+    return nil
+  end
+
+  def self.store_historical_data_for_crypto(cryptocurrency, period = 100)
+    puts "Storing historical data for #{cryptocurrency.symbol} (period: #{period})"
+    
+    intervals = %w[1h 4h 1d] # Verschiedene Intervalle für verschiedene Zeiträume
+    
+    intervals.each do |interval|
+      begin
+        # Hole historische Daten von Binance
+        start_time = case interval
+                    when '1h' then "#{period} hours ago UTC"
+                    when '4h' then "#{period * 4} hours ago UTC"
+                    when '1d' then "#{period} days ago UTC"
+                    else "#{period} hours ago UTC"
+                    end
+        
+        chart_data = get_historical_data(cryptocurrency.symbol, interval, start_time)
+        next if chart_data.empty?
+        
+        # Speichere die Daten in der Datenbank
+        chart_data.each do |data|
+          next unless data[:close] && data[:close] > 0
+          
+          # Berechne RSI, ROC und ROC' für diesen Datenpunkt
+          rsi = data[:rsi_1h] || calculate_rsi_for_timestamp(cryptocurrency.symbol, data[:timestamp], interval)
+          roc = data[:roc_1h] || calculate_roc_for_timestamp(cryptocurrency.symbol, data[:timestamp], interval)
+          roc_derivative = data[:roc_derivative_1h] || calculate_roc_derivative_for_timestamp(cryptocurrency.symbol, data[:timestamp], interval)
+          
+          # Erstelle historischen Datensatz
+          CryptoHistoryData.record_data(cryptocurrency, {
+            timestamp: Time.at(data[:timestamp] / 1000),
+            open: data[:open],
+            high: data[:high],
+            low: data[:low],
+            close: data[:close],
+            volume: data[:volume],
+            rsi: rsi,
+            roc: roc,
+            roc_derivative: roc_derivative
+          }, interval)
+        end
+        
+        puts "Stored #{chart_data.length} historical records for #{cryptocurrency.symbol} (#{interval})"
+        
+        # Kleine Pause um Rate Limits zu vermeiden
+        sleep(0.2)
+        
+      rescue => e
+        puts "Error storing historical data for #{cryptocurrency.symbol} (#{interval}): #{e.message}"
+        next
+      end
+    end
+    
+    # Cleanup alte Daten basierend auf der Periode
+    CryptoHistoryData.cleanup_old_data(period)
+  end
+  
+  def self.calculate_rsi_for_timestamp(symbol, timestamp, interval)
+    # Berechne RSI für einen spezifischen Timestamp
+    # Diese Methode würde die RSI-Berechnung für einen einzelnen Datenpunkt implementieren
+    # Vereinfachte Implementierung - in der Praxis würde man mehr historische Daten benötigen
+    nil
+  end
+  
+  def self.calculate_roc_for_timestamp(symbol, timestamp, interval)
+    # Berechne ROC für einen spezifischen Timestamp
+    nil
+  end
+  
+  def self.calculate_roc_derivative_for_timestamp(symbol, timestamp, interval)
+    # Berechne ROC-Ableitung für einen spezifischen Timestamp
+    nil
+  end
+
   def self.find_or_create_cryptocurrency(name, symbol, price, rsi, volume_24h = 0)
     # Market Cap berechnen basierend auf geschätzter Coin Supply
     estimated_supply = estimate_coin_supply(name.upcase)
     market_cap_usd = price * estimated_supply
 
-    # ROC berechnen (14-Perioden)
+    # ROC und ROC-Ableitung berechnen
     roc = calculate_roc_for_symbol(symbol, '1h')
+    roc_derivative = calculate_roc_derivative_for_symbol(symbol, '1h')
 
     # Verwende das vollständige Trading-Pair als Symbol
     crypto = Cryptocurrency.find_or_initialize_by(symbol: symbol.upcase)
@@ -602,6 +740,7 @@ class BinanceService
       market_cap: market_cap_usd,
       rsi: rsi,
       roc: roc,
+      roc_derivative: roc_derivative,
       volume_24h: volume_24h * price, # Volumen in USD
       market_cap_rank: crypto.persisted? ? crypto.market_cap_rank : Cryptocurrency.count + 1,
       updated_at: Time.current
@@ -766,5 +905,219 @@ class BinanceService
     
     # Gib den gültigen RSI-Wert zurück
     rsi_value
+  end
+
+  # Neue Methode: Hole ROC-Daten für mehrere Zeitrahmen (1m, 15m, 1h)
+  def self.get_multi_timeframe_roc_for_chart_data(symbol, chart_data)
+    puts "Fetching multi-timeframe ROC data for #{symbol} (15m, 1h)"
+    
+    roc_data = {}
+    timeframes = ['15m', '1h']
+    
+    timeframes.each do |timeframe|
+      puts "Fetching #{timeframe} ROC data for #{symbol}"
+      
+      # Bestimme wie viele Tage zurück wir gehen müssen
+      days_back = case timeframe
+                  when '15m' then 7  # 7 Tage für 15m
+                  when '1h' then 30  # 30 Tage für 1h
+                  end
+      
+      start_time_tf = (Time.current - days_back.days).to_i * 1000
+      
+      response = get("/api/v3/klines", query: {
+        symbol: symbol,
+        interval: timeframe,
+        startTime: start_time_tf,
+        limit: 1000
+      })
+
+      if response.success?
+        klines_tf = response.parsed_response
+        puts "Received #{klines_tf.length} #{timeframe} klines for ROC calculation"
+        
+        # Berechne ROC für diesen Zeitrahmen
+        closes_tf = klines_tf.map { |kline| kline[4].to_f }
+        roc_tf_values = calculate_historical_roc(closes_tf)
+        
+        # Erstelle Mapping von Zeitstempel zu ROC-Werten
+        roc_map_tf = {}
+        klines_tf.each_with_index do |kline, index|
+          timestamp_tf = kline[0]
+          roc_map_tf[timestamp_tf] = roc_tf_values[index]
+        end
+        
+        # Mappe ROC-Werte auf Chart-Datenpunkte
+        roc_data[timeframe] = chart_data.map do |data_point|
+          chart_timestamp = data_point[:timestamp]
+          
+          # Für 1m-Daten: Verwende Interpolation wenn nötig
+          if timeframe == '1m'
+            roc_value = interpolate_roc_value(chart_timestamp, roc_map_tf, timeframe)
+          else
+            # Für 15m und 1h: Normale Zuordnung
+            closest_timestamp = find_closest_timestamp_for_timeframe(chart_timestamp, roc_map_tf.keys, timeframe)
+            roc_value = roc_map_tf[closest_timestamp]
+          end
+          
+          roc_value
+        end
+      else
+        puts "Error fetching #{timeframe} data for ROC: #{response.code}"
+        roc_data[timeframe] = chart_data.map { |data| nil }
+      end
+    end
+    
+    roc_data
+  rescue => e
+    puts "Exception in get_multi_timeframe_roc_for_chart_data: #{e.message}"
+    { '1m' => chart_data.map { |data| nil }, '15m' => chart_data.map { |data| nil }, '1h' => chart_data.map { |data| nil } }
+  end
+
+  # Neue Methode: Hole ROC-Ableitungs-Daten für mehrere Zeitrahmen (1m, 15m, 1h)
+  def self.get_multi_timeframe_roc_derivative_for_chart_data(symbol, chart_data)
+    puts "Fetching multi-timeframe ROC derivative data for #{symbol} (15m, 1h)"
+    
+    roc_derivative_data = {}
+    timeframes = ['15m', '1h']
+    
+    timeframes.each do |timeframe|
+      puts "Fetching #{timeframe} ROC derivative data for #{symbol}"
+      
+      # Bestimme wie viele Tage zurück wir gehen müssen
+      days_back = case timeframe
+                  when '15m' then 7  # 7 Tage für 15m
+                  when '1h' then 30  # 30 Tage für 1h
+                  end
+      
+      start_time_tf = (Time.current - days_back.days).to_i * 1000
+      
+      response = get("/api/v3/klines", query: {
+        symbol: symbol,
+        interval: timeframe,
+        startTime: start_time_tf,
+        limit: 1000
+      })
+
+      if response.success?
+        klines_tf = response.parsed_response
+        puts "Received #{klines_tf.length} #{timeframe} klines for ROC derivative calculation"
+        
+        # Berechne ROC-Ableitung für diesen Zeitrahmen
+        closes_tf = klines_tf.map { |kline| kline[4].to_f }
+        roc_derivative_tf_values = calculate_historical_roc_derivative(closes_tf)
+        
+        # Erstelle Mapping von Zeitstempel zu ROC-Ableitungs-Werten
+        roc_derivative_map_tf = {}
+        klines_tf.each_with_index do |kline, index|
+          timestamp_tf = kline[0]
+          roc_derivative_map_tf[timestamp_tf] = roc_derivative_tf_values[index]
+        end
+        
+        # Mappe ROC-Ableitungs-Werte auf Chart-Datenpunkte
+        roc_derivative_data[timeframe] = chart_data.map do |data_point|
+          chart_timestamp = data_point[:timestamp]
+          
+          # Für 1m-Daten: Verwende Interpolation wenn nötig
+          if timeframe == '1m'
+            roc_derivative_value = interpolate_roc_derivative_value(chart_timestamp, roc_derivative_map_tf, timeframe)
+          else
+            # Für 15m und 1h: Normale Zuordnung
+            closest_timestamp = find_closest_timestamp_for_timeframe(chart_timestamp, roc_derivative_map_tf.keys, timeframe)
+            roc_derivative_value = roc_derivative_map_tf[closest_timestamp]
+          end
+          
+          roc_derivative_value
+        end
+      else
+        puts "Error fetching #{timeframe} data for ROC derivative: #{response.code}"
+        roc_derivative_data[timeframe] = chart_data.map { |data| nil }
+      end
+    end
+    
+    roc_derivative_data
+  rescue => e
+    puts "Exception in get_multi_timeframe_roc_derivative_for_chart_data: #{e.message}"
+    { '1m' => chart_data.map { |data| nil }, '15m' => chart_data.map { |data| nil }, '1h' => chart_data.map { |data| nil } }
+  end
+
+  # Hilfsmethode: Berechne historische ROC-Werte
+  def self.calculate_historical_roc(closes, period = ROC_PERIOD)
+    return [] if closes.length < period + 1
+    
+    roc_values = []
+    
+    # Für die ersten period-1 Werte gibt es keinen ROC
+    (period - 1).times { roc_values << nil }
+    
+    # Berechne ROC für jeden möglichen Punkt
+    (period - 1...closes.length).each do |i|
+      subset = closes[0..i]
+      next if subset.length < period + 1
+      
+      roc = calculate_roc(subset, period)
+      roc_values << roc
+    end
+    
+    roc_values
+  end
+
+  # Hilfsmethode: Berechne historische ROC-Ableitungs-Werte
+  def self.calculate_historical_roc_derivative(closes, period = ROC_PERIOD)
+    return [] if closes.length < period + 2
+    
+    roc_derivative_values = []
+    
+    # Für die ersten period-1 Werte gibt es keine ROC-Ableitung
+    (period - 1).times { roc_derivative_values << nil }
+    
+    # Berechne ROC-Ableitung für jeden möglichen Punkt
+    (period - 1...closes.length).each do |i|
+      subset = closes[0..i]
+      next if subset.length < period + 2
+      
+      roc_derivative = calculate_roc_derivative(subset, period)
+      roc_derivative_values << roc_derivative
+    end
+    
+    roc_derivative_values
+  end
+
+  # Hilfsmethode: Interpoliere ROC-Werte
+  def self.interpolate_roc_value(target_timestamp, roc_map, timeframe)
+    return nil if roc_map.empty?
+    
+    # Filtere nur gültige ROC-Werte (nicht null/nil)
+    valid_roc_map = roc_map.select { |timestamp, roc| roc && roc.is_a?(Numeric) && !roc.nan? }
+    
+    if valid_roc_map.empty?
+      puts "1m ROC interpolation: No valid ROC values found in map"
+      return nil
+    end
+    
+    # Finde den zeitlich nächstgelegenen Zeitstempel mit gültigem ROC-Wert
+    closest_timestamp = valid_roc_map.keys.min_by { |ts| (ts - target_timestamp).abs }
+    roc_value = valid_roc_map[closest_timestamp]
+    
+    roc_value
+  end
+
+  # Hilfsmethode: Interpoliere ROC-Ableitungs-Werte
+  def self.interpolate_roc_derivative_value(target_timestamp, roc_derivative_map, timeframe)
+    return nil if roc_derivative_map.empty?
+    
+    # Filtere nur gültige ROC-Ableitungs-Werte (nicht null/nil)
+    valid_roc_derivative_map = roc_derivative_map.select { |timestamp, roc_derivative| roc_derivative && roc_derivative.is_a?(Numeric) && !roc_derivative.nan? }
+    
+    if valid_roc_derivative_map.empty?
+      puts "1m ROC derivative interpolation: No valid ROC derivative values found in map"
+      return nil
+    end
+    
+    # Finde den zeitlich nächstgelegenen Zeitstempel mit gültigem ROC-Ableitungs-Wert
+    closest_timestamp = valid_roc_derivative_map.keys.min_by { |ts| (ts - target_timestamp).abs }
+    roc_derivative_value = valid_roc_derivative_map[closest_timestamp]
+    
+    roc_derivative_value
   end
 end 

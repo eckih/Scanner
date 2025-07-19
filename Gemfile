@@ -1,19 +1,19 @@
 source 'https://rubygems.org'
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-ruby '3.2.8'
+ruby '3.3.0'
 
 # Bundle edge Rails instead: gem 'rails', github: 'rails/rails', branch: 'main'
-gem 'rails', '~> 7.1.0'
+gem 'rails', '7.1.4'
 
 # Ensure compatible ActiveSupport version
-gem 'activesupport', '~> 7.1.0'
+gem 'activesupport', '7.1.4'
 
 # Use sqlite3 as the database for Active Record
 gem 'sqlite3', '~> 1.4'
 
 # Use Puma as the app server
-gem 'puma', '~> 5.0'
+gem 'puma', '~> 6.0'
 
 # Use SCSS for stylesheets
 gem 'sass-rails', '>= 6'
@@ -28,26 +28,17 @@ gem 'stimulus-rails'
 # Build JSON APIs with ease. Read more: https://github.com/rails/jbuilder
 gem 'jbuilder', '~> 2.7'
 
-# Use Redis adapter to run Action Cable in production
-# gem 'redis', '~> 4.0'
-
 # Use Active Model has_secure_password
-# gem 'bcrypt', '~> 3.1.7'
+# gem "bcrypt", "~> 3.1.7"
 
-# Use Active Storage variant
-# gem 'image_processing', '~> 1.2'
+# Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
+# gem "image_processing", "~> 1.2"
 
 # HTTP client for API calls
 gem 'httparty'
 
 # For environment variables
 gem 'dotenv-rails'
-
-# For background jobs
-gem 'sidekiq', '~> 6.5'
-
-# For scheduling
-gem 'whenever', require: false
 
 # Bootstrap for styling
 gem 'bootstrap', '~> 5.2'
@@ -59,10 +50,9 @@ gem 'bootsnap', '>= 1.4.4', require: false
 # Lock concurrent-ruby to compatible version
 gem 'concurrent-ruby', '~> 1.3.4'
 
-
 group :development, :test do
-  # Call 'byebug' anywhere in the code to stop execution and get a debugger console
-  gem 'byebug', platforms: [:mri, :mingw, :x64_mingw]
+  # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
+  gem "debug", platforms: %i[ mri mingw x64_mingw ]
   gem 'listen', '~> 3.3'
   gem 'faker'
 end
@@ -74,7 +64,11 @@ group :development do
   # Can be configured to work on production as well see: https://github.com/MiniProfiler/rack-mini-profiler/blob/master/README.md
   # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
   gem 'spring'
-  gem 'faker'
+end
+
+group :test do
+  # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
+  gem "capybara"
 end
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem

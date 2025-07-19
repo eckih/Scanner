@@ -16,6 +16,16 @@
                 <%= @cryptocurrency.rsi %>
               </span>
             <% end %>
+            <% if @cryptocurrency.roc %>
+              | ROC: <span class="badge <%= @cryptocurrency.roc >= 0 ? 'bg-success' : 'bg-danger' %>">
+                <%= @cryptocurrency.roc.round(2) %>%
+              </span>
+            <% end %>
+            <% if @cryptocurrency.roc_derivative %>
+              | ROC': <span class="badge <%= @cryptocurrency.roc_derivative >= 0 ? 'bg-success' : 'bg-danger' %>">
+                <%= @cryptocurrency.roc_derivative.round(2) %>%
+              </span>
+            <% end %>
           </p>
         </div>
         <div>
@@ -62,6 +72,42 @@
             <i class="bi bi-speedometer2"></i> RSI (Relative Strength Index)
           </h5>
           <canvas id="rsiChart" width="400" height="150"></canvas>
+        </div>
+      </div>
+
+      <!-- ROC Chart -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-graph-up-arrow"></i> ROC (Rate of Change)
+            </h5>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="rocAutoScale" checked>
+              <label class="form-check-label" for="rocAutoScale">
+                Auto-Scale
+              </label>
+            </div>
+          </div>
+          <canvas id="rocChart" width="400" height="150"></canvas>
+        </div>
+      </div>
+
+      <!-- ROC Derivative Chart -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-graph-up-arrow"></i> ROC' (ROC-Ableitung)
+            </h5>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="rocDerivativeAutoScale" checked>
+              <label class="form-check-label" for="rocDerivativeAutoScale">
+                Auto-Scale
+              </label>
+            </div>
+          </div>
+          <canvas id="rocDerivativeChart" width="400" height="150"></canvas>
         </div>
       </div>
 
@@ -139,8 +185,10 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log('Chart Data 30d length:', chartData['30d'] ? chartData['30d'].length : 'undefined');
 
   let currentTimeframe = '24h';
-  let priceChart, volumeChart, rsiChart;
+  let priceChart, volumeChart, rsiChart, rocChart, rocDerivativeChart;
   let isTooltipSyncing = false; // Flag to prevent infinite loops
+  let rocAutoScale = true;
+  let rocDerivativeAutoScale = true;
 
   // Event-Listener für automatisches Reload bei Datenaktualisierung
   window.addEventListener('storage', function(e) {
@@ -181,46 +229,57 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Synchronized tooltip function
-  function syncTooltips(activeChart, activeElements) {
-    if (isTooltipSyncing || !activeElements || activeElements.length === 0) return;
-    
-    isTooltipSyncing = true;
-    
-    const activeIndex = activeElements[0].index;
-    const charts = [priceChart, volumeChart, rsiChart];
-    
-    charts.forEach(chart => {
-      if (chart !== activeChart && chart.data.datasets[0].data[activeIndex]) {
-        // Set tooltip to show at the same index
-        chart.tooltip.setActiveElements([{
-          datasetIndex: 0,
-          index: activeIndex
-        }]);
-        chart.update('none');
-      }
-    });
-    
-    isTooltipSyncing = false;
-  }
+  // Auto-Scale Toggles
+  document.getElementById('rocAutoScale').addEventListener('change', function() {
+    rocAutoScale = this.checked;
+    updateRocChartScale();
+  });
 
-  // Clear all tooltips when mouse leaves
-  function clearAllTooltips(exceptChart) {
-    if (isTooltipSyncing) return;
-    
-    isTooltipSyncing = true;
-    
-    const charts = [priceChart, volumeChart, rsiChart];
-    
-    charts.forEach(chart => {
-      if (chart !== exceptChart) {
-        chart.tooltip.setActiveElements([]);
-        chart.update('none');
-      }
-    });
-    
-    isTooltipSyncing = false;
-  }
+  document.getElementById('rocDerivativeAutoScale').addEventListener('change', function() {
+    rocDerivativeAutoScale = this.checked;
+    updateRocDerivativeChartScale();
+  });
+
+      // Synchronized tooltip function
+    function syncTooltips(activeChart, activeElements) {
+      if (isTooltipSyncing || !activeElements || activeElements.length === 0) return;
+      
+      isTooltipSyncing = true;
+      
+      const activeIndex = activeElements[0].index;
+      const charts = [priceChart, volumeChart, rsiChart, rocChart, rocDerivativeChart];
+      
+      charts.forEach(chart => {
+        if (chart !== activeChart && chart.data.datasets[0].data[activeIndex]) {
+          // Set tooltip to show at the same index
+          chart.tooltip.setActiveElements([{
+            datasetIndex: 0,
+            index: activeIndex
+          }]);
+          chart.update('none');
+        }
+      });
+      
+      isTooltipSyncing = false;
+    }
+
+      // Clear all tooltips when mouse leaves
+    function clearAllTooltips(exceptChart) {
+      if (isTooltipSyncing) return;
+      
+      isTooltipSyncing = true;
+      
+      const charts = [priceChart, volumeChart, rsiChart, rocChart, rocDerivativeChart];
+      
+      charts.forEach(chart => {
+        if (chart !== exceptChart) {
+          chart.tooltip.setActiveElements([]);
+          chart.update('none');
+        }
+      });
+      
+      isTooltipSyncing = false;
+    }
 
   function initializeCharts() {
     // Price Chart
@@ -512,16 +571,6 @@ document.addEventListener('DOMContentLoaded', function() {
       type: 'line',
       data: {
         datasets: [{
-          label: 'RSI 1m',
-          data: [],
-          borderColor: 'rgb(255, 99, 132)',
-          backgroundColor: 'transparent',
-          borderWidth: 2,
-          fill: false,
-          tension: 0.1,
-          pointRadius: 0,
-          pointHoverRadius: 4
-        }, {
           label: 'RSI 15m',
           data: [],
           borderColor: 'rgb(54, 162, 235)',
@@ -658,8 +707,242 @@ document.addEventListener('DOMContentLoaded', function() {
       clearAllTooltips(rsiChart);
     });
 
-    // Initial chart update
-    updateCharts();
+    // ROC Chart
+    const rocCtx = document.getElementById('rocChart').getContext('2d');
+    rocChart = new Chart(rocCtx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'ROC 15m',
+          data: [],
+          borderColor: 'rgb(54, 162, 235)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'ROC 1h',
+          data: [],
+          borderColor: 'rgb(255, 206, 86)',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        onHover: (event, activeElements) => {
+          syncTooltips(rocChart, activeElements);
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              displayFormats: {
+                hour: 'HH:mm',
+                day: 'dd.MM'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Zeit (MEZ/MESZ)'
+            }
+          },
+          y: {
+            beginAtZero: false,
+            min: undefined, // Auto-scale standardmäßig aktiviert
+            max: undefined, // Auto-scale standardmäßig aktiviert
+            title: {
+              display: true,
+              text: 'ROC'
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                // Konvertiere zu deutscher Zeit (MEZ/MESZ)
+                const date = new Date(context[0].parsed.x);
+                return date.toLocaleString('de-DE', {
+                  timeZone: 'Europe/Berlin',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                }) + ' MEZ/MESZ';
+              },
+              label: function(context) {
+                const timeframe = context.dataset.label.split(' ')[1]; // Extrahiere Zeitrahmen
+                return `ROC ${timeframe}: ${context.parsed.y.toFixed(2)}%`;
+              }
+            }
+          },
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'line'
+            }
+          }
+        }
+      }
+    });
+
+    // Add mouse leave event for ROC chart
+    rocCtx.canvas.addEventListener('mouseleave', () => {
+      clearAllTooltips(rocChart);
+    });
+
+    // ROC Derivative Chart
+    const rocDerivativeCtx = document.getElementById('rocDerivativeChart').getContext('2d');
+    rocDerivativeChart = new Chart(rocDerivativeCtx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'ROC\' 15m',
+          data: [],
+          borderColor: 'rgb(54, 162, 235)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }, {
+          label: 'ROC\' 1h',
+          data: [],
+          borderColor: 'rgb(255, 206, 86)',
+          backgroundColor: 'transparent',
+          borderWidth: 3,
+          fill: false,
+          tension: 0.1,
+          pointRadius: 0,
+          pointHoverRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        onHover: (event, activeElements) => {
+          syncTooltips(rocDerivativeChart, activeElements);
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              displayFormats: {
+                hour: 'HH:mm',
+                day: 'dd.MM'
+              }
+            },
+            title: {
+              display: true,
+              text: 'Zeit (MEZ/MESZ)'
+            }
+          },
+          y: {
+            beginAtZero: false,
+            min: undefined, // Auto-scale standardmäßig aktiviert
+            max: undefined, // Auto-scale standardmäßig aktiviert
+            title: {
+              display: true,
+              text: 'ROC\''
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                // Konvertiere zu deutscher Zeit (MEZ/MESZ)
+                const date = new Date(context[0].parsed.x);
+                return date.toLocaleString('de-DE', {
+                  timeZone: 'Europe/Berlin',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit'
+                }) + ' MEZ/MESZ';
+              },
+              label: function(context) {
+                const timeframe = context.dataset.label.split(' ')[1]; // Extrahiere Zeitrahmen
+                return `ROC' ${timeframe}: ${context.parsed.y.toFixed(2)}%`;
+              }
+            }
+          },
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              pointStyle: 'line'
+            }
+          }
+        }
+      }
+    });
+
+    // Add mouse leave event for ROC Derivative chart
+    rocDerivativeCtx.canvas.addEventListener('mouseleave', () => {
+      clearAllTooltips(rocDerivativeChart);
+    });
+
+      // Initial chart update
+  updateCharts();
+  
+  // Synchronisiere Auto-Scale-Status mit den Checkboxen
+  document.getElementById('rocAutoScale').checked = rocAutoScale;
+  document.getElementById('rocDerivativeAutoScale').checked = rocDerivativeAutoScale;
+  }
+
+  function updateRocChartScale() {
+    if (rocChart) {
+      if (rocAutoScale) {
+        // Auto-Scale: Verwende die tatsächlichen Datenwerte
+        rocChart.options.scales.y.min = undefined;
+        rocChart.options.scales.y.max = undefined;
+      } else {
+        // Fester Bereich: -100 bis +100
+        rocChart.options.scales.y.min = -100;
+        rocChart.options.scales.y.max = 100;
+      }
+      rocChart.update();
+    }
+  }
+
+  function updateRocDerivativeChartScale() {
+    if (rocDerivativeChart) {
+      if (rocDerivativeAutoScale) {
+        // Auto-Scale: Verwende die tatsächlichen Datenwerte
+        rocDerivativeChart.options.scales.y.min = undefined;
+        rocDerivativeChart.options.scales.y.max = undefined;
+      } else {
+        // Fester Bereich: -100 bis +100
+        rocDerivativeChart.options.scales.y.min = -100;
+        rocDerivativeChart.options.scales.y.max = 100;
+      }
+      rocDerivativeChart.update();
+    }
   }
 
   function updateCharts() {
@@ -722,17 +1005,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
     }).filter(item => item.y !== null && item.y !== undefined);
 
-    // Prepare RSI data - drei verschiedene Zeitrahmen
-    const rsiData1m = data.map(item => {
-      const timeValue = item.timestamp || new Date(item.time).getTime();
-      return {
-        x: new Date(timeValue),
-        y: item.rsi_1m
-      };
-    });
-    
-    const rsiData1mFiltered = rsiData1m.filter(item => item.y !== null && item.y !== undefined);
-
+    // Prepare RSI data - zwei verschiedene Zeitrahmen (15m, 1h)
     const rsiData15m = data.map(item => {
       const timeValue = item.timestamp || new Date(item.time).getTime();
       return {
@@ -749,26 +1022,55 @@ document.addEventListener('DOMContentLoaded', function() {
       };
     }).filter(item => item.y !== null && item.y !== undefined);
 
-    console.log('RSI 1m data sample (before filter):', rsiData1m.slice(0, 3));
-    console.log('RSI 1m data sample (after filter):', rsiData1mFiltered.slice(0, 3));
+    // Prepare ROC data - zwei verschiedene Zeitrahmen (15m, 1h)
+    const rocData15m = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.roc_15m
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    const rocData1h = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.roc_1h
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    // Prepare ROC Derivative data - zwei verschiedene Zeitrahmen (15m, 1h)
+    const rocDerivativeData15m = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.roc_derivative_15m
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
+    const rocDerivativeData1h = data.map(item => {
+      const timeValue = item.timestamp || new Date(item.time).getTime();
+      return {
+        x: new Date(timeValue),
+        y: item.roc_derivative_1h
+      };
+    }).filter(item => item.y !== null && item.y !== undefined);
+
     console.log('RSI 15m data sample:', rsiData15m.slice(0, 3));
     console.log('RSI 1h data sample:', rsiData1h.slice(0, 3));
-    console.log('RSI 1m data length:', rsiData1mFiltered.length);
     console.log('RSI 15m data length:', rsiData15m.length);
     console.log('RSI 1h data length:', rsiData1h.length);
     
     // Debug: Prüfe ob RSI-Werte vorhanden sind
     console.log('First data item RSI values:', {
-      rsi_1m: data[0]?.rsi_1m,
       rsi_15m: data[0]?.rsi_15m,
       rsi_1h: data[0]?.rsi_1h
     });
     
     // Debug: Zähle null/undefined Werte
-    const nullCount1m = rsiData1m.filter(item => item.y === null || item.y === undefined).length;
     const nullCount15m = data.filter(item => item.rsi_15m === null || item.rsi_15m === undefined).length;
     const nullCount1h = data.filter(item => item.rsi_1h === null || item.rsi_1h === undefined).length;
-    console.log('Null/undefined counts:', { '1m': nullCount1m, '15m': nullCount15m, '1h': nullCount1h });
+    console.log('Null/undefined counts:', { '15m': nullCount15m, '1h': nullCount1h });
 
     // Update price chart
     if (priceChart) {
@@ -787,10 +1089,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Update RSI chart
     if (rsiChart) {
-      rsiChart.data.datasets[0].data = rsiData1mFiltered;
-      rsiChart.data.datasets[1].data = rsiData15m;
-      rsiChart.data.datasets[2].data = rsiData1h;
+      rsiChart.data.datasets[0].data = rsiData15m;
+      rsiChart.data.datasets[1].data = rsiData1h;
       rsiChart.update('none');
+    }
+
+    // Update ROC chart
+    if (rocChart) {
+      rocChart.data.datasets[0].data = rocData15m;
+      rocChart.data.datasets[1].data = rocData1h;
+      rocChart.update('none');
+    }
+
+    // Update ROC Derivative chart
+    if (rocDerivativeChart) {
+      rocDerivativeChart.data.datasets[0].data = rocDerivativeData15m;
+      rocDerivativeChart.data.datasets[1].data = rocDerivativeData1h;
+      rocDerivativeChart.update('none');
     }
 
     // Update time format based on timeframe
@@ -809,6 +1124,18 @@ document.addEventListener('DOMContentLoaded', function() {
       rsiChart.options.scales.x.time.unit = timeFormat;
       rsiChart.update();
     }
+    if (rocChart) {
+      rocChart.options.scales.x.time.unit = timeFormat;
+      rocChart.update();
+    }
+    if (rocDerivativeChart) {
+      rocDerivativeChart.options.scales.x.time.unit = timeFormat;
+      rocDerivativeChart.update();
+    }
+
+    // Aktualisiere Auto-Scale nach Datenupdate
+    updateRocChartScale();
+    updateRocDerivativeChartScale();
 
     console.log('Charts updated successfully');
   }
@@ -834,6 +1161,14 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   #rsiChart {
+    height: 250px !important;
+  }
+  
+  #rocChart {
+    height: 250px !important;
+  }
+  
+  #rocDerivativeChart {
     height: 250px !important;
   }
   
