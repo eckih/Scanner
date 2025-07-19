@@ -502,6 +502,7 @@ class BinanceService
 
     # Berechne Gewinne und Verluste
     (1...closes.length).each do |i|
+      logger.info("Debug: closes[#{i}]: #{closes[i]} - #{closes[i-1]} ")
       change = closes[i] - closes[i-1]
       if change > 0
         gains << change

@@ -1,12 +1,17 @@
-class CryptocurrencyUpdateJob < ApplicationJob
-  queue_as :default
+class CryptocurrencyUpdateJob
+  def self.perform_later
+    # Führe den Job sofort aus (für einfache Implementierung)
+    new.perform
+  end
 
   def perform
     Rails.logger.info "Starting background cryptocurrency update..."
     
     begin
-      # Lade die Kryptowährungsdaten im Hintergrund
-      CryptoDataLoader.load_real_cryptocurrency_data
+      # Verwende BinanceService direkt
+      top_symbols = BinanceService.get_top_usdc_pairs
+      BinanceService.fetch_specific_cryptos(top_symbols)
+      
       Rails.logger.info "Background cryptocurrency update completed successfully"
     rescue => e
       Rails.logger.error "Background cryptocurrency update failed: #{e.message}"

@@ -25,8 +25,8 @@ module Scanner
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
     
-    # Configure Active Job to use Sidekiq
-    config.active_job.queue_adapter = :sidekiq
+    # Konfiguration für regelmäßige Updates
+    config.crypto_update_interval = ENV.fetch('CRYPTO_UPDATE_INTERVAL', 300).to_i # 5 Minuten Standard
   end
 end
 

@@ -1,8 +1,13 @@
 class CryptocurrenciesController < ApplicationController
   ROC_PERIOD = 24 # Standard ROC-Periode in Stunden
+  
+  # CSRF-Schutz für AJAX-Endpoints deaktivieren
+  skip_before_action :verify_authenticity_token, only: [:refresh_data, :update_roc, :add_roc_derivative]
 
   def index
     @cryptocurrencies = Cryptocurrency.order(:market_cap_rank)
+    @last_update = Cryptocurrency.maximum(:updated_at)
+    @update_interval = Rails.application.config.crypto_update_interval
     calculate_trends_for_cryptocurrencies
   end
 

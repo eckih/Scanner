@@ -1,5 +1,8 @@
-class BalanceUpdateJob < ApplicationJob
-  queue_as :default
+class BalanceUpdateJob
+  def self.perform_later
+    # Führe den Job sofort aus (für einfache Implementierung)
+    new.perform
+  end
 
   def perform
     Rails.logger.info "Starting background balance update..."
