@@ -7,6 +7,8 @@ Rails.application.routes.draw do
   # Database viewer route (nur in Development)
   if Rails.env.development?
     get '/database', to: 'database#index'
+    post '/database/execute', to: 'database#execute', as: :execute_database
+    get '/database/table/:table', to: 'database#table', as: :database_table
     # Sidekiq Web Interface
     # require 'sidekiq/web'
     # mount Sidekiq::Web => '/sidekiq'
