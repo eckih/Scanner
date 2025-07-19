@@ -1,4 +1,6 @@
 class CryptocurrenciesController < ApplicationController
+  ROC_PERIOD = 24 # Standard ROC-Periode in Stunden
+
   def index
     @cryptocurrencies = Cryptocurrency.order(:market_cap_rank)
     calculate_trends_for_cryptocurrencies

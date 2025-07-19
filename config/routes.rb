@@ -8,8 +8,8 @@ Rails.application.routes.draw do
   if Rails.env.development?
     get '/database', to: 'database#index'
     # Sidekiq Web Interface
-    require 'sidekiq/web'
-    mount Sidekiq::Web => '/sidekiq'
+    # require 'sidekiq/web'
+    # mount Sidekiq::Web => '/sidekiq'
   end
   
   resources :cryptocurrencies, only: [:index, :show] do

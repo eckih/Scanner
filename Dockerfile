@@ -1,43 +1,38 @@
-ARG RUBY_VERSION=3.3.0
-FROM ruby:$RUBY_VERSION-slim
-
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y \
-    build-essential \
-    curl \
-    git \
-    libsqlite3-dev \
-    libvips \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists /var/cache/apt/archives
-
+FROM ruby:3.3.0-slim
 
 # Install system dependencies
-# RUN apk add --no-cache \
-#     build-base \
-#     tzdata \
-#     nodejs \
-#     yarn \
-#     sqlite-dev \
-#     sqlite \
-#     git
+RUN apt-get update -qq && \
+    apt-get install -y \
+    build-essential \
+    nodejs \
+    npm \
+    sqlite3 \
+    libsqlite3-dev \
+    git \
+    curl \
+    libyaml-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy Gemfile and install dependencies
+# Copy Gemfile and install gems
 COPY Gemfile Gemfile.lock ./
-RUN bundle install
+RUN bundle config set --local deployment 'false' && \
+    bundle install
 
-# Copy the rest of the application
+# Copy application code
 COPY . .
 
-# Add a script to be executed every time the container starts
-COPY entrypoint.sh /usr/bin/
-RUN chmod +x /usr/bin/entrypoint.sh
-ENTRYPOINT ["entrypoint.sh"]
+# Create necessary directories and set permissions
+RUN mkdir -p tmp/pids tmp/cache tmp/sockets log db && \
+    chmod -R 755 tmp log db
 
+# Precompile assets (if needed)
+RUN RAILS_ENV=development bundle exec rails assets:precompile || true
+
+# Expose port
 EXPOSE 3000
 
-# Configure the main process to run when running the image
-# CMD ["rails", "server", "-b", "0.0.0.0"] 
+# Start command
+CMD ["bash", "-c", "bundle exec rails db:create RAILS_ENV=development || true && bundle exec rails db:migrate RAILS_ENV=development || true && bundle exec rails server -b 0.0.0.0 -e development"] 
