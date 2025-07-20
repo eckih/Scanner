@@ -5,8 +5,8 @@ class DatabaseController < ApplicationController
     
     @tables.each do |table|
       begin
-        # Hole die ersten 10 Zeilen jeder Tabelle
-        result = ActiveRecord::Base.connection.execute("SELECT * FROM #{table} LIMIT 10")
+        # Hole die ersten 500 Zeilen jeder Tabelle
+        result = ActiveRecord::Base.connection.execute("SELECT * FROM #{table} LIMIT 500")
         @table_data[table] = result.to_a
       rescue => e
         @table_data[table] = []
