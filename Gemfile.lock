@@ -109,6 +109,7 @@ GEM
     drb (2.2.3)
     erb (5.0.2)
     erubi (1.13.1)
+    event_emitter (0.2.6)
     faker (3.5.2)
       i18n (>= 1.8.11, < 2)
     ffi (1.17.2-x86_64-linux-gnu)
@@ -262,6 +263,10 @@ GEM
       activemodel (>= 6.0.0)
       bindex (>= 0.4.0)
       railties (>= 6.0.0)
+    websocket (1.2.11)
+    websocket-client-simple (0.3.1)
+      event_emitter
+      websocket
     websocket-driver (0.8.0)
       base64
       websocket-extensions (>= 0.1.0)
@@ -296,6 +301,7 @@ DEPENDENCIES
   turbo-rails
   tzinfo-data
   web-console (>= 4.1.0)
+  websocket-client-simple (~> 0.3.0)
 
 RUBY VERSION
    ruby 3.3.0p0
