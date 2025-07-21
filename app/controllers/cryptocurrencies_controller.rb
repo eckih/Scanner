@@ -80,6 +80,29 @@ class CryptocurrenciesController < ApplicationController
     render json: @chart_data
   end
 
+  def last_update
+    # Hole die letzte erfolgreiche Datenaktualisierung
+    # Suche nach dem neuesten Eintrag in der RsiHistory (das zeigt echte Datenaktualisierung)
+    last_rsi_update = RsiHistory.maximum(:created_at)
+    last_roc_update = RocHistory.maximum(:created_at)
+    last_roc_derivative_update = RocDerivativeHistory.maximum(:created_at)
+    
+    # Verwende das neueste Datum aus allen historischen Daten
+    last_update = [last_rsi_update, last_roc_update, last_roc_derivative_update].compact.max
+    
+    # Fallback auf Cryptocurrency updated_at falls keine historischen Daten vorhanden
+    if last_update.nil?
+      last_update = Cryptocurrency.maximum(:updated_at)
+    end
+    
+    render json: {
+      last_update: last_update ? last_update.iso8601 : nil,
+      last_rsi_update: last_rsi_update ? last_rsi_update.iso8601 : nil,
+      last_roc_update: last_roc_update ? last_roc_update.iso8601 : nil,
+      last_roc_derivative_update: last_roc_derivative_update ? last_roc_derivative_update.iso8601 : nil
+    }
+  end
+
   private
 
   def settings_params

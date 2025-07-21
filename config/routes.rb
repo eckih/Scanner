@@ -23,6 +23,7 @@ Rails.application.routes.draw do
       get :add_roc_derivative
       post :add_roc_derivative
       get :averages_chart
+      get :last_update
     end
     member do
       get :chart

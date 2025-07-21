@@ -9,7 +9,139 @@ class BinanceService
   RSI_PERIOD = 14
   DEFAULT_INTERVAL = '1h'
 
+  # Binance Logger für separate Logdatei
+  def self.binance_logger
+    @binance_logger ||= begin
+      log_file = Rails.root.join('log', 'binance.log')
+      # Stelle sicher, dass das Log-Verzeichnis existiert
+      FileUtils.mkdir_p(File.dirname(log_file)) unless Dir.exist?(File.dirname(log_file))
+      
+      # Verwende sowohl separate Datei als auch Rails Logger als Fallback
+      logger = Logger.new(log_file)
+      logger.level = Logger::INFO
+      logger.formatter = proc do |severity, datetime, progname, msg|
+        "#{datetime.strftime('%Y-%m-%d %H:%M:%S')} [#{severity}] #{msg}\n"
+      end
+      
+      # Schreibe auch in Rails Logger für Debugging
+      Rails.logger.info("BINANCE LOGGER: Initialized binance.log at #{log_file}")
+      
+      logger
+    rescue => e
+      # Fallback auf Rails Logger
+      Rails.logger.error("BINANCE LOGGER ERROR: #{e.message}")
+      Rails.logger
+    end
+  end
+
+  def self.log_binance_request(endpoint, params = {}, response_code = nil, response_body = nil)
+    log_message = "BINANCE API REQUEST: #{endpoint}"
+    log_message += " | Params: #{params}" unless params.empty?
+    log_message += " | Response: #{response_code}" if response_code
+    log_message += " | Body: #{response_body}" if response_body && response_body.length < 500
+    
+    # Schreibe in beide Logger
+    binance_logger.info(log_message)
+    Rails.logger.info(log_message)
+    
+    # Direktes Schreiben in Datei als Backup
+    write_direct_to_log(log_message)
+  end
+
+  def self.log_binance_error(endpoint, error_message)
+    log_message = "BINANCE API ERROR: #{endpoint} | Error: #{error_message}"
+    
+    # Schreibe in beide Logger
+    binance_logger.error(log_message)
+    Rails.logger.error(log_message)
+    
+    # Direktes Schreiben in Datei als Backup
+    write_direct_to_log(log_message)
+  end
+
+  def self.log_binance_success(endpoint, message)
+    log_message = "BINANCE API SUCCESS: #{endpoint} | #{message}"
+    
+    # Schreibe in beide Logger
+    binance_logger.info(log_message)
+    Rails.logger.info(log_message)
+    
+    # Direktes Schreiben in Datei als Backup
+    write_direct_to_log(log_message)
+  end
+
+  # Direktes Schreiben in die Logdatei als Backup
+  def self.write_direct_to_log(message)
+    begin
+      log_file = Rails.root.join('log', 'binance.log')
+      File.open(log_file, 'a') do |f|
+        f.puts "#{Time.current.strftime('%Y-%m-%d %H:%M:%S')} [INFO] #{message}"
+      end
+    rescue => e
+      Rails.logger.error("Failed to write to binance.log: #{e.message}")
+    end
+  end
+
+  # Detailliertes Logging aller API-Antworten
+  def self.log_binance_response_data(endpoint, response_data, symbol = nil)
+    if response_data.is_a?(Array)
+      # Für Arrays (z.B. Klines-Daten)
+      log_message = "BINANCE API RESPONSE DATA: #{endpoint}"
+      log_message += " | Symbol: #{symbol}" if symbol
+      log_message += " | Data Count: #{response_data.length}"
+      
+      binance_logger.info(log_message)
+      write_direct_to_log(log_message)
+      
+      # Logge alle Daten detailliert
+      response_data.each_with_index do |item, index|
+        if item.is_a?(Array) && item.length >= 6
+          kline_data = {
+            index: index,
+            timestamp: Time.at(item[0] / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+            open: item[1].to_f,
+            high: item[2].to_f,
+            low: item[3].to_f,
+            close: item[4].to_f,
+            volume: item[5].to_f
+          }
+          data_log = "BINANCE KLINE DATA: #{symbol} | #{kline_data}"
+          binance_logger.info(data_log)
+          write_direct_to_log(data_log)
+        elsif item.is_a?(Hash)
+          data_log = "BINANCE RESPONSE ITEM: #{symbol} | #{item}"
+          binance_logger.info(data_log)
+          write_direct_to_log(data_log)
+        end
+      end
+      
+    elsif response_data.is_a?(Hash)
+      # Für Hash-Daten (z.B. Ticker-Daten)
+      log_message = "BINANCE API RESPONSE DATA: #{endpoint}"
+      log_message += " | Symbol: #{symbol}" if symbol
+      log_message += " | Data: #{response_data}"
+      
+      binance_logger.info(log_message)
+      write_direct_to_log(log_message)
+    end
+  end
+
+  # Test-Methode um das Logging zu überprüfen
+  def self.test_logging
+    binance_logger.info("BINANCE LOGGER TEST: Logger is working properly")
+    
+    # Direktes Schreiben in die Datei als zusätzlicher Test
+    log_file = Rails.root.join('log', 'binance.log')
+    File.open(log_file, 'a') do |f|
+      f.puts "#{Time.current.strftime('%Y-%m-%d %H:%M:%S')} [INFO] DIRECT WRITE TEST: Writing directly to binance.log"
+    end
+    
+    puts "Test logs written to binance.log"
+  end
+
   def self.fetch_and_update_all_cryptos
+    # Test-Log beim ersten Aufruf
+    binance_logger.info("BINANCE SERVICE: Starting fetch_and_update_all_cryptos")
     puts "Starting to fetch cryptocurrency data from Binance..."
     
     # Alle verfügbaren Trading-Paare abrufen
@@ -22,12 +154,12 @@ class BinanceService
     usdc_symbols = symbols.select { |symbol| symbol.end_with?('USDC') }
     puts "Processing #{usdc_symbols.length} USDC pairs"
 
-    # Preise für alle Symbole abrufen
-    prices = fetch_all_prices
+    # Preise für USDC-Paare abrufen
+    prices = fetch_prices_for_symbols(usdc_symbols)
     return unless prices
 
-    # 24h Ticker für Volumen-Daten
-    tickers_24h = fetch_24h_tickers
+    # 24h Ticker für Volumen-Daten (nur für USDC-Paare)
+    tickers_24h = fetch_24h_tickers_for_symbols(usdc_symbols)
     
     # Für jedes Symbol Daten verarbeiten
     usdc_symbols.each_with_index do |symbol, index|
@@ -50,7 +182,7 @@ class BinanceService
         crypto_name = symbol.gsub('USDC', '')
         crypto = find_or_create_cryptocurrency(crypto_name, symbol, price_data['price'].to_f, rsi, volume_24h)
         
-        puts "Updated #{crypto.name} - Price: $#{crypto.current_price}, RSI: #{crypto.rsi}, Volume: $#{crypto.volume_24h}"
+        puts "#{Date.now.strftime('%Y-%m-%d %H:%M:%S')} Updated #{crypto.name} - Price: $#{crypto.current_price}, RSI: #{crypto.rsi}, Volume: $#{crypto.volume_24h}"
         
         # Speichere historische Daten (nur für die ersten 10 Coins um Performance zu optimieren)
         if index < 10
@@ -78,12 +210,12 @@ class BinanceService
     puts "Starting to fetch specific cryptocurrency data from Binance..."
     puts "Processing #{symbols.length} symbols"
 
-    # Preise für alle Symbole abrufen
-    prices = fetch_all_prices
+    # Preise für spezifische Symbole abrufen
+    prices = fetch_prices_for_symbols(symbols)
     return unless prices
 
-    # 24h Ticker für Volumen-Daten
-    tickers_24h = fetch_24h_tickers
+    # 24h Ticker für Volumen-Daten (nur für spezifische Symbole)
+    tickers_24h = fetch_24h_tickers_for_symbols(symbols)
 
     # Für jedes Symbol Daten verarbeiten
     symbols.each_with_index do |symbol, index|
@@ -152,18 +284,23 @@ class BinanceService
 
     puts "Calculated start_timestamp: #{start_timestamp} (#{Time.at(start_timestamp / 1000)})"
 
-    response = get("/api/v3/klines", query: {
+    params = {
       symbol: symbol,
       interval: interval,
       startTime: start_timestamp,
       limit: 1000
-    })
+    }
+    log_binance_request('/api/v3/klines', params)
+    
+    response = get("/api/v3/klines", query: params)
 
     puts "Binance API response status: #{response.code}"
 
     if response.success?
       klines = response.parsed_response
       puts "Received #{klines.length} klines for #{symbol}"
+      log_binance_success('/api/v3/klines', "Retrieved #{klines.length} historical klines for #{symbol}")
+      log_binance_response_data('/api/v3/klines', klines, symbol)
       
       if klines.empty?
         puts "No klines data received for #{symbol}"
@@ -215,6 +352,7 @@ class BinanceService
       puts "Successfully processed #{chart_data.length} data points for #{symbol}"
       chart_data
     else
+      log_binance_error('/api/v3/klines', "HTTP #{response.code} for #{symbol}: #{response.message}")
       puts "Error fetching historical data for #{symbol}: #{response.code} - #{response.message}"
       puts "Response body: #{response.body}" if response.body
       []
@@ -441,54 +579,114 @@ class BinanceService
   private
 
   def self.fetch_all_symbols
+    log_binance_request('/api/v3/exchangeInfo')
     response = get('/api/v3/exchangeInfo')
+    
     if response.success?
       symbols = response.parsed_response['symbols']
                        .select { |s| s['status'] == 'TRADING' }
                        .map { |s| s['symbol'] }
+      log_binance_success('/api/v3/exchangeInfo', "Retrieved #{symbols.length} trading symbols")
+      log_binance_response_data('/api/v3/exchangeInfo', response.parsed_response['symbols'])
       symbols
     else
+      log_binance_error('/api/v3/exchangeInfo', "HTTP #{response.code}: #{response.message}")
       puts "Error fetching symbols: #{response.code} - #{response.message}"
       nil
     end
   end
 
   def self.fetch_all_prices
+    log_binance_request('/api/v3/ticker/price')
     response = get('/api/v3/ticker/price')
     if response.success?
+      log_binance_success('/api/v3/ticker/price', "Retrieved #{response.parsed_response.length} price entries")
+      log_binance_response_data('/api/v3/ticker/price', response.parsed_response)
       response.parsed_response
     else
+      log_binance_error('/api/v3/ticker/price', "HTTP #{response.code}: #{response.message}")
       puts "Error fetching prices: #{response.code} - #{response.message}"
       nil
     end
   end
 
+  # Optimierte Methode: Hole alle Preise und filtere nach spezifischen Symbolen
+  def self.fetch_prices_for_symbols(symbols)
+    return [] if symbols.empty?
+    
+    log_binance_request('/api/v3/ticker/price')
+    response = get('/api/v3/ticker/price')
+    
+    if response.success?
+      all_prices = response.parsed_response
+      # Filtere nur die gewünschten Symbole
+      filtered_prices = all_prices.select { |price| symbols.include?(price['symbol']) }
+      
+      log_binance_success('/api/v3/ticker/price', "Retrieved #{filtered_prices.length} price entries for #{symbols.length} symbols (filtered from #{all_prices.length} total)")
+      log_binance_response_data('/api/v3/ticker/price', filtered_prices)
+      filtered_prices
+    else
+      log_binance_error('/api/v3/ticker/price', "HTTP #{response.code}: #{response.message}")
+      puts "Error fetching prices for symbols: #{response.code} - #{response.message}"
+      []
+    end
+  end
+
   def self.fetch_24h_tickers
+    log_binance_request('/api/v3/ticker/24hr')
     response = get('/api/v3/ticker/24hr')
     if response.success?
+      log_binance_success('/api/v3/ticker/24hr', "Retrieved #{response.parsed_response.length} 24h ticker entries")
+      log_binance_response_data('/api/v3/ticker/24hr', response.parsed_response)
       response.parsed_response
     else
+      log_binance_error('/api/v3/ticker/24hr', "HTTP #{response.code}: #{response.message}")
       puts "Error fetching 24h tickers: #{response.code} - #{response.message}"
+      []
+    end
+  end
+
+  # Optimierte Methode: Hole alle 24h Ticker und filtere nach spezifischen Symbolen
+  def self.fetch_24h_tickers_for_symbols(symbols)
+    return [] if symbols.empty?
+    
+    log_binance_request('/api/v3/ticker/24hr')
+    response = get('/api/v3/ticker/24hr')
+    
+    if response.success?
+      all_tickers = response.parsed_response
+      # Filtere nur die gewünschten Symbole
+      filtered_tickers = all_tickers.select { |ticker| symbols.include?(ticker['symbol']) }
+      
+      log_binance_success('/api/v3/ticker/24hr', "Retrieved #{filtered_tickers.length} 24h ticker entries for #{symbols.length} symbols (filtered from #{all_tickers.length} total)")
+      log_binance_response_data('/api/v3/ticker/24hr', filtered_tickers)
+      filtered_tickers
+    else
+      log_binance_error('/api/v3/ticker/24hr', "HTTP #{response.code}: #{response.message}")
+      puts "Error fetching 24h tickers for symbols: #{response.code} - #{response.message}"
       []
     end
   end
 
   def self.calculate_rsi_for_symbol(symbol, interval = DEFAULT_INTERVAL, period = RSI_PERIOD)
     # Mehr Kline-Daten für genauere RSI-Berechnung abrufen
-    response = get("/api/v3/klines", query: {
-      symbol: symbol,
-      interval: interval,
-      limit: 100 # Deutlich mehr Daten für bessere Genauigkeit
-    })
+    params = { symbol: symbol, interval: interval, limit: 14 }
+    log_binance_request('/api/v3/klines', params)
+    
+    response = get("/api/v3/klines", query: params)
 
     if response.success?
       klines = response.parsed_response
       closes = klines.map { |kline| kline[4].to_f } # Schlusskurse
       
+      log_binance_success('/api/v3/klines', "Retrieved #{klines.length} klines for #{symbol} RSI calculation")
+      log_binance_response_data('/api/v3/klines', klines, symbol)
+      
       return nil if closes.length < period + 1
       
       calculate_rsi_wilders(closes, period)
     else
+      log_binance_error('/api/v3/klines', "HTTP #{response.code} for #{symbol}: #{response.message}")
       puts "Error fetching klines for #{symbol}: #{response.code}"
       nil
     end
@@ -604,7 +802,7 @@ class BinanceService
     response = get("/api/v3/klines", query: {
       symbol: symbol,
       interval: interval,
-      limit: 100  # Mehr Daten für bessere Berechnung
+      limit: 14  # Minimale Daten für ROC-Berechnung
     })
 
     if response.success?
@@ -629,7 +827,7 @@ class BinanceService
     response = get("/api/v3/klines", query: {
       symbol: symbol,
       interval: interval,
-      limit: 150  # Mehr Daten für Ableitungs-Berechnung
+      limit: 15  # Minimale Daten für ROC-Ableitungs-Berechnung (15 für 14+1)
     })
 
     if response.success?

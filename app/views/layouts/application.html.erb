@@ -846,6 +846,60 @@
           
           return new Date(); // Fallback
         }
+
+        // Funktion zum Aktualisieren der "Letzte Aktualisierung" Anzeige
+        function updateLastUpdateDisplay() {
+          // Hole die tatsächliche letzte Aktualisierung aus der Datenbank
+          fetch('/cryptocurrencies/last_update', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          })
+          .then(response => response.json())
+          .then(data => {
+            console.log('Letzte Aktualisierung Daten:', data);
+            
+            if (data.last_update) {
+              const lastUpdate = new Date(data.last_update);
+              const germanTime = lastUpdate.toLocaleString('de-DE', {
+                timeZone: 'Europe/Berlin',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              });
+              
+              console.log('Formatierte Zeit:', germanTime);
+              
+              // Suche nach allen "Letzte Aktualisierung" Elementen
+              const allSmallElements = document.querySelectorAll('small');
+              
+              allSmallElements.forEach(element => {
+                if (element.textContent.includes('Letzte Aktualisierung')) {
+                  console.log('Aktualisiere Element:', element.textContent);
+                  // Ersetze die Zeit mit der tatsächlichen letzten Aktualisierung
+                  element.innerHTML = element.innerHTML.replace(
+                    /(\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})/,
+                    germanTime
+                  );
+                  console.log('Element aktualisiert:', element.innerHTML);
+                }
+              });
+            } else {
+              console.log('Keine letzten Aktualisierungsdaten verfügbar');
+            }
+          })
+          .catch(error => {
+            console.log('Fehler beim Abrufen der letzten Aktualisierung:', error);
+          });
+        }
+
+        // Aktualisiere die Anzeige alle 30 Sekunden (nicht jede Sekunde)
+        setInterval(updateLastUpdateDisplay, 30000);
         
         function refreshDataSilently() {
           console.log('Starte stille Datenaktualisierung...');
