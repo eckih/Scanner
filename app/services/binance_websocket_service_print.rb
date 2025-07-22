@@ -3,6 +3,7 @@ require 'websocket-client-simple'
 require 'net/http'
 require 'json'
 require 'time' # Für Time.at
+require File.expand_path('../../config/environment', __dir__)
 
 # Stellt eine WebSocket-Verbindung zu Binance her, um 1m Kerzendaten
 # für alle USDC-Paare zu empfangen und auf der Konsole auszugeben.
@@ -163,9 +164,31 @@ class BinanceWebsocketService
            "Vol: #{volume} | Δ: #{sprintf('%+.2f%%', price_change)}"
       
       puts "=" * 80
+
+      # --- NEU: In DB speichern ---
+      Kline.upsert(
+        {
+          symbol: symbol,
+          interval: kline['i'],
+          open_price: kline['o'],
+          high_price: kline['h'],
+          low_price: kline['l'],
+          close_price: kline['c'],
+          volume: kline['v'],
+          open_time: kline['t'],
+          close_time: kline['T'],
+          trades_count: kline['n'],
+          is_closed: kline['x'],
+          created_at: Time.now,
+          updated_at: Time.now
+        },
+        unique_by: %i[symbol interval open_time]
+      )
+      # --- ENDE NEU ---
+
     rescue => e
       puts "❌ Fehler in print_kline_data: #{e.message}"
-      puts "  Fehlerhafte Kline-Daten: #{kline.inspect}" # Zusätzliche Debug-Info
+      puts "  Fehlerhafte Kline-Daten: #{kline.inspect}"
     end
   end
 

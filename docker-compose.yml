@@ -17,21 +17,22 @@ services:
       # - RAILS_LOG_TO_STDOUT=true
       - CRYPTO_UPDATE_INTERVAL=300
     working_dir: /app
-    command: >
-      bash -c "
-        echo 'Starting Rails application...' &&
-        bundle install &&
-        # echo 'Creating database...' &&
-        # bundle exec rake db:create RAILS_ENV=development || echo 'Database already exists' &&
-        # echo 'Running migrations...' &&
-        # bundle exec rake db:migrate RAILS_ENV=development || echo 'Migration failed' &&
-        # echo 'Loading real cryptocurrency data from Binance API...' &&
-        # bundle exec rake db:seed RAILS_ENV=development || echo 'Seeding failed' &&
-        echo 'Starting Rails server...' &&
-        bundle exec puma -b tcp://0.0.0.0:3000 -e development --pidfile /tmp/puma.pid
-      "
-    stdin_open: true
-    tty: true
+    command: bundle exec rails server -b 0.0.0.0 -e development    
+    # command: >
+    #   bash -c "
+    #     echo 'Starting Rails application...' &&
+    #     # bundle install &&
+    #     # echo 'Creating database...' &&
+    #     # bundle exec rake db:create RAILS_ENV=development || echo 'Database already exists' &&
+    #     # echo 'Running migrations...' &&
+    #     # bundle exec rake db:migrate RAILS_ENV=development || echo 'Migration failed' &&
+    #     # echo 'Loading real cryptocurrency data from Binance API...' &&
+    #     # bundle exec rake db:seed RAILS_ENV=development || echo 'Seeding failed' &&
+    #     echo 'Starting Rails server...' &&
+    #     bundle exec puma -b tcp://0.0.0.0:3000 -e development --pidfile /tmp/puma.pid
+      # "
+    # stdin_open: true
+    # tty: true
 
 volumes:
   bundle_cache: 
