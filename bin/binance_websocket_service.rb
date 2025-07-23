@@ -105,7 +105,9 @@ class BinanceWebsocketService
 
   # Startet den WebSocket-Service
   def start
-    LOGGER.info "🚀 Starte Binance Websocket-Service für #{@pairs.length} Paare..."
+    if Rails.logger.level <= Logger::INFO
+      Rails.logger.info "🚀 Starte Binance Websocket-Service für #{@pairs.length} Paare..."
+    end
     connect_and_subscribe # Baut die Verbindung auf und abonniert Streams
     keep_alive # Hält den Hauptthread am Laufen
   end
@@ -128,14 +130,18 @@ class BinanceWebsocketService
     service_instance_ref = self 
 
     @mutex.synchronize do # Schützt den Zugriff auf @ws
-      LOGGER.info "🔗 Versuche Verbindung zu #{combined_stream_url} herzustellen..."
+      if Rails.logger.level <= Logger::INFO
+        Rails.logger.info "🔗 Versuche Verbindung zu #{combined_stream_url} herzustellen..."
+      end
       
       # WebSocket::Client::Simple.connect gibt die Client-Instanz zurück, auf der die Callbacks registriert werden.
       # Diese Instanz verwaltet intern ihren eigenen Thread.
       @ws = WebSocket::Client::Simple.connect(combined_stream_url) do |ws_client_instance|
         # Callback für erfolgreiche Verbindung
         ws_client_instance.on :open do
-          LOGGER.info "✅ WebSocket-Verbindung erfolgreich hergestellt!"
+          if Rails.logger.level <= Logger::INFO
+            Rails.logger.info "✅ WebSocket-Verbindung erfolgreich hergestellt!"
+          end
           # Nun können wir über `service_instance_ref` auf die Methoden und Instanzvariablen zugreifen.
           service_instance_ref.instance_variable_set(:@reconnect_attempt, 0) # Instanzvariable direkt setzen
           service_instance_ref.instance_variable_set(:@last_pong_at, Time.now) # Zeit des letzten Pongs/Datenempfangs zurücksetzen
@@ -146,7 +152,9 @@ class BinanceWebsocketService
         # Callback für empfangene Nachrichten
         ws_client_instance.on :message do |msg|
           # NEUE DEBUG-AUSGABE HIER: Prüfen, ob dieser Callback überhaupt erreicht wird.
-          # LOGGER.info "📨 Nachricht empfangen (Typ: #{msg.type}): #{msg.data[0..100]}..."
+          if Rails.logger.level <= Logger::DEBUG
+            Rails.logger.debug "📨 Nachricht empfangen (Typ: #{msg.type}): #{msg.data[0..100]}..."
+          end
           
           # Jede empfangene Nachricht (egal ob Daten oder Pong-Frame) bestätigt die Lebendigkeit der Verbindung.
           service_instance_ref.instance_variable_set(:@last_pong_at, Time.now)
@@ -154,7 +162,9 @@ class BinanceWebsocketService
 
           # Besondere Behandlung für den "Pong timeout..." Nachrichtentyp, der als :close kommt
           if msg.type == :close && msg.data == "Pong timeout" # Genau prüfen
-            LOGGER.warn "⚠️ Pong-Timeout erkannt - Verbindung wird geschlossen"
+            if Rails.logger.level <= Logger::WARN
+              Rails.logger.warn "⚠️ Pong-Timeout erkannt - Verbindung wird geschlossen"
+            end
             # Hier keine weitere Verarbeitung, da dies ein internes Signal ist, das zur Schließung führt.
             return
           end
@@ -164,14 +174,18 @@ class BinanceWebsocketService
 
         # Callback für geschlossene Verbindung
         ws_client_instance.on :close do |e|
-          LOGGER.warn "🔴 WebSocket-Verbindung geschlossen (Code: #{e.code}, Grund: #{e.reason})"
+          if Rails.logger.level <= Logger::WARN
+            Rails.logger.warn "🔴 WebSocket-Verbindung geschlossen (Code: #{e.code}, Grund: #{e.reason})"
+          end
           service_instance_ref.send(:stop_ping_pong_timers) # Timer stoppen
           service_instance_ref.send(:reconnect) # Automatischer Reconnect
         end
 
         # Callback für WebSocket-Fehler
         ws_client_instance.on :error do |e|
-          LOGGER.error "❌ WebSocket-Fehler: #{e.class} - #{e.message}"
+          if Rails.logger.level <= Logger::ERROR
+            Rails.logger.error "❌ WebSocket-Fehler: #{e.class} - #{e.message}"
+          end
           service_instance_ref.send(:stop_ping_pong_timers) # Timer stoppen
           service_instance_ref.send(:reconnect) # Automatischer Reconnect
         end
@@ -204,17 +218,17 @@ class BinanceWebsocketService
     @ping_timer = Concurrent::TimerTask.new(execution_interval: PING_INTERVAL_SECONDS) do
       @mutex.synchronize do # Schützt den Zugriff auf @ws
         if @ws && @ws.open?
-          LOGGER.debug "Sende WebSocket-Ping..."
+          Rails.logger.debug "Sende WebSocket-Ping..."
           @ws.ping # Sendet einen echten WebSocket-Ping-Frame (Protokoll-Level)
           start_pong_timeout_timer # Startet den Timeout-Timer für die Pong-Antwort
         else
-          LOGGER.warn "Kann Ping nicht senden: WebSocket nicht offen. Timer wird gestoppt."
+          Rails.logger.warn "Kann Ping nicht senden: WebSocket nicht offen. Timer wird gestoppt."
           stop_ping_pong_timers # Wenn WS nicht offen, Timer stoppen
         end
       end
     end
     @ping_timer.execute # Timer starten
-    LOGGER.debug "Ping-Timer gestartet."
+    Rails.logger.debug "Ping-Timer gestartet."
   end
 
   # Startet den Pong-Timeout-Timer.
@@ -225,16 +239,16 @@ class BinanceWebsocketService
       @mutex.synchronize do # Schützt den Zugriff auf @last_pong_at und @ws
         # Prüfen, ob wirklich keine Nachricht empfangen wurde seit dem letzten Ping
         if (Time.now - @last_pong_at) > PONG_TIMEOUT_SECONDS
-          LOGGER.warn "Pong-Timeout! Keine Daten oder Pong seit #{PONG_TIMEOUT_SECONDS} Sekunden erhalten."
-          LOGGER.warn "Verbindung wird als inaktiv betrachtet. Schließe Verbindung."
+          Rails.logger.warn "Pong-Timeout! Keine Daten oder Pong seit #{PONG_TIMEOUT_SECONDS} Sekunden erhalten."
+          Rails.logger.warn "Verbindung wird als inaktiv betrachtet. Schließe Verbindung."
           @ws.close if @ws && @ws.open? # Schließe die Verbindung, um einen Reconnect auszulösen
         else
-          LOGGER.debug "Pong-Timeout-Timer ausgelöst, aber Daten empfangen. Timer wird beim nächsten Ping neu gestartet."
+          Rails.logger.debug "Pong-Timeout-Timer ausgelöst, aber Daten empfangen. Timer wird beim nächsten Ping neu gestartet."
         end
       end
     end
     @pong_timeout_timer.execute # Timer starten
-    LOGGER.debug "Pong-Timeout-Timer gestartet."
+    Rails.logger.debug "Pong-Timeout-Timer gestartet."
   end
 
   # Bricht den Pong-Timeout-Timer ab.
@@ -242,7 +256,7 @@ class BinanceWebsocketService
     if @pong_timeout_timer && @pong_timeout_timer.running?
       @pong_timeout_timer.shutdown # Timer sauber beenden
       @pong_timeout_timer = nil
-      LOGGER.debug "Pong-Timeout-Timer abgebrochen."
+      Rails.logger.debug "Pong-Timeout-Timer abgebrochen."
     end
   end
 
@@ -251,7 +265,7 @@ class BinanceWebsocketService
     if @ping_timer && @ping_timer.running?
       @ping_timer.shutdown # Ping-Timer sauber beenden
       @ping_timer = nil
-      LOGGER.debug "Ping-Timer gestoppt."
+      Rails.logger.debug "Ping-Timer gestoppt."
     end
     cancel_pong_timeout_timer # Sicherstellen, dass auch der Pong-Timeout-Timer gestoppt wird
   end
@@ -264,7 +278,7 @@ class BinanceWebsocketService
       @reconnect_attempt += 1
       # Exponentieller Backoff mit maximaler Verzögerung
       reconnect_delay = [RECONNECT_INITIAL_DELAY_SECONDS * (2**(@reconnect_attempt - 1)), RECONNECT_MAX_DELAY_SECONDS].min
-      LOGGER.info "Versuche Neuverbindung in #{reconnect_delay} Sekunden (Versuch #{@reconnect_attempt})..."
+      Rails.logger.info "Versuche Neuverbindung in #{reconnect_delay} Sekunden (Versuch #{@reconnect_attempt})..."
       
       # Starte den Reconnect-Versuch in einem neuen Thread, um den aktuellen Callback nicht zu blockieren.
       Thread.new do
@@ -277,14 +291,14 @@ class BinanceWebsocketService
 
   # Verarbeitet eingehende WebSocket-Nachrichten.
   private def handle_message(msg)
-    # LOGGER.info "🔄 Verarbeite Nachricht: #{msg.data[0..80]}..."
+    Rails.logger.debug "🔄 Verarbeite Nachricht: #{msg.data}..."
     
     # Prüfen, ob es sich um gültige JSON-Daten handelt
     return unless msg.data.start_with?('{') || msg.data.start_with?('[')
     
     begin
       data = JSON.parse(msg.data)
-      # LOGGER.info "✅ JSON geparst - Event: #{data['e']}"
+      Rails.logger.debug "✅ JSON geparst - Event: #{data['e']}"
       
       # Verarbeite verschiedene Event-Typen
       case data['e']
@@ -293,18 +307,18 @@ class BinanceWebsocketService
       when '24hrTicker'
         process_ticker_data(data)
       else
-        LOGGER.debug "❓ Unbekannter Event-Typ: #{data['e']}"
+        Rails.logger.debug "❓ Unbekannter Event-Typ: #{data['e']}"
       end
     rescue JSON::ParserError => e
-      LOGGER.warn "⚠️ JSON-Parsing-Fehler: #{e.message}"
+      Rails.logger.warn "⚠️ JSON-Parsing-Fehler: #{e.message}"
     rescue => e
-      LOGGER.error "❌ Fehler bei Nachrichtenverarbeitung: #{e.class} - #{e.message}"
+      Rails.logger.error "❌ Fehler bei Nachrichtenverarbeitung: #{e.class} - #{e.message}"
     end
   end
 
   # Verarbeitet Daten aus einem Multi-Stream (Daten sind unter dem 'data'-Schlüssel)
   private def process_stream_data(data)
-    LOGGER.debug "In process_stream_data. Event-Typ: #{data['e']}" # Debug-Log
+    Rails.logger.debug "In process_stream_data. Event-Typ: #{data['e']}" # Debug-Log
     if data['e'] == 'kline' && data['k']
       process_kline_data(data['s'], data['k'])
     end
@@ -313,25 +327,25 @@ class BinanceWebsocketService
 
   # Verarbeitet Kline-Daten (O, H, L, C, V)
   private def process_kline_data(symbol, kline)
-    # LOGGER.debug "In process_kline_data für #{symbol}. Ist abgeschlossen: #{kline['x']}" # Debug-Log
+    Rails.logger.debug "In process_kline_data für #{symbol}. Ist abgeschlossen: #{kline['x']}" # Debug-Log
     # Nur abgeschlossene Kerzen speichern, um Duplikate und unvollständige Daten zu vermeiden
     if kline['x'] # 'x' ist true für abgeschlossene Kerzen
       save_kline(symbol, kline)
     end
   rescue StandardError => e
-    LOGGER.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
+    Rails.logger.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
   end
 
   # Speichert die Kline-Daten in der Datenbank.
   private def save_kline(symbol, kline)
-    # LOGGER.info "💾 Speichere Kline für #{symbol}..."
+    Rails.logger.info "💾 Speichere Kline für #{symbol}..."
     
     # Verwende die wiederverwendete Datenbankverbindung
     ActiveRecord::Base.connection_pool.with_connection do
       # Typkonvertierung und Mapping
       cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
       unless cryptocurrency
-        # LOGGER.info "🆕 Erstelle neue Kryptowährung: #{symbol}"
+        Rails.logger.info "🆕 Erstelle neue Kryptowährung: #{symbol}"
         cryptocurrency = Cryptocurrency.create!(
           symbol: symbol,
           name: symbol, # Fallback, besser wäre Mapping
@@ -353,17 +367,17 @@ class BinanceWebsocketService
       }
       
       CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
-      # LOGGER.info "📊 [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
+      Rails.logger.info "📊 [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
     end
   rescue => e
-    LOGGER.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
+    Rails.logger.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
   end
 
   # Hält den Hauptthread am Laufen, damit die Hintergrund-Threads arbeiten können.
   def keep_alive
-    LOGGER.info "Service läuft... (Ctrl+C zum Beenden)"
+    Rails.logger.info "Service läuft... (Ctrl+C zum Beenden)"
     trap('INT') do
-      LOGGER.info "\nBeende Service..."
+      Rails.logger.info "\nBeende Service..."
       @mutex.synchronize do
         # Sicherstellen, dass die WebSocket-Verbindung sauber geschlossen wird
         @ws&.close if @ws && @ws.open?
