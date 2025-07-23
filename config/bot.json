@@ -1,0 +1,13 @@
+
+{
+     "exchange": {
+        "name": "binance",
+        "pair_whitelist": [
+  "BTC/USDC"
+],
+
+        "pair_blacklist": [
+  
+        ]
+    }
+}

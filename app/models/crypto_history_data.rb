@@ -3,7 +3,7 @@ class CryptoHistoryData < ApplicationRecord
   
   validates :cryptocurrency_id, presence: true
   validates :timestamp, presence: true
-  validates :interval, presence: true, inclusion: { in: %w[1h 4h 1d 5m] }
+  validates :interval, presence: true, inclusion: { in: %w[1m 1h 4h 1d 5m] }
   
   scope :for_cryptocurrency, ->(crypto) { where(cryptocurrency: crypto) }
   scope :for_interval, ->(interval) { where(interval: interval) }

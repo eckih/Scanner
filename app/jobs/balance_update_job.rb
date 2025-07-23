@@ -1,7 +1,7 @@
 class BalanceUpdateJob
   def self.perform_later
     # Führe den Job sofort aus (für einfache Implementierung)
-    new.perform
+    # new.perform
   end
 
   def perform
