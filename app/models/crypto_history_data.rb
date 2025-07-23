@@ -37,15 +37,17 @@ class CryptoHistoryData < ApplicationRecord
   
   def self.cleanup_old_data(keep_periods = 100)
     # Lösche alte Daten, behalte nur die neuesten Datensätze
-    intervals = %w[1h 4h 1d 5m]
+    intervals = %w[1m 1h 4h 1d 5m]
     
     intervals.each do |interval|
       # Für jede Kryptowährung und jedes Intervall
       Cryptocurrency.find_each do |crypto|
+        # Für 1m-Intervall 1440 Einträge behalten, sonst keep_periods
+        limit = interval == '1m' ? 1440 : keep_periods
         # Finde die neuesten Datensätze
         latest_records = where(cryptocurrency: crypto, interval: interval)
                            .order(timestamp: :desc)
-                           .limit(keep_periods)
+                           .limit(limit)
                            .pluck(:id)
         
         # Lösche alle anderen Datensätze

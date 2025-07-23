@@ -231,3 +231,6 @@ Dieses Projekt ist unter der MIT-Lizenz lizenziert - siehe die [LICENSE](LICENSE
 ---
 
 **Mit ❤️ entwickelt mit Ruby on Rails** 
+
+
+docker compose exec web rails runner "puts '=== ALL CRYPTOCURRENCIES ==='; Cryptocurrency.all.each { |c| puts \"#{c.id}. #{c.name} (#{c.symbol}) - Price: $#{c.current_price} - RSI: #{c.rsi} - ROC: #{c.roc} - ROC': #{c.roc_derivative} - Updated: #{c.updated_at}\" }"

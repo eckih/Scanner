@@ -18,7 +18,7 @@ class BinanceService
       
       # Verwende sowohl separate Datei als auch Rails Logger als Fallback
       logger = Logger.new(log_file)
-      logger.level = Logger::INFO
+      logger.level = Logger::WARN
       logger.formatter = proc do |severity, datetime, progname, msg|
         "#{datetime.strftime('%Y-%m-%d %H:%M:%S')} [#{severity}] #{msg}\n"
       end
@@ -41,7 +41,7 @@ class BinanceService
     log_message += " | Body: #{response_body}" if response_body && response_body.length < 500
     
     # Schreibe in beide Logger
-    binance_logger.info(log_message)
+    binance_logger.debug(log_message)
     Rails.logger.info(log_message)
     
     # Direktes Schreiben in Datei als Backup
@@ -63,7 +63,7 @@ class BinanceService
     log_message = "BINANCE API SUCCESS: #{endpoint} | #{message}"
     
     # Schreibe in beide Logger
-    binance_logger.info(log_message)
+    binance_logger.debug(log_message)
     Rails.logger.info(log_message)
     
     # Direktes Schreiben in Datei als Backup
@@ -73,10 +73,10 @@ class BinanceService
   # Direktes Schreiben in die Logdatei als Backup
   def self.write_direct_to_log(message)
     begin
-      log_file = Rails.root.join('log', 'binance.log')
-      File.open(log_file, 'a') do |f|
-        f.puts "#{Time.current.strftime('%Y-%m-%d %H:%M:%S')} [INFO] #{message}"
-      end
+      # log_file = Rails.root.join('log', 'binance.log')
+      # File.open(log_file, 'a') do |f|
+      #   f.puts "#{Time.current.strftime('%Y-%m-%d %H:%M:%S')} [INFO] #{message}"
+      # end
     rescue => e
       Rails.logger.error("Failed to write to binance.log: #{e.message}")
     end
@@ -90,7 +90,7 @@ class BinanceService
       log_message += " | Symbol: #{symbol}" if symbol
       log_message += " | Data Count: #{response_data.length}"
       
-      binance_logger.info(log_message)
+      binance_logger.debug(log_message)
       write_direct_to_log(log_message)
       
       # Logge alle Daten detailliert
@@ -106,11 +106,11 @@ class BinanceService
             volume: item[5].to_f
           }
           data_log = "BINANCE KLINE DATA: #{symbol} | #{kline_data}"
-          binance_logger.info(data_log)
+          binance_logger.debug(data_log)
           write_direct_to_log(data_log)
         elsif item.is_a?(Hash)
           data_log = "BINANCE RESPONSE ITEM: #{symbol} | #{item}"
-          binance_logger.info(data_log)
+          binance_logger.debug(data_log)
           write_direct_to_log(data_log)
         end
       end
@@ -121,7 +121,7 @@ class BinanceService
       log_message += " | Symbol: #{symbol}" if symbol
       log_message += " | Data: #{response_data}"
       
-      binance_logger.info(log_message)
+      binance_logger.debug(log_message)
       write_direct_to_log(log_message)
     end
   end
@@ -184,14 +184,12 @@ class BinanceService
         
         puts "#{Date.now.strftime('%Y-%m-%d %H:%M:%S')} Updated #{crypto.name} - Price: $#{crypto.current_price}, RSI: #{crypto.rsi}, Volume: $#{crypto.volume_24h}"
         
-        # Speichere historische Daten (nur für die ersten 10 Coins um Performance zu optimieren)
-        if index < 10
-          begin
-            store_historical_data_for_crypto(crypto, 100) # 100 Perioden
-            puts "Stored historical data for #{crypto.name}"
-          rescue => e
-            puts "Error storing historical data for #{crypto.name}: #{e.message}"
-          end
+        # Speichere historische Daten (1m, 1h, 4h, 1d) für alle Coins
+        begin
+          store_historical_data_for_crypto(crypto, 100) # 100 Perioden, 1m = 1440 Minuten (24h)
+          puts "Stored historical data for #{crypto.name}"
+        rescue => e
+          puts "Error storing historical data for #{crypto.name}: #{e.message}"
         end
         
         # Kleine Pause um Rate Limits zu vermeiden
@@ -670,7 +668,7 @@ class BinanceService
 
   def self.calculate_rsi_for_symbol(symbol, interval = DEFAULT_INTERVAL, period = RSI_PERIOD)
     # Mehr Kline-Daten für genauere RSI-Berechnung abrufen
-    params = { symbol: symbol, interval: interval, limit: 14 }
+    params = { symbol: symbol, interval: interval, limit: 15 }
     log_binance_request('/api/v3/klines', params)
     
     response = get("/api/v3/klines", query: params)
@@ -802,7 +800,7 @@ class BinanceService
     response = get("/api/v3/klines", query: {
       symbol: symbol,
       interval: interval,
-      limit: 14  # Minimale Daten für ROC-Berechnung
+      limit: 15  # Minimale Daten für ROC-Berechnung
     })
 
     if response.success?
@@ -850,12 +848,13 @@ class BinanceService
   def self.store_historical_data_for_crypto(cryptocurrency, period = 100)
     puts "Storing historical data for #{cryptocurrency.symbol} (period: #{period})"
     
-    intervals = %w[1h 4h 1d] # Verschiedene Intervalle für verschiedene Zeiträume
+    intervals = %w[1m 1h 4h 1d] # Verschiedene Intervalle für verschiedene Zeiträume
     
     intervals.each do |interval|
       begin
         # Hole historische Daten von Binance
         start_time = case interval
+                    when '1m' then "1440 minutes ago UTC"
                     when '1h' then "#{period} hours ago UTC"
                     when '4h' then "#{period * 4} hours ago UTC"
                     when '1d' then "#{period} days ago UTC"

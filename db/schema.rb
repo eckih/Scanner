@@ -87,5 +87,41 @@ ActiveRecord::Schema[7.1].define(version: 202412221) do
     t.index ["symbol"], name: "index_cryptocurrencies_on_symbol", unique: true
   end
 
+  create_table "roc_derivative_histories", force: :cascade do |t|
+    t.integer "cryptocurrency_id", null: false
+    t.float "value", null: false
+    t.string "interval", default: "1h", null: false
+    t.datetime "calculated_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cryptocurrency_id", "interval", "calculated_at"], name: "index_roc_derivative_histories_on_crypto_interval_time", unique: true
+    t.index ["cryptocurrency_id"], name: "index_roc_derivative_histories_on_cryptocurrency_id"
+  end
+
+  create_table "roc_histories", force: :cascade do |t|
+    t.integer "cryptocurrency_id", null: false
+    t.float "value", null: false
+    t.string "interval", default: "1h", null: false
+    t.datetime "calculated_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cryptocurrency_id", "interval", "calculated_at"], name: "index_roc_histories_on_crypto_interval_time", unique: true
+    t.index ["cryptocurrency_id"], name: "index_roc_histories_on_cryptocurrency_id"
+  end
+
+  create_table "rsi_histories", force: :cascade do |t|
+    t.integer "cryptocurrency_id", null: false
+    t.float "value", null: false
+    t.string "interval", default: "1h", null: false
+    t.datetime "calculated_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cryptocurrency_id", "interval", "calculated_at"], name: "index_rsi_histories_on_crypto_interval_time", unique: true
+    t.index ["cryptocurrency_id"], name: "index_rsi_histories_on_cryptocurrency_id"
+  end
+
   add_foreign_key "crypto_history_data", "cryptocurrencies"
+  add_foreign_key "roc_derivative_histories", "cryptocurrencies"
+  add_foreign_key "roc_histories", "cryptocurrencies"
+  add_foreign_key "rsi_histories", "cryptocurrencies"
 end

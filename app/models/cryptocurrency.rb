@@ -10,10 +10,10 @@ class Cryptocurrency < ApplicationRecord
   attribute :roc_derivative, :decimal, default: nil
   
   # Beziehungen - temporär deaktiviert um Seeds-Fehler zu beheben
-  # has_many :crypto_history_data, class_name: 'CryptoHistoryDatum', dependent: :destroy
-  # has_many :rsi_histories, dependent: :destroy
-  # has_many :roc_histories, dependent: :destroy
-  # has_many :roc_derivative_histories, dependent: :destroy
+  has_many :crypto_history_data, class_name: 'CryptoHistoryDatum', dependent: :destroy
+  has_many :rsi_histories, dependent: :destroy
+  has_many :roc_histories, dependent: :destroy
+  has_many :roc_derivative_histories, dependent: :destroy
   
   scope :top_50, -> { order(:market_cap_rank).limit(50) }
   scope :by_market_cap, -> { order(market_cap: :desc) }
