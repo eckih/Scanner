@@ -19,14 +19,4 @@ class BalancesController < ApplicationController
     
     render json: @chart_data
   end
-
-  def refresh_data
-    # Starte Background-Job für Balance-Aktualisierung
-    BalanceUpdateJob.perform_later
-    
-    respond_to do |format|
-      format.html { redirect_to balances_path, notice: 'Balance-Aktualisierung wurde im Hintergrund gestartet.' }
-      format.json { render json: { status: 'started', message: 'Balance-Aktualisierung wurde im Hintergrund gestartet.' } }
-    end
-  end
 end 

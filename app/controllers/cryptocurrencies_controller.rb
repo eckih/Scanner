@@ -1,14 +1,14 @@
+require_dependency "crypto_config"
+
 class CryptocurrenciesController < ApplicationController
   ROC_PERIOD = 24 # Standard ROC-Periode in Stunden
   
   # CSRF-Schutz für AJAX-Endpoints deaktivieren
-  skip_before_action :verify_authenticity_token, only: [:refresh_data, :update_roc, :add_roc_derivative]
+  skip_before_action :verify_authenticity_token, only: [:add_roc_derivative]
 
   def index
     @cryptocurrencies = Cryptocurrency.order(:market_cap_rank)
-    @last_update = Cryptocurrency.maximum(:updated_at)
-    logger.info("********* Last update: #{@last_update}")
-    @update_interval = Rails.application.config.crypto_update_interval
+    # @last_update entfernt - nicht mehr benötigt für Live-Updates
     calculate_trends_for_cryptocurrencies
 
     # Effizient: Hash mit den letzten Preisen für alle Cryptos
@@ -25,26 +25,6 @@ class CryptocurrenciesController < ApplicationController
   def show
     @cryptocurrency = Cryptocurrency.find(params[:id])
     @chart_data = create_chart_data(@cryptocurrency.rsi_histories, @cryptocurrency.roc_histories, @cryptocurrency.roc_derivative_histories)
-  end
-
-  def refresh_data
-    # Starte Background-Job für Datenaktualisierung
-    CryptocurrencyUpdateJob.perform_later
-    
-    respond_to do |format|
-      format.html { redirect_to cryptocurrencies_path, notice: 'Datenaktualisierung wurde im Hintergrund gestartet.' }
-      format.json { render json: { status: 'started', message: 'Datenaktualisierung wurde im Hintergrund gestartet.' } }
-    end
-  end
-
-  def update_roc
-    # Starte Background-Job für ROC-Aktualisierung
-    CryptocurrencyUpdateJob.perform_later
-    
-    respond_to do |format|
-      format.html { redirect_to cryptocurrencies_path, notice: 'ROC-Berechnung wurde im Hintergrund gestartet.' }
-      format.json { render json: { status: 'started', message: 'ROC-Berechnung wurde im Hintergrund gestartet.' } }
-    end
   end
 
   def settings
@@ -93,31 +73,39 @@ class CryptocurrenciesController < ApplicationController
 
   def last_update
     begin
-        # Hole die letzte erfolgreiche Datenaktualisierung
-        # Suche nach dem neuesten Eintrag in der RsiHistory (das zeigt echte Datenaktualisierung)
       last_rsi_update = RsiHistory.maximum(:created_at)
       last_roc_update = RocHistory.maximum(:created_at)
       last_roc_derivative_update = RocDerivativeHistory.maximum(:created_at)
-      
-      # Verwende das neueste Datum aus allen historischen Daten
       last_update = [last_rsi_update, last_roc_update, last_roc_derivative_update].compact.max
-      
-      # Fallback auf Cryptocurrency updated_at falls keine historischen Daten vorhanden
       if last_update.nil?
         last_update = Cryptocurrency.maximum(:updated_at)
       end
-      
       render json: {
         last_update: last_update ? last_update.iso8601 : nil,
         last_rsi_update: last_rsi_update ? last_rsi_update.iso8601 : nil,
         last_roc_update: last_roc_update ? last_roc_update.iso8601 : nil,
         last_roc_derivative_update: last_roc_derivative_update ? last_roc_derivative_update.iso8601 : nil
       }
-
     rescue => e
       Rails.logger.error("Fehler in last_update: #{e.class} - #{e.message}")
       render json: { error: e.message }, status: 500
     end    
+  end
+
+  # Neue Route für ActionCable-Broadcasts
+  def broadcast_price
+    cryptocurrency_id = params[:cryptocurrency_id]
+    price = params[:price]
+    symbol = params[:symbol]
+    
+    ActionCable.server.broadcast("prices", {
+      cryptocurrency_id: cryptocurrency_id,
+      price: price,
+      symbol: symbol,
+      timestamp: Time.now.iso8601
+    })
+    
+    render json: { status: 'ok' }
   end
 
   private

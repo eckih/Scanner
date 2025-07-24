@@ -16,14 +16,15 @@ Rails.application.routes.draw do
   
   resources :cryptocurrencies, only: [:index, :show] do
     collection do
-      post :refresh_data
-      post :update_roc
+      # post :refresh_data
+      # post :update_roc
       get :settings
       patch :update_settings
       get :add_roc_derivative
       post :add_roc_derivative
       get :averages_chart
       get :last_update
+      post :broadcast_price
     end
     member do
       get :chart
@@ -34,7 +35,6 @@ Rails.application.routes.draw do
   resources :balances, only: [:index] do
     collection do
       get :chart_data
-      post :refresh_data
     end
   end
 

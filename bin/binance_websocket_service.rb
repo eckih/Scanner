@@ -367,7 +367,10 @@ class BinanceWebsocketService
         volume: kline['v'].to_f,
         interval: '1m',
       }
-      
+
+      # Broadcast the price to the frontend
+      broadcast_price(symbol, attrs[:close])
+
       begin
         result = CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
         if result.persisted?
@@ -384,6 +387,50 @@ class BinanceWebsocketService
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
+  end
+
+  def broadcast_price(symbol, price)  
+    Rails.logger.info "🔔 Sende ActionCable Broadcast für #{symbol}: #{price}"
+    puts "🔔 Sende ActionCable Broadcast für #{symbol}: #{price}"
+    
+    cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
+    if cryptocurrency
+      Rails.logger.info "📡 Broadcasting an PricesChannel: #{cryptocurrency.id}, #{price}"
+      puts "📡 Broadcasting an PricesChannel: #{cryptocurrency.id}, #{price}"
+      
+      # Sende HTTP-Anfrage an den Web-Server für ActionCable-Broadcast
+      begin
+        uri = URI('http://web:3000/cryptocurrencies/broadcast_price')
+        http = Net::HTTP.new(uri.host, uri.port)
+        request = Net::HTTP::Post.new(uri)
+        request['Content-Type'] = 'application/json'
+        request.body = {
+          cryptocurrency_id: cryptocurrency.id,
+          price: price,
+          symbol: symbol
+        }.to_json
+        
+        response = http.request(request)
+        
+        if response.code == '200'
+          Rails.logger.info "✅ ActionCable Broadcast gesendet"
+          puts "✅ ActionCable Broadcast gesendet"
+        else
+          Rails.logger.error "❌ HTTP-Fehler beim Broadcast: #{response.code} - #{response.body}"
+          puts "❌ HTTP-Fehler beim Broadcast: #{response.code} - #{response.body}"
+        end
+      rescue => e
+        Rails.logger.error "❌ Fehler beim HTTP-Broadcast: #{e.class} - #{e.message}"
+        puts "❌ Fehler beim HTTP-Broadcast: #{e.message}"
+      end
+    else
+      Rails.logger.warn "⚠️ Kryptowährung nicht gefunden für Symbol: #{symbol}"
+      puts "⚠️ Kryptowährung nicht gefunden für Symbol: #{symbol}"
+    end
+  rescue => e
+    Rails.logger.error "❌ Fehler beim ActionCable Broadcast: #{e.class} - #{e.message}"
+    puts "❌ Fehler beim ActionCable Broadcast: #{e.message}"
+    puts e.backtrace.join("\n")
   end
 
   # Hält den Hauptthread am Laufen, damit die Hintergrund-Threads arbeiten können.

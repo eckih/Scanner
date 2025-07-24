@@ -1,25 +1,10 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1><i class="bi bi-wallet2"></i> Balance Übersicht</h1>
-  <div class="d-flex gap-2">
-    <%= form_with url: refresh_data_balances_path, method: :post, class: "d-inline" do |form| %>
-      <%= form.submit "Daten aktualisieren", class: "btn btn-primary" %>
-    <% end %>
-    <button class="btn btn-outline-secondary" onclick="toggleAutoRefresh()">
-      <i class="bi bi-play-circle" id="auto-refresh-icon"></i> Auto-Refresh
-    </button>
-  </div>
+  <!-- Auto-Refresh Button entfernt -->
 </div>
 
 <!-- Status und Warnung -->
-<% if @update_needed %>
-  <div class="alert alert-warning">
-    <i class="bi bi-exclamation-triangle"></i>
-    <strong>Daten sind veraltet!</strong> Die letzte Aktualisierung war vor mehr als 5 Minuten.
-    <%= form_with url: refresh_data_balances_path, method: :post, class: "d-inline" do |form| %>
-      <%= form.submit "Jetzt aktualisieren", class: "btn btn-sm btn-warning ms-2" %>
-    <% end %>
-  </div>
-<% end %>
+<!-- Hinweis auf Datenaktualisierung entfernt -->
 
 <!-- Gesamt-Balance Cards -->
 <div class="row mb-4">
@@ -189,9 +174,6 @@
           <div class="text-center py-4">
             <i class="bi bi-wallet2 text-muted" style="font-size: 3rem;"></i>
             <p class="text-muted mt-2">Keine Balance-Daten verfügbar</p>
-            <%= form_with url: refresh_data_balances_path, method: :post, class: "d-inline" do |form| %>
-              <%= form.submit "Daten laden", class: "btn btn-primary" %>
-            <% end %>
           </div>
         <% end %>
       </div>
