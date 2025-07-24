@@ -11,7 +11,21 @@ class CryptoHistoryData < ApplicationRecord
   scope :ordered_by_time, -> { order(:timestamp) }
   
   def self.record_data(cryptocurrency, data, interval = '1h')
-    create!(
+    Rails.logger.debug "Versuche Datensatz zu erstellen für #{cryptocurrency.symbol}..."
+    
+    # Prüfe ob bereits ein Datensatz für diesen Zeitpunkt existiert
+    existing_record = where(
+      cryptocurrency: cryptocurrency,
+      timestamp: data[:timestamp],
+      interval: interval
+    ).first
+    
+    if existing_record
+      Rails.logger.debug "Datensatz bereits vorhanden für #{cryptocurrency.symbol} um #{data[:timestamp]}"
+      return existing_record
+    end
+    
+    new_record = create!(
       cryptocurrency: cryptocurrency,
       timestamp: data[:timestamp],
       open_price: data[:open],
@@ -24,9 +38,22 @@ class CryptoHistoryData < ApplicationRecord
       roc_derivative: data[:roc_derivative],
       interval: interval
     )
+    
+    Rails.logger.debug "✅ Neuer Datensatz erstellt für #{cryptocurrency.symbol}"
+    return new_record
   rescue ActiveRecord::RecordNotUnique => e
     # Wenn der Datensatz bereits existiert, überspringe ihn
     Rails.logger.debug "Duplicate record skipped: #{e.message}"
+    # Versuche den existierenden Datensatz zu finden und zurückzugeben
+    existing_record = where(
+      cryptocurrency: cryptocurrency,
+      timestamp: data[:timestamp],
+      interval: interval
+    ).first
+    return existing_record
+  rescue => e
+    Rails.logger.error "Fehler beim Erstellen des Datensatzes: #{e.class} - #{e.message}"
+    raise e
   end
   
   def self.get_previous_data(cryptocurrency, interval = '1h', count = 1)

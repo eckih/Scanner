@@ -238,13 +238,14 @@
                 <br><small class="text-muted">#<%= crypto.market_cap_rank %></small>
               </span>
             </td>
-            <td data-sort="<%= crypto.current_price || 0 %>">
+            <td data-sort="<%= @latest_prices[crypto.id] || 0 %>">
               <strong>
-                <%= link_to crypto.formatted_current_price, 
-                    chart_cryptocurrency_path(crypto), 
-                    target: '_blank',
-                    class: 'text-decoration-none text-primary chart-link',
-                    title: 'Chart anzeigen' %>
+                <% price = @latest_prices[crypto.id] %>
+                <% if price.present? %>
+                  <%= link_to (price >= 1 ? "$#{price.round(2)}" : "$#{price.round(6)}"), chart_cryptocurrency_path(crypto), target: '_blank', class: 'text-decoration-none text-primary chart-link', title: 'Chart anzeigen' %>
+                <% else %>
+                  <span class="text-muted">N/A</span>
+                <% end %>
               </strong>
             </td>
             <td class="d-none d-lg-table-cell">

@@ -234,3 +234,8 @@ Dieses Projekt ist unter der MIT-Lizenz lizenziert - siehe die [LICENSE](LICENSE
 
 
 docker compose exec web rails runner "puts '=== ALL CRYPTOCURRENCIES ==='; Cryptocurrency.all.each { |c| puts \"#{c.id}. #{c.name} (#{c.symbol}) - Price: $#{c.current_price} - RSI: #{c.rsi} - ROC: #{c.roc} - ROC': #{c.roc_derivative} - Updated: #{c.updated_at}\" }"
+
+docker compose exec web bash
+bundle exec ruby bin/binance_websocket_service.rb
+
+docker compose exec web ruby bin/binance_websocket_service.rb

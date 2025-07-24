@@ -10,6 +10,16 @@ class CryptocurrenciesController < ApplicationController
     logger.info("********* Last update: #{@last_update}")
     @update_interval = Rails.application.config.crypto_update_interval
     calculate_trends_for_cryptocurrencies
+
+    # Effizient: Hash mit den letzten Preisen für alle Cryptos
+    subquery = CryptoHistoryData.select('MAX(timestamp) as max_time, cryptocurrency_id')
+                                .where(interval: '1m')
+                                .group(:cryptocurrency_id)
+    
+    @latest_prices = CryptoHistoryData.joins("INNER JOIN (#{subquery.to_sql}) sub ON crypto_history_data.cryptocurrency_id = sub.cryptocurrency_id AND crypto_history_data.timestamp = sub.max_time")
+                                      .where(interval: '1m')
+                                      .pluck(:cryptocurrency_id, :close_price)
+                                      .to_h
   end
 
   def show

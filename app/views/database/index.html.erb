@@ -66,6 +66,9 @@
                 <h6 class="mb-0">
                   <i class="bi bi-table"></i> <%= table %>
                   <span class="badge bg-secondary"><%= @table_data[table].size %> Zeilen</span>
+                  <% if table == 'crypto_history_data' %>
+                    <span class="badge bg-success">Neueste 100 Einträge</span>
+                  <% end %>
                 </h6>
               </div>
               <div class="card-body">
@@ -82,8 +85,16 @@
                       <tbody>
                         <% @table_data[table].each do |row| %>
                           <tr>
-                            <% row.values.each do |value| %>
-                              <td><%= value %></td>
+                            <% row.values.each_with_index do |value, index| %>
+                              <td>
+                                <% if value.is_a?(Time) || value.is_a?(DateTime) %>
+                                  <%= value.strftime('%Y-%m-%d %H:%M:%S') %>
+                                <% elsif value.is_a?(BigDecimal) %>
+                                  <%= value.to_f.round(8) %>
+                                <% else %>
+                                  <%= value %>
+                                <% end %>
+                              </td>
                             <% end %>
                           </tr>
                         <% end %>

@@ -8,21 +8,16 @@ require 'logger' # Für bessere Protokollierung
 require 'concurrent' # Für Concurrent-Programmierung, z.B. Timer
 require_relative '../config/environment' # Rails-Umgebung laden (stellt Cryptocurrency und CryptoHistoryData bereit)
 
-# --- Konfiguration ---
-BINANCE_WS_BASE_URL = 'wss://stream.binance.com:9443/ws'
-BINANCE_API_EXCHANGE_INFO_URL = 'https://api.binance.com/api/v3/exchangeInfo'
+# --- Konfiguration und Konstanten ---
+BINANCE_WS_BASE_URL = "wss://stream.binance.com:9443/ws"
+BINANCE_REST_API_BASE_URL = "https://api.binance.com/api/v3"
 PING_INTERVAL_SECONDS = 30 # Sekunden: Wie oft wir einen Ping senden (Binance-Empfehlung ca. alle 3 Minuten, aber aggressiver ist sicherer)
 PONG_TIMEOUT_SECONDS = 120 # WICHTIG: Erhöht auf 120 Sekunden (2 Minuten)
 RECONNECT_INITIAL_DELAY_SECONDS = 5 # Sekunden: Startverzögerung für Reconnect (exponentieller Backoff)
 RECONNECT_MAX_DELAY_SECONDS = 60 # Sekunden: Maximale Verzögerung für exponentiellen Backoff
 
-# --- Logger initialisieren ---
-# Der Logger gibt detaillierte Informationen über den Ablauf des Skripts aus.
-LOGGER = Logger.new(STDOUT)
-LOGGER.level = Logger::DEBUG # WICHTIG: Auf DEBUG setzen, um alle Debug-Ausgaben zu sehen
-LOGGER.formatter = proc do |severity, datetime, progname, msg|
-  "[#{datetime.strftime('%Y-%m-%d %H:%M:%S')}] [#{severity}] #{msg}\n"
-end
+# --- Logger-Konfiguration ---
+# Verwende Rails.logger statt eigener Logger-Konstante
 
 # --- Hilfsfunktion: Lese und filtere Paare aus bot.json ---
 # Diese Klasse ist für das Laden und Filtern der Handelspaare zuständig.
@@ -31,7 +26,7 @@ class PairSelector
   def self.load_pairs
     config_path = File.join(__dir__, '../config/bot.json')
     unless File.exist?(config_path)
-      LOGGER.error "Konfigurationsdatei nicht gefunden: #{config_path}"
+      Rails.logger.error "Konfigurationsdatei nicht gefunden: #{config_path}"
       raise "Konfigurationsdatei bot.json nicht gefunden. Bitte stellen Sie sicher, dass sie im 'config'-Verzeichnis liegt."
     end
 
@@ -39,12 +34,12 @@ class PairSelector
     whitelist = config.dig('exchange', 'pair_whitelist') || []
     blacklist = config.dig('exchange', 'pair_blacklist') || []
 
-    LOGGER.info "Lade aktive Trading-Paare von Binance API..."
-    uri = URI(BINANCE_API_EXCHANGE_INFO_URL)
+    Rails.logger.info "Lade aktive Trading-Paare von Binance API..."
+    uri = URI(BINANCE_REST_API_BASE_URL + "/exchangeInfo")
     response = Net::HTTP.get_response(uri)
 
     unless response.is_a?(Net::HTTPSuccess)
-      LOGGER.error "Fehler beim Laden der Binance-Paare: #{response.code} - #{response.message}"
+      Rails.logger.error "Fehler beim Laden der Binance-Paare: #{response.code} - #{response.message}"
       raise "Fehler beim Laden der Binance-Paare: #{response.code} #{response.message}"
     end
 
@@ -58,28 +53,28 @@ class PairSelector
       if whitelist.any? { |w| w.include?('.*') || w.include?('*') } # Prüfen auf Regex-Muster
         regexes = whitelist.map { |w| Regexp.new(w.gsub('/', '').gsub('*', '.*'), Regexp::IGNORECASE) }
         active_pairs = active_pairs.select { |s| regexes.any? { |r| s['symbol'] =~ r } }
-        LOGGER.info "Whitelist (Regex) angewendet: #{whitelist.inspect}"
+        Rails.logger.info "Whitelist (Regex) angewendet: #{whitelist.inspect}"
       else # Explizite Paare
         allowed_symbols = whitelist.map { |p| p.gsub('/', '').upcase }.to_set
         active_pairs = active_pairs.select { |s| allowed_symbols.include?(s['symbol'].upcase) }
-        LOGGER.info "Whitelist (explizit) angewendet: #{whitelist.inspect}"
+        Rails.logger.info "Whitelist (explizit) angewendet: #{whitelist.inspect}"
       end
     else
-      LOGGER.warn "Keine Whitelist konfiguriert. Alle TRADING-Paare werden berücksichtigt."
+      Rails.logger.warn "Keine Whitelist konfiguriert. Alle TRADING-Paare werden berücksichtigt."
     end
 
     # Blacklist-Filterung: Entfernt unerwünschte Paare
     if blacklist.any?
       blocked_symbols = blacklist.map { |p| p.gsub('/', '').upcase }.to_set
       active_pairs = active_pairs.reject { |s| blocked_symbols.include?(s['symbol'].upcase) }
-      LOGGER.info "Blacklist angewendet: #{blacklist.inspect}"
+      Rails.logger.info "Blacklist angewendet: #{blacklist.inspect}"
     end
 
     selected_pairs = active_pairs.map { |s| s['symbol'].downcase }
-    LOGGER.info "Ausgewählte Paare für den Stream: #{selected_pairs.join(', ')} (#{selected_pairs.length} Paare)"
+    Rails.logger.info "Ausgewählte Paare für den Stream: #{selected_pairs.join(', ')} (#{selected_pairs.length} Paare)"
     selected_pairs
   rescue StandardError => e
-    LOGGER.fatal "Fehler in PairSelector.load_pairs: #{e.message}\n#{e.backtrace.join("\n")}"
+    Rails.logger.fatal "Fehler in PairSelector.load_pairs: #{e.message}\n#{e.backtrace.join("\n")}"
     raise e # Fehler weitergeben, um das Skript zu beenden
   end
 end
@@ -206,7 +201,7 @@ class BinanceWebsocketService
     #     id: Time.now.to_i + rand(1000) # Eindeutige ID für die Anfrage
     #   }.to_json
     #   @ws.send(subscribe_message)
-    #   LOGGER.debug "Abonniert: #{pair}@kline_1m"
+    #   Rails.logger.debug "Abonniert: #{pair}@kline_1m"
     # end
   end
 
@@ -291,7 +286,7 @@ class BinanceWebsocketService
 
   # Verarbeitet eingehende WebSocket-Nachrichten.
   private def handle_message(msg)
-    Rails.logger.debug "🔄 Verarbeite Nachricht: #{msg.data}..."
+    Rails.logger.debug "🔄 #{Time.now.strftime('%H:%M:%S')} Verarbeite Nachricht: #{msg.data}..."
     
     # Prüfen, ob es sich um gültige JSON-Daten handelt
     return unless msg.data.start_with?('{') || msg.data.start_with?('[')
@@ -328,9 +323,12 @@ class BinanceWebsocketService
   # Verarbeitet Kline-Daten (O, H, L, C, V)
   private def process_kline_data(symbol, kline)
     Rails.logger.debug "In process_kline_data für #{symbol}. Ist abgeschlossen: #{kline['x']}" # Debug-Log
-    # Nur abgeschlossene Kerzen speichern, um Duplikate und unvollständige Daten zu vermeiden
-    if kline['x'] # 'x' ist true für abgeschlossene Kerzen
+    # Speichere nur abgeschlossene Kerzen für konsistente Datenqualität
+    # Abgeschlossene Kerzen haben 'x': true
+    if kline['x'] == true
       save_kline(symbol, kline)
+    else
+      Rails.logger.debug "⏳ Überspringe unvollständige Kerze für #{symbol}"
     end
   rescue StandardError => e
     Rails.logger.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
@@ -339,6 +337,7 @@ class BinanceWebsocketService
   # Speichert die Kline-Daten in der Datenbank.
   private def save_kline(symbol, kline)
     Rails.logger.info "💾 Speichere Kline für #{symbol}..."
+    puts "💾 Speichere Kline für #{symbol}..."
     
     # Verwende die wiederverwendete Datenbankverbindung
     ActiveRecord::Base.connection_pool.with_connection do
@@ -355,6 +354,9 @@ class BinanceWebsocketService
         )
       end
       
+      # Aktualisiere den aktuellen Preis der Kryptowährung
+      cryptocurrency.update!(current_price: kline['c'].to_f)
+      
       attrs = {
         cryptocurrency: cryptocurrency,
         timestamp: Time.at(kline['t'] / 1000),
@@ -366,8 +368,19 @@ class BinanceWebsocketService
         interval: '1m',
       }
       
-      CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
-      Rails.logger.info "📊 [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
+      begin
+        result = CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
+        if result.persisted?
+          Rails.logger.info "📊 [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
+          puts "✅ Neuer Datensatz gespeichert: #{symbol} - #{attrs[:close]}"
+        else
+          Rails.logger.debug "⏭️ Datensatz bereits vorhanden für #{symbol} um #{attrs[:timestamp].strftime('%H:%M:%S')}"
+          puts "⏭️ Übersprungen (bereits vorhanden): #{symbol} - #{attrs[:close]}"
+        end
+      rescue => e
+        Rails.logger.error "❌ Fehler beim Speichern in CryptoHistoryData: #{e.class} - #{e.message}"
+        puts "❌ Fehler beim Speichern: #{e.message}"
+      end
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
@@ -401,15 +414,15 @@ if __FILE__ == $0
   begin
     pairs = PairSelector.load_pairs # Handelspaare laden
     if pairs.empty?
-      LOGGER.warn "Keine gültigen Paare zum Abonnieren gefunden! Skript wird beendet."
+      Rails.logger.warn "Keine gültigen Paare zum Abonnieren gefunden! Skript wird beendet."
       exit 1
     end
     # Erstelle eine Instanz des Service mit den geladenen Paaren
     binance_service = BinanceWebsocketService.new(pairs)
     binance_service.start # Starte den Service
   rescue StandardError => e
-    LOGGER.fatal "❌ Schwerwiegender Fehler beim Starten des Services: #{e.class} - #{e.message}"
-    LOGGER.fatal e.backtrace.join("\n") # Detaillierten Stacktrace protokollieren
+    Rails.logger.fatal "❌ Schwerwiegender Fehler beim Starten des Services: #{e.class} - #{e.message}"
+    Rails.logger.fatal e.backtrace.join("\n") # Detaillierten Stacktrace protokollieren
     exit 1
   end
 end

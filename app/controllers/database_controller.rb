@@ -5,8 +5,13 @@ class DatabaseController < ApplicationController
     
     @tables.each do |table|
       begin
-        # Hole die ersten 500 Zeilen jeder Tabelle
-        result = ActiveRecord::Base.connection.execute("SELECT * FROM #{table} LIMIT 500")
+        # Für crypto_history_data zeige die neuesten 100 Einträge
+        if table == 'crypto_history_data'
+          result = ActiveRecord::Base.connection.execute("SELECT * FROM #{table} ORDER BY created_at DESC LIMIT 100")
+        else
+          # Hole die ersten 500 Zeilen jeder anderen Tabelle
+          result = ActiveRecord::Base.connection.execute("SELECT * FROM #{table} LIMIT 500")
+        end
         @table_data[table] = result.to_a
       rescue => e
         @table_data[table] = []
