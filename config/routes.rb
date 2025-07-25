@@ -4,6 +4,9 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   root "cryptocurrencies#index"
   
+  # ActionCable WebSocket mount
+  mount ActionCable.server => '/cable'
+  
   # Database viewer route (nur in Development)
   if Rails.env.development?
     get '/database', to: 'database#index'
@@ -24,7 +27,6 @@ Rails.application.routes.draw do
       post :add_roc_derivative
       get :averages_chart
       get :last_update
-      post :broadcast_price
     end
     member do
       get :chart

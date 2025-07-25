@@ -27,6 +27,7 @@ module Scanner
     
     # Konfiguration für regelmäßige Updates
     config.crypto_update_interval = ENV.fetch('CRYPTO_UPDATE_INTERVAL', 300).to_i # 5 Minuten Standard
+    
   end
 end
 

@@ -398,30 +398,21 @@ class BinanceWebsocketService
       Rails.logger.info "📡 Broadcasting an PricesChannel: #{cryptocurrency.id}, #{price}"
       puts "📡 Broadcasting an PricesChannel: #{cryptocurrency.id}, #{price}"
       
-      # Sende HTTP-Anfrage an den Web-Server für ActionCable-Broadcast
+      # Direkter ActionCable-Broadcast (da wir im gleichen Container sind)
       begin
-        uri = URI('http://web:3000/cryptocurrencies/broadcast_price')
-        http = Net::HTTP.new(uri.host, uri.port)
-        request = Net::HTTP::Post.new(uri)
-        request['Content-Type'] = 'application/json'
-        request.body = {
+        ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
-          symbol: symbol
-        }.to_json
+          symbol: symbol,
+          timestamp: Time.now.iso8601
+        })
         
-        response = http.request(request)
-        
-        if response.code == '200'
-          Rails.logger.info "✅ ActionCable Broadcast gesendet"
-          puts "✅ ActionCable Broadcast gesendet"
-        else
-          Rails.logger.error "❌ HTTP-Fehler beim Broadcast: #{response.code} - #{response.body}"
-          puts "❌ HTTP-Fehler beim Broadcast: #{response.code} - #{response.body}"
-        end
+        Rails.logger.info "✅ ActionCable Broadcast erfolgreich gesendet"
+        puts "✅ ActionCable Broadcast erfolgreich gesendet"
       rescue => e
-        Rails.logger.error "❌ Fehler beim HTTP-Broadcast: #{e.class} - #{e.message}"
-        puts "❌ Fehler beim HTTP-Broadcast: #{e.message}"
+        Rails.logger.error "❌ Fehler beim ActionCable Broadcast: #{e.class} - #{e.message}"
+        puts "❌ Fehler beim ActionCable Broadcast: #{e.message}"
+        puts "❌ Backtrace: #{e.backtrace.first(3).join("\n")}"
       end
     else
       Rails.logger.warn "⚠️ Kryptowährung nicht gefunden für Symbol: #{symbol}"
@@ -471,5 +462,25 @@ if __FILE__ == $0
     Rails.logger.fatal "❌ Schwerwiegender Fehler beim Starten des Services: #{e.class} - #{e.message}"
     Rails.logger.fatal e.backtrace.join("\n") # Detaillierten Stacktrace protokollieren
     exit 1
+  end
+end
+
+# --- Modul-Funktion für Rails-Integration ---
+# Diese Funktion kann von Rails aufgerufen werden, um den Service zu starten
+def start_binance_websocket_service
+  begin
+    pairs = PairSelector.load_pairs # Handelspaare laden
+    if pairs.empty?
+      Rails.logger.warn "Keine gültigen Paare zum Abonnieren gefunden!"
+      return false
+    end
+    # Erstelle eine Instanz des Service mit den geladenen Paaren
+    binance_service = BinanceWebsocketService.new(pairs)
+    binance_service.start # Starte den Service
+    return true
+  rescue StandardError => e
+    Rails.logger.error "❌ Fehler beim Starten des Binance WebSocket Service: #{e.class} - #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
+    return false
   end
 end

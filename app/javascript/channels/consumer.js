@@ -3,4 +3,14 @@
 
 import { createConsumer } from "@rails/actioncable"
 
-export default createConsumer()
+// Konfiguriere WebSocket-URL für Docker-Container
+// Verwende die aktuelle Host-URL für WebSocket-Verbindung
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+const host = window.location.host
+const wsUrl = `${protocol}//${host}/cable`
+
+console.log('🔌 ActionCable WebSocket URL:', wsUrl)
+
+const consumer = createConsumer(wsUrl)
+
+export default consumer

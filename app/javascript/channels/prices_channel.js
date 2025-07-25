@@ -1,20 +1,25 @@
 import consumer from "./consumer"
 
 console.log("🔌 PricesChannel wird initialisiert...")
+console.log("🔌 Consumer URL:", consumer.url)
+console.log("🔌 Consumer Subscriptions:", consumer.subscriptions)
 
 consumer.subscriptions.create("PricesChannel", {
   connected() {
     console.log("✅ Connected to PricesChannel")
     console.log("🔗 WebSocket URL:", consumer.url)
     console.log("📡 Subscription:", this)
+    console.log("📡 Subscription ID:", this.id)
   },
 
   disconnected() {
     console.log("❌ Disconnected from PricesChannel")
+    console.log("❌ Disconnect reason:", this.disconnectReason)
   },
 
   rejected() {
     console.log("🚫 PricesChannel subscription rejected")
+    console.log("🚫 Rejection reason:", this.rejectionReason)
   },
 
   received(data) {

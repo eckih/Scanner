@@ -19,22 +19,15 @@ services:
     working_dir: /app
     command: bundle exec rails server -b 0.0.0.0 -e development
     depends_on:
-      - websocket
+      - redis
 
-  websocket:
-    build: .
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
     volumes:
-      - .:/app
-      - bundle_cache:/usr/local/bundle
-      - ./db:/app/db
-      - ./tmp:/app/tmp
-      - ./log:/app/log
-    environment:
-      - RAILS_ENV=development
-      - BUNDLE_PATH=/usr/local/bundle
-    working_dir: /app
-    command: bundle exec ruby bin/binance_websocket_service.rb
-    restart: unless-stopped
+      - redis_data:/data
 
 volumes:
-  bundle_cache: 
+  bundle_cache:
+  redis_data: 

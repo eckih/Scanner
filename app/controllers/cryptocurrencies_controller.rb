@@ -92,21 +92,7 @@ class CryptocurrenciesController < ApplicationController
     end    
   end
 
-  # Neue Route für ActionCable-Broadcasts
-  def broadcast_price
-    cryptocurrency_id = params[:cryptocurrency_id]
-    price = params[:price]
-    symbol = params[:symbol]
-    
-    ActionCable.server.broadcast("prices", {
-      cryptocurrency_id: cryptocurrency_id,
-      price: price,
-      symbol: symbol,
-      timestamp: Time.now.iso8601
-    })
-    
-    render json: { status: 'ok' }
-  end
+
 
   private
 

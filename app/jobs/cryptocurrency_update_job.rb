@@ -8,11 +8,8 @@ class CryptocurrencyUpdateJob
     Rails.logger.info "Starting background cryptocurrency update..."
     
     begin
-      # Verwende BinanceService direkt
-      top_symbols = BinanceService.get_top_usdc_pairs
-      BinanceService.fetch_specific_cryptos(top_symbols)
-      
-      Rails.logger.info "Background cryptocurrency update completed successfully"
+      # Temporär deaktiviert - BinanceService wurde entfernt
+      Rails.logger.info "Background cryptocurrency update skipped - BinanceService removed"
     rescue => e
       Rails.logger.error "Background cryptocurrency update failed: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
