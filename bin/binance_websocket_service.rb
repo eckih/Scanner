@@ -323,12 +323,15 @@ class BinanceWebsocketService
   # Verarbeitet Kline-Daten (O, H, L, C, V)
   private def process_kline_data(symbol, kline)
     Rails.logger.debug "In process_kline_data für #{symbol}. Ist abgeschlossen: #{kline['x']}" # Debug-Log
-    # Speichere nur abgeschlossene Kerzen für konsistente Datenqualität
-    # Abgeschlossene Kerzen haben 'x': true
+    
+    # 🚀 ECHTZEIT-UPDATE: Broadcaste JEDEN Preis sofort (auch unvollständige Kerzen)
+    broadcast_price_realtime(symbol, kline['c'].to_f)
+    
+    # Speichere nur abgeschlossene Kerzen in die Datenbank für konsistente historische Daten
     if kline['x'] == true
       save_kline(symbol, kline)
     else
-      Rails.logger.debug "⏳ Überspringe unvollständige Kerze für #{symbol}"
+      Rails.logger.debug "⏳ Überspringe Datenbank-Speicherung für unvollständige Kerze #{symbol} (Preis bereits gebroadcastet)"
     end
   rescue StandardError => e
     Rails.logger.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
@@ -389,9 +392,38 @@ class BinanceWebsocketService
     Rails.logger.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
   end
 
+  # 🚀 ECHTZEIT-BROADCAST: Sendet jeden Preis sofort (optimiert für Performance)
+  def broadcast_price_realtime(symbol, price)
+    # Minimale Logs für bessere Performance bei häufigen Updates
+    Rails.logger.debug "🚀 Echtzeit-Broadcast #{symbol}: #{price}"
+    
+    cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
+    if cryptocurrency
+      # Direkter ActionCable-Broadcast (da wir im gleichen Container sind)
+      begin
+        ActionCable.server.broadcast("prices", {
+          cryptocurrency_id: cryptocurrency.id,
+          price: price,
+          symbol: symbol,
+          timestamp: Time.now.iso8601,
+          realtime: true # Flag für Echtzeit-Updates
+        })
+        
+        Rails.logger.debug "⚡ Echtzeit-Broadcast erfolgreich: #{symbol}"
+      rescue => e
+        Rails.logger.error "❌ Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
+      end
+    else
+      Rails.logger.warn "⚠️ Kryptowährung nicht gefunden für Symbol: #{symbol}"
+    end
+  rescue => e
+    Rails.logger.error "❌ Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
+  end
+
+  # 📊 DATENBANK-BROADCAST: Sendet Preis bei abgeschlossenen Kerzen (mit vollständigen Logs)
   def broadcast_price(symbol, price)  
-    Rails.logger.info "🔔 Sende ActionCable Broadcast für #{symbol}: #{price}"
-    puts "🔔 Sende ActionCable Broadcast für #{symbol}: #{price}"
+    Rails.logger.info "🔔 Sende ActionCable Broadcast für abgeschlossene Kerze #{symbol}: #{price}"
+    puts "🔔 Sende ActionCable Broadcast für abgeschlossene Kerze #{symbol}: #{price}"
     
     cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
     if cryptocurrency
@@ -404,7 +436,8 @@ class BinanceWebsocketService
           cryptocurrency_id: cryptocurrency.id,
           price: price,
           symbol: symbol,
-          timestamp: Time.now.iso8601
+          timestamp: Time.now.iso8601,
+          candle_closed: true # Flag für abgeschlossene Kerzen
         })
         
         Rails.logger.info "✅ ActionCable Broadcast erfolgreich gesendet"
