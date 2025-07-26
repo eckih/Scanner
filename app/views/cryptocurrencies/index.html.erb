@@ -62,47 +62,54 @@ document.addEventListener('DOMContentLoaded', function() {
           console.log("🚫 PricesChannel Subscription abgelehnt");
         },
         
-                 received(data) {
-           // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen
-           const updateType = data.realtime ? "🚀 ECHTZEIT" : "📊 KERZE";
-           console.log(`📨 ${updateType} Preis-Update erhalten:`, data);
-           
-           // DOM Update
-           const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`);
-           if (row) {
-             console.log(`🎯 Zeile gefunden für Crypto ID: ${data.cryptocurrency_id} (${data.symbol})`);
-             const priceCell = row.querySelector('.price-cell');
-             if (priceCell) {
-               const price = parseFloat(data.price);
-               const formattedPrice = price >= 1 ? `$${price.toFixed(2)}` : `$${price.toFixed(6)}`;
+                              received(data) {
+               // ActionCable-Nachrichten sind oft in einem 'message'-Objekt verschachtelt
+               const messageData = data.message || data; // Nutze data.message, falls vorhanden, sonst direkt data
                
-               const priceLink = priceCell.querySelector('a');
-               if (priceLink) {
-                 priceLink.textContent = formattedPrice;
-                 console.log(`💰 ${updateType} Preis aktualisiert: ${formattedPrice} (${data.symbol})`);
-               }
+               // Debug: Zeige die vollständige Nachrichtenstruktur
+               console.log("📨 Rohe ActionCable-Nachricht:", data);
+               console.log("📨 Verarbeitete Nachrichtendaten:", messageData);
+
+               // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen
+               const updateType = messageData.realtime ? "🚀 ECHTZEIT" : "📊 KERZE";
+               console.log(`📨 ${updateType} Preis-Update erhalten:`, messageData);
                
-               // Verschiedene Animationen für verschiedene Update-Typen
-               if (data.realtime) {
-                 // Subtile Animation für Echtzeit-Updates (häufig)
-                 priceCell.style.transition = 'background-color 0.15s ease';
-                 priceCell.style.backgroundColor = '#e3f2fd'; // Hellblau für Echtzeit
-                 setTimeout(() => {
-                   priceCell.style.backgroundColor = '';
-                 }, 150);
+               // DOM Update
+               const row = document.querySelector(`[data-crypto-id='${messageData.cryptocurrency_id}']`);
+               if (row) {
+                 console.log(`🎯 Zeile gefunden für Crypto ID: ${messageData.cryptocurrency_id} (${messageData.symbol})`);
+                 const priceCell = row.querySelector('.price-cell');
+                 if (priceCell) {
+                   const price = parseFloat(messageData.price);
+                   const formattedPrice = price >= 1 ? `$${price.toFixed(2)}` : `$${price.toFixed(6)}`;
+                   
+                   const priceLink = priceCell.querySelector('a');
+                   if (priceLink) {
+                     priceLink.textContent = formattedPrice;
+                     console.log(`💰 ${updateType} Preis aktualisiert: ${formattedPrice} (${messageData.symbol})`);
+                   }
+                   
+                   // Verschiedene Animationen für verschiedene Update-Typen
+                   if (messageData.realtime) {
+                     // Subtile Animation für Echtzeit-Updates (häufig)
+                     priceCell.style.transition = 'background-color 0.15s ease';
+                     priceCell.style.backgroundColor = '#e3f2fd'; // Hellblau für Echtzeit
+                     setTimeout(() => {
+                       priceCell.style.backgroundColor = '';
+                     }, 150);
+                   } else {
+                     // Auffälligere Animation für abgeschlossene Kerzen (seltener)
+                     priceCell.style.transition = 'background-color 0.5s ease';
+                     priceCell.style.backgroundColor = '#d4edda'; // Grün für abgeschlossene Kerzen
+                     setTimeout(() => {
+                       priceCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                 }
                } else {
-                 // Auffälligere Animation für abgeschlossene Kerzen (seltener)
-                 priceCell.style.transition = 'background-color 0.5s ease';
-                 priceCell.style.backgroundColor = '#d4edda'; // Grün für abgeschlossene Kerzen
-                 setTimeout(() => {
-                   priceCell.style.backgroundColor = '';
-                 }, 500);
+                 console.log(`❌ Keine Zeile gefunden für Crypto ID: ${messageData.cryptocurrency_id} (${messageData.symbol})`);
                }
              }
-           } else {
-             console.log(`❌ Keine Zeile gefunden für Crypto ID: ${data.cryptocurrency_id} (${data.symbol})`);
-           }
-         }
       });
       
       console.log("📡 Subscription erstellt:", subscription);
