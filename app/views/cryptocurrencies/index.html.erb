@@ -78,6 +78,8 @@ document.addEventListener('DOMContentLoaded', function() {
                const row = document.querySelector(`[data-crypto-id='${messageData.cryptocurrency_id}']`);
                if (row) {
                  console.log(`🎯 Zeile gefunden für Crypto ID: ${messageData.cryptocurrency_id} (${messageData.symbol})`);
+                 
+                 // Preis-Update
                  const priceCell = row.querySelector('.price-cell');
                  if (priceCell) {
                    const price = parseFloat(messageData.price);
@@ -103,6 +105,45 @@ document.addEventListener('DOMContentLoaded', function() {
                      priceCell.style.backgroundColor = '#d4edda'; // Grün für abgeschlossene Kerzen
                      setTimeout(() => {
                        priceCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                 }
+                 
+                 // 24h Änderung Update (nur bei abgeschlossenen Kerzen)
+                 if (messageData.candle_closed && messageData.price_change_24h !== undefined) {
+                   const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Änderung"
+                   if (change24hCell) {
+                     const change24h = parseFloat(messageData.price_change_24h);
+                     const formattedChange = messageData.price_change_24h_formatted || 
+                       (change24h >= 0 ? `+${change24h.toFixed(2)}%` : `${change24h.toFixed(2)}%`);
+                     
+                     // Bestimme die Farbe basierend auf Wert und Vollständigkeit
+                     let colorClass = 'text-danger'; // Standard: rot für unvollständige Daten
+                     
+                     if (messageData.price_change_24h_complete === true) {
+                       // Vollständige 24h Daten - normale Farben
+                       colorClass = change24h >= 0 ? 'text-success' : 'text-danger';
+                     } else {
+                       // Unvollständige Daten - immer rot (wie bei 0.00)
+                       colorClass = 'text-danger';
+                     }
+                     
+                     // Aktualisiere den Text und die Farbe
+                     change24hCell.innerHTML = `
+                       <span class="${colorClass}">
+                         ${change24h >= 0 ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>'}
+                         ${formattedChange}
+                       </span>
+                     `;
+                     
+                     const updateType = messageData.price_change_24h_complete ? "📈 24h Änderung (vollständig)" : "⚠️ 24h Änderung (unvollständig)";
+                     console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
+                     
+                     // Animation für 24h Änderung
+                     change24hCell.style.transition = 'background-color 0.5s ease';
+                     change24hCell.style.backgroundColor = colorClass === 'text-success' ? '#d4edda' : '#f8d7da';
+                     setTimeout(() => {
+                       change24hCell.style.backgroundColor = '';
                      }, 500);
                    }
                  }
@@ -305,14 +346,24 @@ document.addEventListener('DOMContentLoaded', function() {
               </strong>
             </td>
             <td class="d-none d-lg-table-cell">
-              <span class="<%= crypto.price_change_color_class %>">
-                <% if crypto.price_change_percentage_24h && crypto.price_change_percentage_24h >= 0 %>
-                  <i class="bi bi-arrow-up"></i>
-                <% elsif crypto.price_change_percentage_24h %>
-                  <i class="bi bi-arrow-down"></i>
-                <% end %>
-                <%= crypto.price_change_percentage_24h_formatted %>
-              </span>
+              <% if crypto.price_change_percentage_24h %>
+                <%# Bestimme die Farbe basierend auf Vollständigkeit der 24h-Daten %>
+                <% color_class = if crypto.price_change_24h_complete?
+                                   crypto.price_change_percentage_24h >= 0 ? 'text-success' : 'text-danger'
+                                 else
+                                   'text-danger' # Unvollständige Daten immer rot
+                                 end %>
+                <span class="<%= color_class %>">
+                  <% if crypto.price_change_percentage_24h >= 0 %>
+                    <i class="bi bi-arrow-up"></i>
+                  <% else %>
+                    <i class="bi bi-arrow-down"></i>
+                  <% end %>
+                  <%= crypto.price_change_percentage_24h_formatted %>
+                </span>
+              <% else %>
+                <span class="text-muted">0.00%</span>
+              <% end %>
             </td>
             <td class="d-none d-xl-table-cell"><%= crypto.formatted_market_cap %></td>
             <td class="d-none d-xl-table-cell">

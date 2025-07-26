@@ -46,6 +46,10 @@ class Cryptocurrency < ApplicationRecord
     "#{sign}#{percentage}%"
   end
   
+  def price_change_24h_complete?
+    price_change_24h_complete == true
+  end
+  
   def price_change_color_class
     return "text-muted" if price_change_percentage_24h.nil?
     

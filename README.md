@@ -239,3 +239,5 @@ docker compose exec web bash
 bundle exec ruby bin/binance_websocket_service.rb
 
 docker compose exec web ruby bin/binance_websocket_service.rb
+
+curl -H "Upgrade: websocket" -H "Connection: Upgrade" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" -H "Sec-WebSocket-Version: 13" http://localhost:3005/cable

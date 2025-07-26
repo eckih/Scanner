@@ -360,6 +360,9 @@ class BinanceWebsocketService
       # Aktualisiere den aktuellen Preis der Kryptowährung
       cryptocurrency.update!(current_price: kline['c'].to_f)
       
+      # Berechne und aktualisiere 24h Änderung
+      update_24h_change(cryptocurrency, kline['c'].to_f)
+      
       attrs = {
         cryptocurrency: cryptocurrency,
         timestamp: Time.at(kline['t'] / 1000),
@@ -390,6 +393,62 @@ class BinanceWebsocketService
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
+  end
+
+  # Berechne und aktualisiere die 24h Preisänderung
+  private def update_24h_change(cryptocurrency, current_price)
+    begin
+      # Hole den Preis von vor 24 Stunden
+      twenty_four_hours_ago = Time.now - 24.hours
+      
+      # Suche nach dem letzten verfügbaren Datensatz von vor 24 Stunden
+      historical_data = CryptoHistoryData.where(
+        cryptocurrency: cryptocurrency,
+        timestamp: ..twenty_four_hours_ago,
+        interval: '1m'
+      ).order(:timestamp).last
+      
+      if historical_data
+        # Vollständige 24h Daten verfügbar
+        old_price = historical_data.close_price
+        price_change = ((current_price - old_price) / old_price) * 100
+        is_24h_complete = true
+        
+        Rails.logger.info "📈 24h Änderung für #{cryptocurrency.symbol}: #{price_change.round(2)}% (von #{old_price} auf #{current_price})"
+        puts "📈 24h Änderung für #{cryptocurrency.symbol}: #{price_change.round(2)}%"
+      else
+        # Keine 24h Daten verfügbar - verwende den ältesten verfügbaren Wert
+        oldest_data = CryptoHistoryData.where(
+          cryptocurrency: cryptocurrency,
+          interval: '1m'
+        ).order(:timestamp).first
+        
+        if oldest_data
+          old_price = oldest_data.close_price
+          time_diff_hours = (Time.now - oldest_data.timestamp) / 3600.0
+          price_change = ((current_price - old_price) / old_price) * 100
+          is_24h_complete = false
+          
+          Rails.logger.warn "⚠️ Keine 24h Daten für #{cryptocurrency.symbol}, verwende ältesten Wert (#{time_diff_hours.round(1)}h alt): #{price_change.round(2)}%"
+          puts "⚠️ Keine 24h Daten für #{cryptocurrency.symbol}, verwende ältesten Wert (#{time_diff_hours.round(1)}h alt): #{price_change.round(2)}%"
+        else
+          # Keine historischen Daten überhaupt verfügbar
+          Rails.logger.warn "⚠️ Keine historischen Daten für #{cryptocurrency.symbol} verfügbar"
+          puts "⚠️ Keine historischen Daten für #{cryptocurrency.symbol} verfügbar"
+          return
+        end
+      end
+      
+      # Aktualisiere die 24h Änderung in der Cryptocurrency-Tabelle
+      cryptocurrency.update!(
+        price_change_percentage_24h: price_change.round(2),
+        price_change_24h_complete: is_24h_complete # Neues Feld für Frontend-Logik
+      )
+      
+    rescue => e
+      Rails.logger.error "❌ Fehler bei 24h-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+      puts "❌ Fehler bei 24h-Berechnung: #{e.message}"
+    end
   end
 
   # 🚀 ECHTZEIT-BROADCAST: Sendet jeden Preis sofort (optimiert für Performance)
@@ -437,7 +496,10 @@ class BinanceWebsocketService
           price: price,
           symbol: symbol,
           timestamp: Time.now.iso8601,
-          candle_closed: true # Flag für abgeschlossene Kerzen
+          candle_closed: true, # Flag für abgeschlossene Kerzen
+          price_change_24h: cryptocurrency.price_change_percentage_24h,
+          price_change_24h_formatted: cryptocurrency.price_change_percentage_24h_formatted,
+          price_change_24h_complete: cryptocurrency.price_change_24h_complete?
         })
         
         Rails.logger.info "✅ ActionCable Broadcast erfolgreich gesendet"

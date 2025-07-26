@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 202412221) do
+ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
   create_table "balances", force: :cascade do |t|
     t.string "asset", null: false
     t.decimal "total_balance", precision: 20, scale: 8, default: "0.0"
@@ -23,6 +23,22 @@ ActiveRecord::Schema[7.1].define(version: 202412221) do
     t.index ["asset", "created_at"], name: "index_balances_on_asset_and_created_at"
     t.index ["asset"], name: "index_balances_on_asset"
     t.index ["created_at"], name: "index_balances_on_created_at"
+  end
+
+  create_table "crypto_history_data", force: :cascade do |t|
+    t.integer "cryptocurrency_id", null: false
+    t.datetime "timestamp", precision: nil, null: false
+    t.decimal "open_price", precision: 20, scale: 8
+    t.decimal "high_price", precision: 20, scale: 8
+    t.decimal "low_price", precision: 20, scale: 8
+    t.decimal "close_price", precision: 20, scale: 8
+    t.decimal "volume", precision: 20, scale: 8
+    t.decimal "rsi", precision: 5, scale: 2
+    t.decimal "roc", precision: 10, scale: 2
+    t.decimal "roc_derivative", precision: 10, scale: 2
+    t.string "interval", limit: 10, default: "1h"
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
   end
 
   create_table "cryptocurrencies", force: :cascade do |t|
@@ -38,6 +54,7 @@ ActiveRecord::Schema[7.1].define(version: 202412221) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.decimal "roc_derivative", precision: 10, scale: 2
+    t.boolean "price_change_24h_complete"
     t.index ["last_updated"], name: "index_cryptocurrencies_on_last_updated"
     t.index ["market_cap"], name: "index_cryptocurrencies_on_market_cap"
     t.index ["market_cap_rank"], name: "index_cryptocurrencies_on_market_cap_rank"
@@ -77,6 +94,7 @@ ActiveRecord::Schema[7.1].define(version: 202412221) do
     t.index ["cryptocurrency_id"], name: "index_rsi_histories_on_cryptocurrency_id"
   end
 
+  add_foreign_key "crypto_history_data", "cryptocurrencies"
   add_foreign_key "roc_derivative_histories", "cryptocurrencies"
   add_foreign_key "roc_histories", "cryptocurrencies"
   add_foreign_key "rsi_histories", "cryptocurrencies"
