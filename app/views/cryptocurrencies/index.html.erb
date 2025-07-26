@@ -63,12 +63,18 @@ document.addEventListener('DOMContentLoaded', function() {
         },
         
                               received(data) {
-               // ActionCable-Nachrichten sind oft in einem 'message'-Objekt verschachtelt
-               const messageData = data.message || data; // Nutze data.message, falls vorhanden, sonst direkt data
-               
                // Debug: Zeige die vollständige Nachrichtenstruktur
                console.log("📨 Rohe ActionCable-Nachricht:", data);
+               
+               // ActionCable-Nachrichten sind oft in einem 'message'-Objekt verschachtelt
+               const messageData = data.message || data; // Nutze data.message, falls vorhanden, sonst direkt data
                console.log("📨 Verarbeitete Nachrichtendaten:", messageData);
+               
+               // Ignoriere Nachrichten ohne cryptocurrency_id (keine Preis-Updates)
+               if (!messageData.cryptocurrency_id || !messageData.symbol) {
+                 console.log("⚠️ Nachricht ohne cryptocurrency_id oder symbol ignoriert:", messageData);
+                 return;
+               }
 
                // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen
                const updateType = messageData.realtime ? "🚀 ECHTZEIT" : "📊 KERZE";
@@ -144,6 +150,42 @@ document.addEventListener('DOMContentLoaded', function() {
                      change24hCell.style.backgroundColor = colorClass === 'text-success' ? '#d4edda' : '#f8d7da';
                      setTimeout(() => {
                        change24hCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                 }
+                 
+                 // Market Cap Update (nur bei abgeschlossenen Kerzen)
+                 if (messageData.candle_closed && messageData.market_cap !== undefined) {
+                   const marketCapCell = row.querySelector('td:nth-child(6)'); // 6. Spalte ist "Market Cap"
+                   if (marketCapCell) {
+                     const marketCap = messageData.market_cap_formatted || 'N/A';
+                     marketCapCell.textContent = marketCap;
+                     
+                     console.log(`📊 Market Cap aktualisiert: ${marketCap} (${messageData.symbol})`);
+                     
+                     // Animation für Market Cap
+                     marketCapCell.style.transition = 'background-color 0.5s ease';
+                     marketCapCell.style.backgroundColor = '#e3f2fd'; // Hellblau für Market Cap
+                     setTimeout(() => {
+                       marketCapCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                 }
+                 
+                 // Volume 24h Update (nur bei abgeschlossenen Kerzen)
+                 if (messageData.candle_closed && messageData.volume_24h !== undefined) {
+                   const volumeCell = row.querySelector('td:nth-child(7)'); // 7. Spalte ist "Volumen 24h"
+                   if (volumeCell) {
+                     const volume = messageData.volume_24h_formatted || 'N/A';
+                     volumeCell.textContent = volume;
+                     
+                     console.log(`📈 Volume 24h aktualisiert: ${volume} (${messageData.symbol})`);
+                     
+                     // Animation für Volume
+                     volumeCell.style.transition = 'background-color 0.5s ease';
+                     volumeCell.style.backgroundColor = '#fff3cd'; // Hellgelb für Volume
+                     setTimeout(() => {
+                       volumeCell.style.backgroundColor = '';
                      }, 500);
                    }
                  }

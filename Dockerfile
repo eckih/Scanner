@@ -14,10 +14,9 @@ FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 # Rails app lives here
 WORKDIR /app
 
-# Install base packages
-# Replace libpq-dev with sqlite3 if using SQLite, or libmysqlclient-dev if using MySQL
+# Install base packages including PostgreSQL client and development libraries
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libjemalloc2 libvips libpq-dev && \
+    apt-get install --no-install-recommends -y curl libjemalloc2 libvips libpq-dev postgresql-client && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Set production environment
@@ -29,9 +28,9 @@ ENV RAILS_ENV="development" \
 # Throw-away build stage to reduce size of final image
 FROM base AS build
 
-# Install packages needed to build gems
+# Install packages needed to build gems including PostgreSQL development headers
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential curl git pkg-config libyaml-dev && \
+    apt-get install --no-install-recommends -y build-essential curl git pkg-config libyaml-dev libpq-dev postgresql-client && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Install JavaScript dependencies and Node.js for asset compilation

@@ -1,6 +1,23 @@
 
 
 services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: scanner_development
+      POSTGRES_USER: scanner_user
+      POSTGRES_PASSWORD: scanner_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scanner_user -d scanner_development"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   web:
     build: .
     ports:
@@ -8,16 +25,25 @@ services:
     volumes:
       - .:/app
       - bundle_cache:/usr/local/bundle
-      - ./db:/app/db
       - ./tmp:/app/tmp
       - ./log:/app/log
     environment:
       - RAILS_ENV=development
       - BUNDLE_PATH=/usr/local/bundle
-      # - RAILS_LOG_TO_STDOUT=true
       - CRYPTO_UPDATE_INTERVAL=300
+      - DATABASE_URL=postgresql://scanner_user:scanner_password@db:5432/scanner_development
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=scanner_development
+      - POSTGRES_USER=scanner_user
+      - POSTGRES_PASSWORD=scanner_password
+      - DEBUG_MODE=true
+      - VERBOSE_LOGGING=true
     working_dir: /app
     command: bundle exec rails server -b 0.0.0.0 -e development
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
-  bundle_cache: 
+  bundle_cache:
+  postgres_data: 

@@ -64,6 +64,13 @@
                         console.log("📨 WebSocket Nachricht:", event.data);
                         try {
                           const data = JSON.parse(event.data);
+                          
+                          // Ignoriere Ping-Nachrichten
+                          if (data.type === 'ping') {
+                            console.log("🏓 Ping-Nachricht ignoriert (lokale Implementation)");
+                            return;
+                          }
+                          
                           if (data.message && callbacks.received) {
                             callbacks.received(data.message);
                           }

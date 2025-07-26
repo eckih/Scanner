@@ -48,7 +48,8 @@ Rails.application.configure do
   config.active_record.migration_error = :page_load
 
   # Highlight code that triggered database queries in logs.
-  config.active_record.verbose_query_logs = true
+  # Reduziere Logs basierend auf DEBUG_MODE Umgebungsvariable
+  config.active_record.verbose_query_logs = ENV.fetch('DEBUG_MODE', 'false').downcase == 'true'
 
   # Debug mode disables concatenation and preprocessing of assets.
   # This option may cause significant delays in view rendering with a large
@@ -57,6 +58,20 @@ Rails.application.configure do
 
   # Suppress logger output for asset requests.
   config.assets.quiet = true
+
+  # Logging-Level basierend auf Umgebungsvariablen
+  if ENV.fetch('VERBOSE_LOGGING', 'false').downcase == 'true'
+    config.log_level = :debug
+  else
+    config.log_level = :warn
+  end
+
+  # ActionCable Logging reduzieren
+  if ENV.fetch('VERBOSE_LOGGING', 'false').downcase != 'true'
+    config.action_cable.log_tags = []
+    # Nicht den Logger komplett deaktivieren, da Rails.logger.debug verwendet wird
+    # config.action_cable.logger = nil
+  end
 
   # Raises error for missing translations.
   # config.i18n.raise_on_missing_translations = true

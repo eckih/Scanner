@@ -1,16 +1,29 @@
 default: &default
-  adapter: sqlite3
+  adapter: postgresql
+  encoding: unicode
+  host: <%= ENV.fetch("POSTGRES_HOST") { "localhost" } %>
+  username: <%= ENV.fetch("POSTGRES_USER") { "scanner_user" } %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD") { "scanner_password" } %>
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 20 } %>
   timeout: 5000
+  connect_timeout: 10
+  checkout_timeout: 10
+  reaping_frequency: 10
+  dead_connection_timeout: 30
 
 development:
   <<: *default
-  database: db/development.sqlite3
+  database: <%= ENV.fetch("POSTGRES_DB") { "scanner_development" } %>
 
 test:
   <<: *default
-  database: db/test.sqlite3
+  database: scanner_test
 
 production:
   <<: *default
-  database: db/production.sqlite3 
+  database: scanner_production
+  username: <%= ENV['DATABASE_USERNAME'] %>
+  password: <%= ENV['DATABASE_PASSWORD'] %>
+  host: <%= ENV['DATABASE_HOST'] %>
+  port: <%= ENV['DATABASE_PORT'] %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 30 } %> 
