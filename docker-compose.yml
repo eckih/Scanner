@@ -18,16 +18,6 @@ services:
       - CRYPTO_UPDATE_INTERVAL=300
     working_dir: /app
     command: bundle exec rails server -b 0.0.0.0 -e development
-    depends_on:
-      - redis
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
 
 volumes:
-  bundle_cache:
-  redis_data: 
+  bundle_cache: 

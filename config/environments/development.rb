@@ -68,15 +68,17 @@ Rails.application.configure do
   # routes, locales, etc. This feature depends on the listen gem.
   # config.file_watcher = ActiveSupport::EventedFileUpdateChecker
 
-  # ActionCable Konfiguration für Development mit Redis
+  # Docker Host-Konfiguration
+  config.hosts << "web"
+  config.hosts << "web:3000"
+  config.hosts << "localhost"
+  config.hosts << "127.0.0.1"
+
+  # ActionCable Konfiguration für Development
   config.action_cable.allowed_request_origins = [
     /http:\/\/localhost:\d+/,
     /http:\/\/127\.0\.0\.1:\d+/
   ]
   config.action_cable.disable_request_forgery_protection = true
-  
-  # Redis für ActionCable
-  config.action_cable.pubsub_adapter = :redis
-  config.action_cable.redis_url = 'redis://redis:6379/1'
   
 end 

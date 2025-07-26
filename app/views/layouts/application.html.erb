@@ -9,6 +9,107 @@
     <%= stylesheet_link_tag 'application', 'data-turbo-track': 'reload' %>
     <%= javascript_importmap_tags %>
     
+    <!-- ActionCable über mehrere CDN-Quellen laden -->
+    <script>
+    console.log("🔧 Versuche ActionCable zu laden...");
+    
+    // Funktion zum Laden von ActionCable
+    function loadActionCable() {
+      return new Promise((resolve, reject) => {
+        // Versuche zuerst die offizielle CDN-Version
+        const script1 = document.createElement('script');
+        script1.src = 'https://cdn.jsdelivr.net/npm/@rails/actioncable@7.1.4/app/assets/javascripts/actioncable.js';
+        script1.onload = () => {
+          console.log("✅ ActionCable von jsdelivr geladen");
+          resolve();
+        };
+        script1.onerror = () => {
+          console.log("❌ jsdelivr fehlgeschlagen, versuche unpkg...");
+          
+          // Fallback zu unpkg
+          const script2 = document.createElement('script');
+          script2.src = 'https://unpkg.com/@rails/actioncable@7.1.4/app/assets/javascripts/actioncable.js';
+          script2.onload = () => {
+            console.log("✅ ActionCable von unpkg geladen");
+            resolve();
+          };
+          script2.onerror = () => {
+            console.log("❌ unpkg fehlgeschlagen, erstelle lokale ActionCable...");
+            
+            // Lokale ActionCable-Implementation als letzter Fallback
+            window.ActionCable = {
+              createConsumer: function(url) {
+                console.log("🔧 Erstelle lokalen ActionCable Consumer für:", url);
+                
+                return {
+                  subscriptions: {
+                    create: function(channel, callbacks) {
+                      console.log("🔧 Erstelle lokale Subscription für:", channel);
+                      
+                      const ws = new WebSocket(url);
+                      
+                      ws.onopen = function() {
+                        console.log("🎉 WebSocket Verbindung hergestellt");
+                        
+                        // Sende Subscription-Request
+                        ws.send(JSON.stringify({
+                          command: "subscribe",
+                          identifier: JSON.stringify({channel: channel})
+                        }));
+                        
+                        if (callbacks.connected) callbacks.connected();
+                      };
+                      
+                      ws.onmessage = function(event) {
+                        console.log("📨 WebSocket Nachricht:", event.data);
+                        try {
+                          const data = JSON.parse(event.data);
+                          if (data.message && callbacks.received) {
+                            callbacks.received(data.message);
+                          }
+                        } catch (e) {
+                          console.log("❌ Fehler beim Parsen der WebSocket-Nachricht:", e);
+                        }
+                      };
+                      
+                      ws.onclose = function() {
+                        console.log("❌ WebSocket Verbindung geschlossen");
+                        if (callbacks.disconnected) callbacks.disconnected();
+                      };
+                      
+                      ws.onerror = function(error) {
+                        console.log("❌ WebSocket Fehler:", error);
+                        if (callbacks.rejected) callbacks.rejected();
+                      };
+                      
+                      return {
+                        unsubscribe: function() {
+                          ws.close();
+                        }
+                      };
+                    }
+                  }
+                };
+              }
+            };
+            
+            console.log("✅ Lokale ActionCable-Implementation erstellt");
+            resolve();
+          };
+          
+          document.head.appendChild(script2);
+        };
+        
+        document.head.appendChild(script1);
+      });
+    }
+    
+    // Lade ActionCable beim Seitenstart
+    loadActionCable().then(() => {
+      console.log("🎉 ActionCable erfolgreich geladen:", typeof window.ActionCable);
+    });
+    </script>
+    
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->

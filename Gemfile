@@ -78,5 +78,7 @@ gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 gem 'websocket-client-simple', '~> 0.3.0' 
 
 # Redis für ActionCable
-gem 'redis', '~> 5.0' 
+# gem 'redis', '~> 5.0' 
 
+# Asset compression
+gem 'uglifier', '>= 1.3.0'
