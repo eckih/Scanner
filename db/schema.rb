@@ -28,6 +28,26 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
     t.index ["created_at"], name: "index_balances_on_created_at"
   end
 
+  create_table "crypto_history_data", id: :serial, force: :cascade do |t|
+    t.integer "cryptocurrency_id", null: false
+    t.datetime "timestamp", precision: nil, null: false
+    t.decimal "open_price", precision: 20, scale: 8
+    t.decimal "high_price", precision: 20, scale: 8
+    t.decimal "low_price", precision: 20, scale: 8
+    t.decimal "close_price", precision: 20, scale: 8
+    t.decimal "volume", precision: 20, scale: 8
+    t.decimal "rsi", precision: 5, scale: 2
+    t.decimal "roc", precision: 10, scale: 2
+    t.decimal "roc_derivative", precision: 10, scale: 2
+    t.string "interval", limit: 10, default: "1h"
+    t.datetime "created_at", precision: nil, default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.datetime "updated_at", precision: nil, default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.index ["cryptocurrency_id", "timestamp", "interval"], name: "index_crypto_history_on_crypto_timestamp_interval"
+    t.index ["cryptocurrency_id", "timestamp", "interval"], name: "index_crypto_history_unique", unique: true
+    t.index ["interval"], name: "index_crypto_history_on_interval"
+    t.index ["timestamp"], name: "index_crypto_history_on_timestamp"
+  end
+
   create_table "cryptocurrencies", force: :cascade do |t|
     t.string "symbol", null: false
     t.string "name", null: false
@@ -81,6 +101,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
     t.index ["cryptocurrency_id"], name: "index_rsi_histories_on_cryptocurrency_id"
   end
 
+  add_foreign_key "crypto_history_data", "cryptocurrencies", name: "fk_crypto_history_cryptocurrency"
   add_foreign_key "roc_derivative_histories", "cryptocurrencies"
   add_foreign_key "roc_histories", "cryptocurrencies"
   add_foreign_key "rsi_histories", "cryptocurrencies"
