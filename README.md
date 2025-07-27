@@ -16,7 +16,7 @@ Das System verfügt über konfigurierbare Debug-Schalter, um die Logging-Perform
 
 ### Umgebungsvariablen
 
-```bash
+   ```bash
 # Debug-Modus (detaillierte Logs)
 DEBUG_MODE=true
 VERBOSE_LOGGING=true

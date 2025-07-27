@@ -31,9 +31,10 @@ end
 BINANCE_WS_BASE_URL = "wss://stream.binance.com:9443/ws"
 BINANCE_REST_API_BASE_URL = "https://api.binance.com/api/v3"
 PING_INTERVAL_SECONDS = 30 # Sekunden: Wie oft wir einen Ping senden (Binance-Empfehlung ca. alle 3 Minuten, aber aggressiver ist sicherer)
-PONG_TIMEOUT_SECONDS = 120 # WICHTIG: Erhöht auf 120 Sekunden (2 Minuten)
-RECONNECT_INITIAL_DELAY_SECONDS = 5 # Sekunden: Startverzögerung für Reconnect (exponentieller Backoff)
-RECONNECT_MAX_DELAY_SECONDS = 60 # Sekunden: Maximale Verzögerung für exponentiellen Backoff
+PONG_TIMEOUT_SECONDS = 60 # Sekunden: Reduziert auf 60 Sekunden für schnellere Reconnects
+RECONNECT_INITIAL_DELAY_SECONDS = 2 # Sekunden: Schnellere Reconnects
+RECONNECT_MAX_DELAY_SECONDS = 30 # Sekunden: Maximale Verzögerung für exponentiellen Backoff
+MAX_RECONNECT_ATTEMPTS = 10 # Maximale Anzahl Reconnect-Versuche vor Pause
 
 # --- Market Cap Update Intervall ---
 MARKET_CAP_UPDATE_INTERVAL = 300 # 5 Minuten: Wie oft Market Cap Daten aktualisiert werden
@@ -63,6 +64,8 @@ end
 
 # --- Logger-Konfiguration ---
 # Verwende Rails.logger statt eigener Logger-Konstante
+
+
 
 # --- Hilfsfunktion: Lese und filtere Paare aus bot.json ---
 # Diese Klasse ist für das Laden und Filtern der Handelspaare zuständig.
@@ -158,9 +161,9 @@ class MarketCapService
       Rails.logger.error e.backtrace.join("\n")
     end
   end
-  
+
   private
-  
+
   def self.create_symbol_mapping(whitelist)
     # Mapping von Binance-Symbolen zu CoinGecko-IDs
     # Beispiel: BTCUSDC -> bitcoin, ETHUSDC -> ethereum
@@ -557,8 +560,8 @@ class MarketCapService
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim Aktualisieren der Market Cap Daten: #{e.class} - #{e.message}"
+    end
   end
-end
 
 # --- WebSocket Message Handler ---
 def handle_message(msg)
@@ -593,7 +596,8 @@ def handle_message(msg)
     # Ignoriere Ping/Pong Timeout Nachrichten und Invalid Requests
     if data_string.include?('Pong timeout') || data_string.include?('Ping timeout') || 
        data_string.include?('Invalid request') || data_string.include?('Invalid')
-      debug_log "⏰ Timeout/Invalid Nachricht ignoriert: #{data_string}"
+      Rails.logger.warn "⏰ Timeout/Invalid Nachricht ignoriert: #{data_string}"
+      # Bei Timeout-Nachrichten sofort Reconnect erzwingen
       return
     end
     
@@ -605,9 +609,15 @@ def handle_message(msg)
       return
     end
     
-    # Ping/Pong Handling
-    if data['pong']
-      debug_log "🏓 Pong erhalten: #{data['pong']}"
+    # Ping/Pong Handling - Binance sendet automatisch Pongs
+    if data['pong'] || data_string.include?('pong')
+      debug_log "🏓 Pong erhalten - Verbindung aktiv"
+      return
+    end
+    
+    # Ping-Nachrichten behandeln - Binance sendet manchmal Pings
+    if data['ping'] || data_string.include?('ping')
+      debug_log "🏓 Ping erhalten - Verbindung aktiv"
       return
     end
     
@@ -637,62 +647,67 @@ private def process_kline_data(symbol, kline)
   broadcast_price_realtime(symbol, kline['c'].to_f)
   
   # Speichere nur abgeschlossene Kerzen in die Datenbank für konsistente historische Daten
-  if kline['x'] == true
-    save_kline(symbol, kline)
-  else
+    if kline['x'] == true
+      save_kline(symbol, kline)
+    else
     debug_log "⏳ Überspringe Datenbank-Speicherung für unvollständige Kerze #{symbol} (Preis bereits gebroadcastet)"
-  end
-rescue StandardError => e
-  Rails.logger.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
-end
-
-# Speichert die Kline-Daten in der Datenbank.
-private def save_kline(symbol, kline)
-      verbose_log "💾 Speichere Kline für #{symbol}..."
-  
-  # Verwende die wiederverwendete Datenbankverbindung
-  with_database_connection do
-    # Typkonvertierung und Mapping
-    cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
-    unless cryptocurrency
-      Rails.logger.info "🆕 Erstelle neue Kryptowährung: #{symbol}"
-      cryptocurrency = Cryptocurrency.create!(
-        symbol: symbol,
-        name: symbol, # Fallback, besser wäre Mapping
-        current_price: kline['c'].to_f > 0 ? kline['c'].to_f : 1,
-        market_cap: 1,
-        market_cap_rank: 9999
-      )
     end
+  rescue StandardError => e
+    Rails.logger.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
+  end
+
+  # Speichert die Kline-Daten in der Datenbank.
+  private def save_kline(symbol, kline)
+      verbose_log "💾 Speichere Kline für #{symbol}..."
     
-    # Aktualisiere den aktuellen Preis der Kryptowährung
-    cryptocurrency.update!(current_price: kline['c'].to_f)
+    # Verwende die wiederverwendete Datenbankverbindung
+  with_database_connection do
+      # Typkonvertierung und Mapping
+      cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
+      unless cryptocurrency
+        Rails.logger.info "🆕 Erstelle neue Kryptowährung: #{symbol}"
+        cryptocurrency = Cryptocurrency.create!(
+          symbol: symbol,
+          name: symbol, # Fallback, besser wäre Mapping
+          current_price: kline['c'].to_f > 0 ? kline['c'].to_f : 1,
+          market_cap: 1,
+          market_cap_rank: 9999
+        )
+      end
+      
+      # Aktualisiere den aktuellen Preis der Kryptowährung
+      cryptocurrency.update!(current_price: kline['c'].to_f)
     
     # Berechne und aktualisiere 24h Änderung
     update_24h_change(cryptocurrency, kline['c'].to_f)
     
-    attrs = {
-      cryptocurrency: cryptocurrency,
-      timestamp: Time.at(kline['t'] / 1000),
-      open: kline['o'].to_f,
-      high: kline['h'].to_f,
-      low: kline['l'].to_f,
-      close: kline['c'].to_f,
-      volume: kline['v'].to_f,
-      interval: '1m',
-    }
+    # Berechne RSI nur für abgeschlossene Kerzen
+    if kline['x'] == true
+      calculate_rsi_for_cryptocurrency(cryptocurrency)
+    end
+      
+      attrs = {
+        cryptocurrency: cryptocurrency,
+        timestamp: Time.at(kline['t'] / 1000),
+        open: kline['o'].to_f,
+        high: kline['h'].to_f,
+        low: kline['l'].to_f,
+        close: kline['c'].to_f,
+        volume: kline['v'].to_f,
+      interval: '1m', # Immer 1m für Echtzeit-Updates
+      }
 
-    # Broadcast the price to the frontend
-    broadcast_price(symbol, attrs[:close])
+      # Broadcast the price to the frontend
+      broadcast_price(symbol, attrs[:close])
 
-    begin
-      result = CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
-      if result.persisted?
+      begin
+        result = CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
+        if result.persisted?
         verbose_log "📊 [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
-      else
+        else
         debug_log "⏭️ Datensatz bereits vorhanden für #{symbol} um #{attrs[:timestamp].strftime('%H:%M:%S')}"
-      end
-          rescue => e
+        end
+      rescue => e
         Rails.logger.error "❌ Fehler beim Speichern in CryptoHistoryData: #{e.class} - #{e.message}"
     end
   end
@@ -706,7 +721,7 @@ private def update_24h_change(cryptocurrency, current_price)
     # Hole den Preis von vor 24 Stunden
     twenty_four_hours_ago = Time.now - 24.hours
     
-    # Suche nach dem letzten verfügbaren Datensatz von vor 24 Stunden
+    # Suche nach dem letzten verfügbaren Datensatz von vor 24 Stunden (immer 1m für 24h-Berechnung)
     historical_data = CryptoHistoryData.where(
       cryptocurrency: cryptocurrency,
       timestamp: ..twenty_four_hours_ago,
@@ -749,6 +764,60 @@ private def update_24h_change(cryptocurrency, current_price)
     
   rescue => e
     Rails.logger.error "❌ Fehler bei 24h-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+  end
+end
+
+# Professionelle Ping-Monitor-Funktionen nach Binance-Beispiel
+private def start_ping_monitor(ws)
+  # Send periodic ping frames to keep connection alive
+  # Binance expects pong within 10 minutes, so we ping every 60 seconds
+  Thread.new do
+    last_pong_check = Time.now
+    
+    loop do
+      sleep(60) # Ping every minute
+      
+      if ws && ws.respond_to?(:open?) && ws.open?
+        ping_payload = Time.now.to_i.to_s
+        Rails.logger.info "🏓 Sende PING mit Payload: #{ping_payload}"
+        
+        begin
+          ws.ping(ping_payload)
+        rescue => e
+          Rails.logger.error "❌ Fehler beim Senden des Pings: #{e.message}"
+          # Erzwinge Reconnect bei Ping-Fehler
+          begin
+            ws.close if ws.respond_to?(:close)
+          rescue
+            # Ignoriere Fehler beim Schließen
+          end
+          break
+        end
+      else
+        Rails.logger.warn "⚠️ WebSocket nicht offen, stoppe Ping-Monitor"
+        break
+      end
+    end
+  end
+rescue => e
+  Rails.logger.error "❌ Fehler beim Starten des Ping-Monitors: #{e.class} - #{e.message}"
+end
+
+private def stop_ping_monitor(ping_interval_thread)
+  if ping_interval_thread
+    ping_interval_thread.kill
+    ping_interval_thread = nil
+    Rails.logger.info "📡 Ping-Monitor gestoppt"
+  end
+end
+
+# Berechne RSI für eine Kryptowährung
+private def calculate_rsi_for_cryptocurrency(cryptocurrency)
+  begin
+    # Verwende den RSI-Berechnungsservice
+    RsiCalculationService.calculate_rsi_for_cryptocurrency(cryptocurrency, '1m', 14)
+  rescue => e
+    Rails.logger.error "❌ Fehler bei RSI-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
   end
 end
 
@@ -867,10 +936,13 @@ def start_binance_websocket_service
     end
   end
   
-  # Haupt-WebSocket Loop
+  # Haupt-WebSocket Loop mit verbesserter Reconnect-Logik
+  reconnect_attempts = 0
+  last_successful_connection = Time.now
+  
   loop do
     begin
-      Rails.logger.info "🔄 Starte WebSocket Verbindung..."
+      Rails.logger.info "🔄 Starte WebSocket Verbindung (Versuch #{reconnect_attempts + 1})..."
       
       # Lade Paare aus der Konfiguration
       pairs = PairSelector.load_pairs
@@ -880,15 +952,19 @@ def start_binance_websocket_service
         break
       end
       
-      # Erstelle WebSocket URL für alle Paare
+      # Erstelle WebSocket URL für alle Paare mit 1m Timeframe (für Echtzeit-Updates)
       stream_names = pairs.map { |pair| "#{pair}@kline_1m" }
       ws_url = "#{BINANCE_WS_BASE_URL}/#{stream_names.join('/')}"
       
       Rails.logger.info "🔗 Verbinde mit: #{ws_url}"
       
-      # Erstelle WebSocket Verbindung mit besserer Fehlerbehandlung
+      # Erstelle WebSocket Verbindung mit verbesserter Fehlerbehandlung
       begin
         ws = WebSocket::Client::Simple.connect ws_url
+        
+        # Variablen für Ping/Pong-Tracking (nach Binance-Beispiel)
+        last_pong_received = Time.now
+        ping_interval_thread = nil
         
         # Event Handler
         ws.on :message do |msg|
@@ -897,6 +973,10 @@ def start_binance_websocket_service
         
         ws.on :open do
           Rails.logger.info "✅ WebSocket Verbindung geöffnet"
+          last_successful_connection = Time.now
+          reconnect_attempts = 0 # Reset Reconnect-Zähler bei erfolgreicher Verbindung
+          last_pong_received = Time.now
+          ping_interval_thread = start_ping_monitor(ws)
         end
         
         ws.on :error do |e|
@@ -905,32 +985,37 @@ def start_binance_websocket_service
         
         ws.on :close do |e|
           Rails.logger.warn "⚠️ WebSocket Verbindung geschlossen: #{e.code} - #{e.reason}"
+          stop_ping_monitor(ping_interval_thread)
         end
         
-        # Binance WebSocket Streams senden automatisch Pings - keine manuellen Pings nötig
-        Rails.logger.info "📡 Binance WebSocket Stream aktiv - automatische Ping/Pong Behandlung"
+        # Handle ping frames from server (nach Binance-Beispiel)
+        ws.on :ping do |event|
+          debug_log "🏓 PING von Server erhalten, Payload: #{event.data}"
+          # WebSocket client sendet automatisch PONG response
+          # Aber wir können es auch manuell senden:
+          ws.pong(event.data)
+          debug_log "🏓 PONG-Antwort gesendet mit Payload: #{event.data}"
+        end
         
-        # Warte auf Verbindungsende mit Timeout-Überwachung
+        # Handle pong frames from server (nach Binance-Beispiel)
+        ws.on :pong do |event|
+          debug_log "🏓 PONG von Server erhalten, Payload: #{event.data}"
+          last_pong_received = Time.now
+        end
+        
+        # Proaktive Ping/Pong-Behandlung für stabile Verbindung
+        Rails.logger.info "📡 Binance WebSocket Stream aktiv - proaktive Ping/Pong Behandlung"
+        
+        # Professionelle WebSocket-Behandlung nach Binance-Beispiel
         begin
-          # Für websocket-client-simple 0.3.1: Verwende loop statt run
           if ws.respond_to?(:loop)
-            # Verwende einen Timeout um stille Disconnects zu erkennen
-            timeout_thread = Thread.new do
-              sleep 120 # Nach 2 Minuten ohne Aktivität reconnecten
-              Rails.logger.warn "⚠️ WebSocket Timeout nach 2 Minuten - erzwinge Reconnect"
-              begin
-                ws.close if ws.respond_to?(:close)
-              rescue => e
-                Rails.logger.error "❌ Fehler beim Schließen der WebSocket: #{e.message}"
-              end
-            end
-            
             ws.loop
-            timeout_thread.kill if timeout_thread.alive?
+          elsif ws.respond_to?(:run)
+            ws.run
           elsif ws.respond_to?(:run)
             ws.run
           else
-            # Fallback: Warte auf Verbindungsende
+            # Fallback: Warte auf Verbindungsende mit kürzeren Checks
             loop do
               sleep 1
               break unless ws.respond_to?(:open?) && ws.open?
@@ -945,12 +1030,20 @@ def start_binance_websocket_service
       end
       
     rescue => e
-      Rails.logger.error "❌ WebSocket Service Fehler: #{e.class} - #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
+      reconnect_attempts += 1
+      Rails.logger.error "❌ WebSocket Service Fehler (Versuch #{reconnect_attempts}): #{e.class} - #{e.message}"
       
-      # Warte vor Reconnect
-      Rails.logger.info "⏳ Warte #{RECONNECT_INITIAL_DELAY_SECONDS} Sekunden vor Reconnect..."
-      sleep RECONNECT_INITIAL_DELAY_SECONDS
+      # Exponentieller Backoff mit Maximum
+      delay = [RECONNECT_INITIAL_DELAY_SECONDS * (2 ** (reconnect_attempts - 1)), RECONNECT_MAX_DELAY_SECONDS].min
+      
+      if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS
+        Rails.logger.error "❌ Maximale Reconnect-Versuche erreicht. Pausiere für 5 Minuten..."
+        sleep 300 # 5 Minuten Pause
+        reconnect_attempts = 0 # Reset für nächsten Zyklus
+      else
+        Rails.logger.info "⏳ Warte #{delay} Sekunden vor Reconnect (Versuch #{reconnect_attempts + 1})..."
+        sleep delay
+      end
     end
   end
 end

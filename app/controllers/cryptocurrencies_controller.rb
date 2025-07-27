@@ -11,7 +11,7 @@ class CryptocurrenciesController < ApplicationController
     # @last_update entfernt - nicht mehr benötigt für Live-Updates
     calculate_trends_for_cryptocurrencies
 
-    # Effizient: Hash mit den letzten Preisen für alle Cryptos
+    # Effizient: Hash mit den letzten Preisen für alle Cryptos (immer 1m für Echtzeit-Updates)
     subquery = CryptoHistoryData.select('MAX(timestamp) as max_time, cryptocurrency_id')
                                 .where(interval: '1m')
                                 .group(:cryptocurrency_id)
@@ -91,6 +91,40 @@ class CryptocurrenciesController < ApplicationController
       render json: { error: e.message }, status: 500
     end    
   end
+
+  def calculate_rsi
+    timeframe = params[:timeframe] || '1m'
+    period = (params[:period] || 14).to_i
+    
+    # Validiere Parameter
+    valid_timeframes = ['1m', '5m', '15m', '1h', '4h', '1d']
+    unless valid_timeframes.include?(timeframe)
+      render json: { error: 'Ungültiger Timeframe' }, status: 400
+      return
+    end
+    
+    unless period.between?(1, 50)
+      render json: { error: 'RSI-Periode muss zwischen 1 und 50 liegen' }, status: 400
+      return
+    end
+    
+    # Starte Background-Job für RSI-Berechnung
+    RsiCalculationJob.perform_later(timeframe, period)
+    
+    Rails.logger.info "🚀 RSI-Berechnung gestartet (Timeframe: #{timeframe}, Periode: #{period})"
+    
+    render json: {
+      success: true,
+      message: "RSI-Berechnung gestartet (Timeframe: #{timeframe}, Periode: #{period})",
+      timeframe: timeframe,
+      period: period
+    }
+  rescue => e
+    Rails.logger.error "❌ Fehler beim Starten der RSI-Berechnung: #{e.message}"
+    render json: { error: e.message }, status: 500
+  end
+
+  
 
 
 

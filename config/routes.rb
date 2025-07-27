@@ -27,6 +27,7 @@ Rails.application.routes.draw do
       post :add_roc_derivative
       get :averages_chart
       get :last_update
+      post :calculate_rsi
     end
     member do
       get :chart
