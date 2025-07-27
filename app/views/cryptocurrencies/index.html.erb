@@ -70,17 +70,29 @@ document.addEventListener('DOMContentLoaded', function() {
                const messageData = data.message || data; // Nutze data.message, falls vorhanden, sonst direkt data
                console.log("📨 Verarbeitete Nachrichtendaten:", messageData);
                
-               // Ignoriere Nachrichten ohne cryptocurrency_id (keine Preis-Updates)
+               // Ignoriere Nachrichten ohne cryptocurrency_id
                if (!messageData.cryptocurrency_id || !messageData.symbol) {
                  console.log("⚠️ Nachricht ohne cryptocurrency_id oder symbol ignoriert:", messageData);
                  return;
                }
 
-               // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen
+               // Behandle verschiedene Update-Typen
+               if (messageData.update_type === 'rsi') {
+                 console.log("📊 RSI-Update erhalten:", messageData);
+                 handleRsiUpdate(messageData);
+                 return;
+               }
+
+               // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen (für Preis-Updates)
                const updateType = messageData.realtime ? "🚀 ECHTZEIT" : "📊 KERZE";
                console.log(`📨 ${updateType} Preis-Update erhalten:`, messageData);
                
                // DOM Update
+               // DEBUG: Zeige verfügbare data-crypto-id Attribute
+               const allRows = document.querySelectorAll('[data-crypto-id]');
+               console.log("🔍 Verfügbare data-crypto-id:", Array.from(allRows).map(r => r.getAttribute('data-crypto-id')));
+               console.log("🎯 Suche nach ID:", messageData.cryptocurrency_id);
+               
                const row = document.querySelector(`[data-crypto-id='${messageData.cryptocurrency_id}']`);
                if (row) {
                  console.log(`🎯 Zeile gefunden für Crypto ID: ${messageData.cryptocurrency_id} (${messageData.symbol})`);
@@ -91,11 +103,16 @@ document.addEventListener('DOMContentLoaded', function() {
                    const price = parseFloat(messageData.price);
                    const formattedPrice = price >= 1 ? `$${price.toFixed(2)}` : `$${price.toFixed(6)}`;
                    
-                   const priceLink = priceCell.querySelector('a');
+                   // Erstelle oder aktualisiere den Link
+                   let priceLink = priceCell.querySelector('a');
                    if (priceLink) {
+                     // Link existiert bereits, nur Text aktualisieren
                      priceLink.textContent = formattedPrice;
-                     console.log(`💰 ${updateType} Preis aktualisiert: ${formattedPrice} (${messageData.symbol})`);
+                   } else {
+                     // Kein Link vorhanden (war N/A), erstelle neuen Link
+                     priceCell.innerHTML = `<a href="/cryptocurrencies/${messageData.cryptocurrency_id}/chart" target="_blank" class="text-decoration-none text-primary chart-link" title="Chart anzeigen">${formattedPrice}</a>`;
                    }
+                   console.log(`💰 ${updateType} Preis aktualisiert: ${formattedPrice} (${messageData.symbol})`);
                    
                    // Verschiedene Animationen für verschiedene Update-Typen
                    if (messageData.realtime) {
@@ -113,6 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
                        priceCell.style.backgroundColor = '';
                      }, 500);
                    }
+                 } else {
+                   console.log(`⚠️ Preis-Zelle nicht gefunden für ${messageData.symbol}`);
                  }
                  
                  // 24h Änderung Update (nur bei abgeschlossenen Kerzen)
@@ -191,6 +210,10 @@ document.addEventListener('DOMContentLoaded', function() {
                  }
                } else {
                  console.log(`❌ Keine Zeile gefunden für Crypto ID: ${messageData.cryptocurrency_id} (${messageData.symbol})`);
+                 console.log("🔍 Verfügbare Zeilen:", Array.from(document.querySelectorAll('[data-crypto-id]')).map(r => ({
+                   id: r.getAttribute('data-crypto-id'),
+                   symbol: r.querySelector('td:first-child')?.textContent?.trim()
+                 })));
                }
              }
       });
@@ -204,6 +227,44 @@ document.addEventListener('DOMContentLoaded', function() {
      console.error("❌ Fehler beim Laden von ActionCable:", error);
    });
  });
+
+ // Funktion zum Behandeln von RSI-Updates
+ function handleRsiUpdate(data) {
+   console.log("📊 Verarbeite RSI-Update für", data.symbol, ":", data.rsi);
+   
+   const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`);
+   if (!row) {
+     console.log("⚠️ Zeile nicht gefunden für Crypto ID:", data.cryptocurrency_id);
+     return;
+   }
+   
+   const rsiCell = row.querySelector('.rsi-cell');
+   if (rsiCell) {
+     const rsiValue = parseFloat(data.rsi);
+     rsiCell.textContent = rsiValue.toFixed(2);
+     
+     // RSI-Farbe basierend auf Wert
+     rsiCell.className = 'rsi-cell';
+     if (rsiValue >= 70) {
+       rsiCell.classList.add('text-danger', 'fw-bold'); // Überkauft - Rot
+     } else if (rsiValue <= 30) {
+       rsiCell.classList.add('text-success', 'fw-bold'); // Überverkauft - Grün
+     } else {
+       rsiCell.classList.add('text-warning'); // Neutral - Orange
+     }
+     
+     // Animation für RSI-Update
+     rsiCell.style.transition = 'background-color 0.8s ease';
+     rsiCell.style.backgroundColor = '#fff3cd'; // Gelber Hintergrund
+     setTimeout(() => {
+       rsiCell.style.backgroundColor = '';
+     }, 800);
+     
+     console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
+   } else {
+     console.log("⚠️ RSI-Zelle nicht gefunden für Crypto ID:", data.cryptocurrency_id);
+   }
+ }
 </script>
 
 <div class="container mt-4">
@@ -393,13 +454,13 @@ document.addEventListener('DOMContentLoaded', function() {
               <span class="badge bg-secondary">#<%= crypto.market_cap_rank %></span>
             </td>
             <td class="d-none d-lg-table-cell">
-              <strong><%= crypto.name %></strong>
+              <strong><%= crypto.display_name %></strong>
             </td>
             <td>
               <%= link_to "https://www.binance.com/en/trade/#{crypto.base_symbol}_USDC?_from=markets&type=spot", 
                   target: '_blank',
                   class: 'text-decoration-none',
-                  title: "#{crypto.name} auf Binance handeln" do %>
+                  title: "#{crypto.display_name} auf Binance handeln" do %>
                 <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
               <% end %>
               <span class="d-md-none">
@@ -478,12 +539,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     class: 'text-decoration-none',
                     title: tooltip_text do %>
                   <i class="bi <%= rsi_trend_icon %> me-1"></i>
-                  <span class="badge <%= rsi_class %> chart-link">
+                  <span class="badge <%= rsi_class %> chart-link rsi-cell">
                     <%= crypto.rsi %>
                   </span>
                 <% end %>
               <% else %>
-                <span class="badge bg-secondary">N/A</span>
+                <span class="badge bg-secondary rsi-cell">N/A</span>
               <% end %>
             </td>
             
@@ -827,56 +888,91 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedTimeframe = localStorage.getItem('selected-timeframe');
     const savedRsiPeriod = localStorage.getItem('selected-rsi-period');
     
-    if (savedTimeframe) {
-      timeframeSelector.value = savedTimeframe;
-      console.log('🕐 Gespeicherter Timeframe geladen:', savedTimeframe);
-    } else {
-      // Standard: 1 Minute
-      timeframeSelector.value = '1m';
-      localStorage.setItem('selected-timeframe', '1m');
-      console.log('🕐 Standard-Timeframe gesetzt: 1m');
-    }
+                    if (savedTimeframe) {
+                  timeframeSelector.value = savedTimeframe;
+                  console.log('🕐 Gespeicherter Timeframe geladen:', savedTimeframe);
+                } else {
+                  // Standard: 1 Minute
+                  timeframeSelector.value = '1m';
+                  localStorage.setItem('selected-timeframe', '1m');
+                  console.log('🕐 Standard-Timeframe gesetzt: 1m');
+                }
+                
+                if (savedRsiPeriod) {
+                  rsiPeriodInput.value = savedRsiPeriod;
+                  console.log('📊 Gespeicherte RSI-Periode geladen:', savedRsiPeriod);
+                } else {
+                  // Standard: 14
+                  rsiPeriodInput.value = '14';
+                  localStorage.setItem('selected-rsi-period', '14');
+                  console.log('📊 Standard-RSI-Periode gesetzt: 14');
+                }
+                
+                // Aktualisiere Backend mit aktuellen Einstellungen beim Laden der Seite
+                updateBackendSettings(timeframeSelector.value, rsiPeriodInput.value);
     
-    if (savedRsiPeriod) {
-      rsiPeriodInput.value = savedRsiPeriod;
-      console.log('📊 Gespeicherte RSI-Periode geladen:', savedRsiPeriod);
-    } else {
-      // Standard: 14
-      rsiPeriodInput.value = '14';
-      localStorage.setItem('selected-rsi-period', '14');
-      console.log('📊 Standard-RSI-Periode gesetzt: 14');
-    }
+                    // Event Listener für Timeframe-Änderungen
+                timeframeSelector.addEventListener('change', function() {
+                  const selectedTimeframe = this.value;
+                  localStorage.setItem('selected-timeframe', selectedTimeframe);
+                  
+                  console.log('🕐 Timeframe geändert zu:', selectedTimeframe);
+                  
+                  // Speichere Timeframe im Rails-Cache für WebSocket-Service
+                  updateBackendSettings(selectedTimeframe, rsiPeriodInput.value);
+                  
+                  // Zeige Benachrichtigung
+                  showTimeframeNotification(selectedTimeframe, 'info');
+                  
+                  // Starte RSI-Berechnung mit neuem Timeframe
+                  startRsiCalculation(selectedTimeframe, rsiPeriodInput.value);
+                });
     
-    // Event Listener für Timeframe-Änderungen
-    timeframeSelector.addEventListener('change', function() {
-      const selectedTimeframe = this.value;
-      localStorage.setItem('selected-timeframe', selectedTimeframe);
-      
-      console.log('🕐 Timeframe geändert zu:', selectedTimeframe);
-      
-      // Zeige Benachrichtigung (ohne Backend-Kommunikation)
-      showTimeframeNotification(selectedTimeframe, 'info');
-      
-      // Starte RSI-Berechnung mit neuem Timeframe
-      startRsiCalculation(selectedTimeframe, rsiPeriodInput.value);
-    });
+                    // Event Listener für RSI-Perioden-Änderungen
+                rsiPeriodInput.addEventListener('change', function() {
+                  const selectedRsiPeriod = this.value;
+                  localStorage.setItem('selected-rsi-period', selectedRsiPeriod);
+                  
+                  console.log('📊 RSI-Periode geändert zu:', selectedRsiPeriod);
+                  
+                  // Speichere RSI-Periode im Rails-Cache für WebSocket-Service
+                  updateBackendSettings(timeframeSelector.value, selectedRsiPeriod);
+                  
+                  // Zeige Benachrichtigung
+                  showRsiPeriodNotification(selectedRsiPeriod, 'info');
+                  
+                  // Starte RSI-Berechnung mit neuer Periode
+                  startRsiCalculation(timeframeSelector.value, selectedRsiPeriod);
+                });
     
-    // Event Listener für RSI-Perioden-Änderungen
-    rsiPeriodInput.addEventListener('change', function() {
-      const selectedRsiPeriod = this.value;
-      localStorage.setItem('selected-rsi-period', selectedRsiPeriod);
-      
-      console.log('📊 RSI-Periode geändert zu:', selectedRsiPeriod);
-      
-      // Zeige Benachrichtigung
-      showRsiPeriodNotification(selectedRsiPeriod, 'info');
-      
-      // Starte RSI-Berechnung mit neuer Periode
-      startRsiCalculation(timeframeSelector.value, selectedRsiPeriod);
-    });
-    
-    // Funktion zum Starten der RSI-Berechnung
-    function startRsiCalculation(timeframe, period) {
+                    // Funktion zum Aktualisieren der Backend-Einstellungen
+                function updateBackendSettings(timeframe, period) {
+                  fetch('/cryptocurrencies/update_rsi_settings', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify({ 
+                      timeframe: timeframe, 
+                      period: parseInt(period) 
+                    })
+                  })
+                  .then(response => response.json())
+                  .then(data => {
+                    if (data.success) {
+                      console.log('✅ Backend-Einstellungen aktualisiert:', data.message);
+                    } else {
+                      console.error('❌ Fehler beim Aktualisieren der Backend-Einstellungen:', data.error);
+                    }
+                  })
+                  .catch(error => {
+                    console.error('❌ Netzwerkfehler beim Aktualisieren der Backend-Einstellungen:', error);
+                  });
+                }
+                
+                // Funktion zum Starten der RSI-Berechnung
+                function startRsiCalculation(timeframe, period) {
       console.log('🚀 Starte RSI-Berechnung:', { timeframe, period });
       
       fetch('/cryptocurrencies/calculate_rsi', {

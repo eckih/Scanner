@@ -1,7 +1,7 @@
 {
   "exchange": {
     "pair_whitelist": [
-      "BTC/USDC", "ETH/USDC", "BNB/USDC", "ADA/USDC", "SOL/USDC"
+      "BTC/USDC", "ETH/USDC", "BNB/USDC", "ADA/USDC", "SOL/USDC", "NEWT/USDC"
     ],
     "pair_blacklist": []
   }

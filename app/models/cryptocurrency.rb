@@ -31,7 +31,21 @@ class Cryptocurrency < ApplicationRecord
   end
   
   def base_symbol
-    symbol.gsub('USDC', '')
+    symbol.gsub('/', '').gsub('USDC', '').gsub('USDT', '')
+  end
+  
+  def display_name
+    # Mapping von Symbolen zu echten Namen
+    name_mapping = {
+      'BTC/USDC' => 'Bitcoin',
+      'ETH/USDC' => 'Ethereum', 
+      'BNB/USDC' => 'Binance Coin',
+      'ADA/USDC' => 'Cardano',
+      'SOL/USDC' => 'Solana',
+      'NEWT/USDC' => 'Newton Project'
+    }
+    
+    name_mapping[symbol] || base_symbol
   end
   
   def trading_pair

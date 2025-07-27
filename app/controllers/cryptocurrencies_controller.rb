@@ -4,10 +4,13 @@ class CryptocurrenciesController < ApplicationController
   ROC_PERIOD = 24 # Standard ROC-Periode in Stunden
   
   # CSRF-Schutz für AJAX-Endpoints deaktivieren
-  skip_before_action :verify_authenticity_token, only: [:add_roc_derivative]
+  skip_before_action :verify_authenticity_token, only: [:add_roc_derivative, :calculate_rsi, :update_rsi_settings]
 
   def index
-    @cryptocurrencies = Cryptocurrency.order(:market_cap_rank)
+    # Lade nur Kryptowährungen aus der bot.json Whitelist
+    whitelist = load_whitelist_pairs
+    @cryptocurrencies = Cryptocurrency.where(symbol: whitelist).order(:market_cap_rank)
+    
     # @last_update entfernt - nicht mehr benötigt für Live-Updates
     calculate_trends_for_cryptocurrencies
 
@@ -124,6 +127,39 @@ class CryptocurrenciesController < ApplicationController
     render json: { error: e.message }, status: 500
   end
 
+  def update_rsi_settings
+    timeframe = params[:timeframe] || '1m'
+    period = (params[:period] || 14).to_i
+    
+    # Validiere Parameter
+    valid_timeframes = ['1m', '5m', '15m', '1h', '4h', '1d']
+    unless valid_timeframes.include?(timeframe)
+      render json: { error: 'Ungültiger Timeframe' }, status: 400
+      return
+    end
+    
+    unless period.between?(1, 50)
+      render json: { error: 'RSI-Periode muss zwischen 1 und 50 liegen' }, status: 400
+      return
+    end
+    
+    # Speichere Einstellungen im Rails-Cache für WebSocket-Service
+    Rails.cache.write('frontend_selected_timeframe', timeframe, expires_in: 1.hour)
+    Rails.cache.write('frontend_selected_rsi_period', period, expires_in: 1.hour)
+    
+    Rails.logger.info "⚙️ RSI-Einstellungen aktualisiert: Timeframe=#{timeframe}, Periode=#{period}"
+    
+    render json: {
+      success: true,
+      message: "RSI-Einstellungen aktualisiert (Timeframe: #{timeframe}, Periode: #{period})",
+      timeframe: timeframe,
+      period: period
+    }
+  rescue => e
+    Rails.logger.error "❌ Fehler beim Aktualisieren der RSI-Einstellungen: #{e.message}"
+    render json: { error: e.message }, status: 500
+  end
+
   
 
 
@@ -132,6 +168,21 @@ class CryptocurrenciesController < ApplicationController
 
   def settings_params
     params.require(:settings).permit(:rsi_period, :roc_period, :roc_derivative_period)
+  end
+  
+  private
+  
+  def load_whitelist_pairs
+    config_path = Rails.root.join('config', 'bot.json')
+    return [] unless File.exist?(config_path)
+    
+    begin
+      config = JSON.parse(File.read(config_path))
+      config.dig('exchange', 'pair_whitelist') || []
+    rescue => e
+      Rails.logger.error "Fehler beim Laden der bot.json: #{e.message}"
+      []
+    end
   end
 
   def calculate_trends_for_cryptocurrencies

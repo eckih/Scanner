@@ -44,6 +44,15 @@ services:
       db:
         condition: service_healthy
 
+  adminer:
+    image: adminer:latest
+    ports:
+      - "3006:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=db
+    depends_on:
+      - db
+
 volumes:
   bundle_cache:
   postgres_data: 

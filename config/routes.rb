@@ -28,6 +28,7 @@ Rails.application.routes.draw do
       get :averages_chart
       get :last_update
       post :calculate_rsi
+      post :update_rsi_settings
     end
     member do
       get :chart

@@ -28,6 +28,9 @@ class RsiCalculationService
       # Speichere RSI-Historie
       save_rsi_history(cryptocurrency, rsi_value, timeframe)
       
+      # Broadcaste RSI-Update über ActionCable
+      broadcast_rsi_update(cryptocurrency, rsi_value.round(2), timeframe)
+      
       return rsi_value.round(2)
     else
       Rails.logger.error "❌ RSI-Berechnung fehlgeschlagen für #{cryptocurrency.symbol}"
@@ -87,6 +90,24 @@ class RsiCalculationService
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim Speichern der RSI-Historie: #{e.message}"
+  end
+  
+  # Broadcaste RSI-Update über ActionCable
+  def self.broadcast_rsi_update(cryptocurrency, rsi_value, timeframe)
+    begin
+      ActionCable.server.broadcast("prices", {
+        cryptocurrency_id: cryptocurrency.id,
+        symbol: cryptocurrency.symbol,
+        rsi: rsi_value,
+        timeframe: timeframe,
+        timestamp: Time.now.iso8601,
+        update_type: 'rsi'
+      })
+      
+      Rails.logger.info "📡 RSI-Update gebroadcastet für #{cryptocurrency.symbol}: #{rsi_value} (#{timeframe})"
+    rescue => e
+      Rails.logger.error "❌ Fehler beim RSI-Broadcast: #{e.message}"
+    end
   end
   
   # Berechne RSI für alle Kryptowährungen

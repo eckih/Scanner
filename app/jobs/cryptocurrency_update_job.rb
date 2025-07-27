@@ -1,8 +1,5 @@
-class CryptocurrencyUpdateJob
-  def self.perform_later
-    # Führe den Job sofort aus (für einfache Implementierung)
-    new.perform
-  end
+class CryptocurrencyUpdateJob < ApplicationJob
+  queue_as :default
 
   def perform
     Rails.logger.info "Starting background cryptocurrency update..."

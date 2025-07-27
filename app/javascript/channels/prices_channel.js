@@ -23,15 +23,50 @@ consumer.subscriptions.create("PricesChannel", {
   },
 
   received(data) {
-    console.log("📨 Received price update:", data)
+    console.log("📨 Received update:", data)
     
-    // Finde die Zeile in der Tabelle und aktualisiere den Preis
+    // Finde die Zeile in der Tabelle
     const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`)
-    if (row) {
-      console.log("🎯 Found row for crypto ID:", data.cryptocurrency_id)
+    if (!row) {
+      console.log("⚠️ Row not found for crypto ID:", data.cryptocurrency_id)
+      return
+    }
+    
+    // Behandle verschiedene Update-Typen
+    if (data.update_type === 'rsi') {
+      // RSI-Update
+      console.log("📊 RSI-Update empfangen für", data.symbol, ":", data.rsi)
+      const rsiCell = row.querySelector('.rsi-cell')
+      if (rsiCell) {
+        const rsiValue = parseFloat(data.rsi)
+        rsiCell.textContent = rsiValue.toFixed(2)
+        
+        // RSI-Farbe basierend auf Wert
+        rsiCell.className = 'rsi-cell'
+        if (rsiValue >= 70) {
+          rsiCell.classList.add('text-danger') // Überkauft
+        } else if (rsiValue <= 30) {
+          rsiCell.classList.add('text-success') // Überverkauft
+        } else {
+          rsiCell.classList.add('text-warning') // Neutral
+        }
+        
+        // Animation für RSI-Update
+        rsiCell.style.transition = 'background-color 0.5s'
+        rsiCell.style.backgroundColor = '#fff3cd'
+        setTimeout(() => {
+          rsiCell.style.backgroundColor = ''
+        }, 500)
+        
+        console.log("✅ RSI-Update completed for:", data.symbol)
+      } else {
+        console.log("⚠️ RSI cell not found for crypto ID:", data.cryptocurrency_id)
+      }
+    } else {
+      // Preis-Update (bestehende Logik)
+      console.log("💰 Preis-Update empfangen für", data.symbol, ":", data.price)
       const priceCell = row.querySelector('.price-cell')
       if (priceCell) {
-        console.log("💰 Found price cell, updating...")
         const price = parseFloat(data.price)
         const formattedPrice = price >= 1 ? `$${price.toFixed(2)}` : `$${price.toFixed(6)}`
         
@@ -59,8 +94,6 @@ consumer.subscriptions.create("PricesChannel", {
       } else {
         console.log("⚠️ Price cell not found for crypto ID:", data.cryptocurrency_id)
       }
-    } else {
-      console.log("⚠️ Row not found for crypto ID:", data.cryptocurrency_id)
     }
   }
 })

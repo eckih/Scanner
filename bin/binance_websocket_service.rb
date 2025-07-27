@@ -811,14 +811,54 @@ private def stop_ping_monitor(ping_interval_thread)
   end
 end
 
-# Berechne RSI für eine Kryptowährung
+# Berechne RSI für eine Kryptowährung basierend auf Frontend-Einstellungen
 private def calculate_rsi_for_cryptocurrency(cryptocurrency)
   begin
-    # Verwende den RSI-Berechnungsservice
-    RsiCalculationService.calculate_rsi_for_cryptocurrency(cryptocurrency, '1m', 14)
+    # Lade aktuelle Frontend-Einstellungen
+    timeframe = get_current_timeframe
+    period = get_current_rsi_period
+    
+    # Verwende den RSI-Berechnungsservice mit Frontend-Parametern
+    RsiCalculationService.calculate_rsi_for_cryptocurrency(cryptocurrency, timeframe, period)
   rescue => e
     Rails.logger.error "❌ Fehler bei RSI-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
   end
+end
+
+# Lade aktuellen Timeframe aus Frontend-Einstellungen
+private def get_current_timeframe
+  # Standard-Timeframe falls keine Einstellung gefunden wird
+  default_timeframe = '1m'
+  
+  # Versuche Timeframe aus Rails-Cache zu lesen (wird vom Frontend gesetzt)
+  cached_timeframe = Rails.cache.read('frontend_selected_timeframe')
+  
+  if cached_timeframe && ['1m', '5m', '15m', '1h', '4h', '1d'].include?(cached_timeframe)
+    cached_timeframe
+  else
+    default_timeframe
+  end
+rescue => e
+  Rails.logger.error "❌ Fehler beim Laden des Timeframes: #{e.message}"
+  '1m' # Fallback
+end
+
+# Lade aktuelle RSI-Periode aus Frontend-Einstellungen
+private def get_current_rsi_period
+  # Standard-Periode falls keine Einstellung gefunden wird
+  default_period = 14
+  
+  # Versuche Periode aus Rails-Cache zu lesen (wird vom Frontend gesetzt)
+  cached_period = Rails.cache.read('frontend_selected_rsi_period')
+  
+  if cached_period && cached_period.to_i.between?(1, 50)
+    cached_period.to_i
+  else
+    default_period
+  end
+rescue => e
+  Rails.logger.error "❌ Fehler beim Laden der RSI-Periode: #{e.message}"
+  14 # Fallback
 end
 
 # 🚀 ECHTZEIT-BROADCAST: Sendet jeden Preis sofort (optimiert für Performance)
@@ -829,9 +869,12 @@ def broadcast_price_realtime(symbol, price)
   # Verwende eine separate, kurze Verbindung nur für den Lookup
   begin
     cryptocurrency = with_database_connection do
+      # Konvertiere WebSocket-Symbol zu Datenbank-Format (btcusdc -> BTC/USDC)
+      db_symbol = convert_websocket_symbol_to_db_format(symbol)
+      
       # Versuche zuerst zu finden, erstelle falls nicht vorhanden
-      Cryptocurrency.find_or_create_by(symbol: symbol) do |crypto|
-        crypto.name = symbol
+      Cryptocurrency.find_or_create_by(symbol: db_symbol) do |crypto|
+        crypto.name = db_symbol
         crypto.current_price = price
         crypto.market_cap = 1
         crypto.market_cap_rank = 9999
@@ -861,6 +904,25 @@ def broadcast_price_realtime(symbol, price)
   end
 end
 
+# Konvertiert WebSocket-Symbol zu Datenbank-Format
+def convert_websocket_symbol_to_db_format(websocket_symbol)
+  # websocket_symbol kommt als "btcusdc", "ethusdc", etc.
+  # Konvertiere zu "BTC/USDC", "ETH/USDC", etc.
+  
+  symbol_upper = websocket_symbol.upcase
+  
+  if symbol_upper.end_with?('USDC')
+    base = symbol_upper.gsub('USDC', '')
+    return "#{base}/USDC"
+  elsif symbol_upper.end_with?('USDT')
+    base = symbol_upper.gsub('USDT', '')
+    return "#{base}/USDT"
+  else
+    # Fallback: return as-is
+    return websocket_symbol
+  end
+end
+
 # 📊 DATENBANK-BROADCAST: Sendet Preis bei abgeschlossenen Kerzen (mit vollständigen Logs)
 def broadcast_price(symbol, price)  
   Rails.logger.info "🔔 Sende ActionCable Broadcast für abgeschlossene Kerze #{symbol}: #{price}"
@@ -868,9 +930,12 @@ def broadcast_price(symbol, price)
   # Verwende eine separate, kurze Verbindung nur für den Lookup
   begin
     cryptocurrency = with_database_connection do
+      # Konvertiere WebSocket-Symbol zu Datenbank-Format (btcusdc -> BTC/USDC)
+      db_symbol = convert_websocket_symbol_to_db_format(symbol)
+      
       # Versuche zuerst zu finden, erstelle falls nicht vorhanden
-      Cryptocurrency.find_or_create_by(symbol: symbol) do |crypto|
-        crypto.name = symbol
+      Cryptocurrency.find_or_create_by(symbol: db_symbol) do |crypto|
+        crypto.name = db_symbol
         crypto.current_price = price
         crypto.market_cap = 1
         crypto.market_cap_rank = 9999
