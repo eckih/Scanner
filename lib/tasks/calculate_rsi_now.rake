@@ -27,16 +27,8 @@ namespace :crypto do
         rsi_value = generate_simulated_rsi(crypto)
         
         if rsi_value
-          # Aktualisiere RSI in der Haupttabelle
-          crypto.update!(rsi: rsi_value)
-          
-          # Erstelle RSI-Historie
-          RsiHistory.create!(
-            cryptocurrency: crypto,
-            value: rsi_value,
-            interval: '1m',
-            calculated_at: Time.current
-          )
+          # Verwende den neuen IndicatorCalculationService
+          IndicatorCalculationService.calculate_and_save_rsi(crypto, '1m', 14)
           
           puts "✅ #{crypto.symbol}: RSI = #{rsi_value.round(2)}"
         else

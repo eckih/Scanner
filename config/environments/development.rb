@@ -65,7 +65,7 @@ Rails.application.configure do
   elsif ENV.fetch('QUIET_LOGGING', 'false').downcase == 'true'
     config.log_level = :error
   else
-    config.log_level = :warn
+    config.log_level = :info
   end
 
   # ActionCable Logging reduzieren

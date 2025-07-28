@@ -33,13 +33,13 @@ namespace :crypto do
         next unless crypto
         
         historical_count = CryptoHistoryData.where(cryptocurrency: crypto).count
-        rsi_count = RsiHistory.where(cryptocurrency: crypto).count
+        indicator_count = Indicator.where(cryptocurrency: crypto).count
         
         total_cryptos += 1
         total_historical += historical_count
-        total_rsi += rsi_count
+        total_rsi += indicator_count
         
-        puts "✅ #{pair}: #{historical_count} historische Datensätze, #{rsi_count} RSI-Werte"
+        puts "✅ #{pair}: #{historical_count} historische Datensätze, #{indicator_count} Indikator-Werte"
       end
       
       puts "\n" + "="*70
@@ -48,7 +48,7 @@ namespace :crypto do
       puts "📊 Zusammenfassung:"
       puts "   Kryptowährungen: #{total_cryptos}"
       puts "   Historische Datensätze: #{total_historical}"
-      puts "   RSI-Datensätze: #{total_rsi}"
+      puts "   Indikator-Datensätze: #{total_rsi}"
       puts "   Verfügbare Timeframes: 1m, 5m, 15m, 1h, 4h"
       puts "\n🚀 Der Crypto-Scanner ist jetzt einsatzbereit!"
       puts "📱 Öffnen Sie: http://localhost:3005/cryptocurrencies"

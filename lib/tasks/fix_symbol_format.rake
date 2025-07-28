@@ -67,9 +67,7 @@ namespace :crypto do
           
           # Lösche zugehörige historische Daten
           CryptoHistoryData.where(cryptocurrency: crypto).delete_all
-          RsiHistory.where(cryptocurrency: crypto).delete_all
-          RocHistory.where(cryptocurrency: crypto).delete_all
-          RocDerivativeHistory.where(cryptocurrency: crypto).delete_all
+          Indicator.where(cryptocurrency: crypto).delete_all
           
           crypto.destroy
         end

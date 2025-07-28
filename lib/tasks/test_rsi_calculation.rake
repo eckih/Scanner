@@ -95,7 +95,7 @@ namespace :crypto do
       
       # Vergleiche mit Service-Berechnung
       puts "\n🔬 Vergleich mit Service-Berechnung:"
-      service_rsi = RsiCalculationService.calculate_rsi_for_cryptocurrency(crypto, timeframe, period)
+              service_rsi = IndicatorCalculationService.calculate_and_save_rsi(crypto, timeframe, period)
       puts "Service RSI: #{service_rsi}"
       puts "Manual RSI:  #{rsi.round(2)}"
       puts service_rsi == rsi.round(2) ? "✅ Übereinstimmung!" : "❌ Abweichung!"

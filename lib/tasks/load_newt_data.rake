@@ -93,7 +93,7 @@ namespace :crypto do
     puts "\n🎉 NEWT/USDT Daten erfolgreich geladen!"
     puts "📊 Datenbankstatistik für NEWT/USDT:"
     puts "  Historische Datensätze: #{CryptoHistoryData.where(cryptocurrency: crypto).count}"
-    puts "  RSI-Datensätze: #{RsiHistory.where(cryptocurrency: crypto).count}"
+    puts "  Indikator-Datensätze: #{Indicator.where(cryptocurrency: crypto).count}"
     puts "  Aktueller Preis: $#{crypto.current_price}"
   end
   
@@ -154,19 +154,8 @@ namespace :crypto do
       rsi_value = calculate_rsi(prices, period)
       
       if rsi_value
-        # Speichere RSI-Wert
-        RsiHistory.create!(
-          cryptocurrency: cryptocurrency,
-          rsi_value: rsi_value,
-          period: period,
-          timeframe: timeframe,
-          calculated_at: Time.current
-        )
-        
-        # Aktualisiere Haupttabelle
-        if timeframe == '15m' # Verwende 15m als Standard
-          cryptocurrency.update!(rsi: rsi_value)
-        end
+        # Speichere RSI-Wert mit neuem IndicatorCalculationService
+        IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, timeframe, period)
         
         puts "✅ RSI #{timeframe}: #{rsi_value.round(2)}"
       else

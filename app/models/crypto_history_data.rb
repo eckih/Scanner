@@ -33,9 +33,6 @@ class CryptoHistoryData < ApplicationRecord
       low_price: data[:low],
       close_price: data[:close],
       volume: data[:volume],
-      rsi: data[:rsi],
-      roc: data[:roc],
-      roc_derivative: data[:roc_derivative],
       interval: interval
     )
     
@@ -89,14 +86,11 @@ class CryptoHistoryData < ApplicationRecord
     where(cryptocurrency: cryptocurrency, interval: interval)
       .order(:timestamp)
       .limit(limit)
-      .pluck(:timestamp, :close_price, :rsi, :roc, :roc_derivative)
-      .map do |timestamp, close, rsi, roc, roc_derivative|
+      .pluck(:timestamp, :close_price)
+      .map do |timestamp, close|
         {
           timestamp: timestamp,
-          close: close,
-          rsi: rsi,
-          roc: roc,
-          roc_derivative: roc_derivative
+          close: close
         }
       end
   end

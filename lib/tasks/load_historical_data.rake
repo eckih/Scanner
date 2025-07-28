@@ -160,7 +160,10 @@ namespace :crypto do
       puts "\n📊 Berechne RSI für Timeframe: #{timeframe}"
       
       begin
-        RsiCalculationService.calculate_rsi_for_all_cryptocurrencies(timeframe, 14)
+        # Verwende den neuen IndicatorCalculationService für alle Kryptowährungen
+        Cryptocurrency.find_each do |crypto|
+          IndicatorCalculationService.calculate_and_save_rsi(crypto, timeframe, 14)
+        end
         puts "✅ RSI-Berechnung für #{timeframe} abgeschlossen"
       rescue => e
         puts "❌ Fehler bei RSI-Berechnung für #{timeframe}: #{e.message}"

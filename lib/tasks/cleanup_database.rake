@@ -28,11 +28,9 @@ namespace :crypto do
       to_delete.each do |symbol|
         crypto = Cryptocurrency.find_by(symbol: symbol)
         if crypto
-          # Lösche zugehörige Daten
-          CryptoHistoryData.where(cryptocurrency: crypto).delete_all
-          RsiHistory.where(cryptocurrency: crypto).delete_all
-          RocHistory.where(cryptocurrency: crypto).delete_all
-          RocDerivativeHistory.where(cryptocurrency: crypto).delete_all
+                  # Lösche zugehörige Daten
+        CryptoHistoryData.where(cryptocurrency: crypto).delete_all
+        Indicator.where(cryptocurrency: crypto).delete_all
           
           crypto.destroy
           puts "✅ #{symbol} gelöscht"

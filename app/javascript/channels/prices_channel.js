@@ -34,7 +34,7 @@ consumer.subscriptions.create("PricesChannel", {
     
     // Behandle verschiedene Update-Typen
     if (data.update_type === 'rsi') {
-      // RSI-Update
+      // RSI-Update (altes Format)
       console.log("📊 RSI-Update empfangen für", data.symbol, ":", data.rsi)
       const rsiCell = row.querySelector('.rsi-cell')
       if (rsiCell) {
@@ -59,6 +59,35 @@ consumer.subscriptions.create("PricesChannel", {
         }, 500)
         
         console.log("✅ RSI-Update completed for:", data.symbol)
+      } else {
+        console.log("⚠️ RSI cell not found for crypto ID:", data.cryptocurrency_id)
+      }
+    } else if (data.update_type === 'indicator' && data.indicator_type === 'rsi') {
+      // RSI-Update (neues Format)
+      console.log("📊 Indikator-Update empfangen für", data.symbol, ":", data.indicator_type, "=", data.value)
+      const rsiCell = row.querySelector('.rsi-cell')
+      if (rsiCell) {
+        const rsiValue = parseFloat(data.value)
+        rsiCell.textContent = rsiValue.toFixed(2)
+        
+        // RSI-Farbe basierend auf Wert
+        rsiCell.className = 'rsi-cell'
+        if (rsiValue >= 70) {
+          rsiCell.classList.add('text-danger') // Überkauft
+        } else if (rsiValue <= 30) {
+          rsiCell.classList.add('text-success') // Überverkauft
+        } else {
+          rsiCell.classList.add('text-warning') // Neutral
+        }
+        
+        // Animation für RSI-Update
+        rsiCell.style.transition = 'background-color 0.5s'
+        rsiCell.style.backgroundColor = '#fff3cd'
+        setTimeout(() => {
+          rsiCell.style.backgroundColor = ''
+        }, 500)
+        
+        console.log("✅ Indikator-Update completed for:", data.symbol)
       } else {
         console.log("⚠️ RSI cell not found for crypto ID:", data.cryptocurrency_id)
       }

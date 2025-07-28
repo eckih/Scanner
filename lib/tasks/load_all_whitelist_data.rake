@@ -134,11 +134,11 @@ namespace :crypto do
       next unless crypto
       
       total_data = CryptoHistoryData.where(cryptocurrency: crypto).count
-      rsi_data = RsiHistory.where(cryptocurrency: crypto).count
+      indicator_data = Indicator.where(cryptocurrency: crypto).count
       
       puts "📊 #{pair}:"
       puts "   Historische Datensätze: #{total_data}"
-      puts "   RSI-Datensätze: #{rsi_data}"
+      puts "   Indikator-Datensätze: #{indicator_data}"
       puts "   Aktueller Preis: $#{crypto.current_price}"
       puts "   Aktueller RSI: #{crypto.rsi || 'N/A'}"
     end
@@ -212,7 +212,7 @@ namespace :crypto do
       puts "📊 Berechne RSI für #{timeframe}..."
       
       begin
-        rsi_value = RsiCalculationService.calculate_rsi_for_cryptocurrency(
+        rsi_value = IndicatorCalculationService.calculate_and_save_rsi(
           cryptocurrency, 
           timeframe, 
           period
