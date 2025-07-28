@@ -82,6 +82,12 @@ document.addEventListener('DOMContentLoaded', function() {
                  handleRsiUpdate(messageData);
                  return;
                }
+               
+               if (messageData.update_type === 'indicator') {
+                 console.log("📊 Indikator-Update erhalten:", messageData);
+                 handleIndicatorUpdate(messageData);
+                 return;
+               }
 
                // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen (für Preis-Updates)
                const updateType = messageData.realtime ? "🚀 ECHTZEIT" : "📊 KERZE";
@@ -265,6 +271,37 @@ document.addEventListener('DOMContentLoaded', function() {
      console.log("⚠️ RSI-Zelle nicht gefunden für Crypto ID:", data.cryptocurrency_id);
    }
  }
+ 
+ // Funktion zum Behandeln von Indikator-Updates
+ function handleIndicatorUpdate(data) {
+   console.log("📊 Verarbeite Indikator-Update für", data.symbol, ":", data.indicator_type, "=", data.value);
+   
+   const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`);
+   if (!row) {
+     console.log("⚠️ Zeile nicht gefunden für Crypto ID:", data.cryptocurrency_id);
+     return;
+   }
+   
+   // Behandle verschiedene Indikator-Typen
+   switch (data.indicator_type) {
+     case 'rsi':
+       handleRsiUpdate({
+         cryptocurrency_id: data.cryptocurrency_id,
+         symbol: data.symbol,
+         rsi: data.value
+       });
+       break;
+       
+     case 'roc':
+     case 'roc_derivative':
+       // ROC und ROC Derivative sind derzeit nicht in der Tabelle sichtbar
+       console.log(`📊 ${data.indicator_type.toUpperCase()} Update erhalten: ${data.value} (${data.timeframe}, ${data.period})`);
+       break;
+       
+     default:
+       console.log(`📊 Unbekannter Indikator-Typ: ${data.indicator_type}`);
+   }
+ }
 </script>
 
 <div class="container mt-4">
@@ -434,16 +471,12 @@ document.addEventListener('DOMContentLoaded', function() {
             <% end %>
           </th>
           <th>
-            ROC (<%= CryptocurrenciesController::ROC_PERIOD %>h)
-            <% if @average_roc %>
-              <br><small class="text-info d-none d-md-inline">Ø <%= @average_roc %>%</small>
-            <% end %>
+            ROC (14h)
+            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
           </th>
           <th>
-            ROC' (<%= CryptocurrenciesController::ROC_PERIOD %>h)
-            <% if @average_roc_derivative %>
-              <br><small class="text-info d-none d-md-inline">Ø <%= @average_roc_derivative %>%</small>
-            <% end %>
+            ROC' (14h)
+            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
           </th>
         </tr>
       </thead>
@@ -548,8 +581,8 @@ document.addEventListener('DOMContentLoaded', function() {
               <% end %>
             </td>
             
-            <td data-sort="<%= crypto.roc || -1 %>">
-              <% if crypto.roc %>
+            <td data-sort="-1">
+              <% if false %>
                 <%# Verwende echte Trend-Daten aus dem Controller %>
                 <% roc_trend_icon = crypto.instance_variable_get(:@roc_trend_icon) || "bi-arrow-right text-muted" %>
                 <% roc_trend_text = case roc_trend_icon
@@ -557,28 +590,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                      when /text-danger/ then "Rückgang"
                                      else "Gleichbleibend"
                                    end %>
-                <%# Hole vorherigen Wert aus dem Cache %>
-                <% previous_roc = historical_data&.last&.dig(:roc) %>
-                <% tooltip_text = if previous_roc
-                                   roc_difference = crypto.roc - previous_roc
-                                   difference_text = if roc_difference > 0
-                                                      "(+#{roc_difference.round(2)}%)"
-                                                    elsif roc_difference < 0
-                                                      "(#{roc_difference.round(2)}%)"
-                                                    else
-                                                      "(0.00%)"
-                                                    end
-                                   "Vorheriger Wert: #{previous_roc.round(2)}% #{difference_text}"
-                                 else
-                                   "Keine historischen Daten verfügbar"
-                                 end %>
+                <%# ROC ist derzeit nicht verfügbar %>
+                <% tooltip_text = "ROC ist derzeit nicht verfügbar" %>
                 <%= link_to chart_cryptocurrency_path(crypto), 
                     target: '_blank',
                     class: 'text-decoration-none',
                     title: tooltip_text do %>
                   <i class="bi <%= roc_trend_icon %> me-1"></i>
-                  <span class="badge <%= crypto.roc_color_class %> chart-link">
-                    <%= crypto.roc_formatted %>
+                  <span class="badge bg-secondary chart-link">
+                    N/A
                   </span>
                 <% end %>
               <% else %>
@@ -586,8 +606,8 @@ document.addEventListener('DOMContentLoaded', function() {
               <% end %>
             </td>
             
-            <td data-sort="<%= crypto.roc_derivative || -1 %>">
-              <% if crypto.roc_derivative %>
+            <td data-sort="-1">
+              <% if false %>
                 <%# Verwende echte Trend-Daten aus dem Controller %>
                 <% roc_derivative_trend_icon = crypto.instance_variable_get(:@roc_derivative_trend_icon) || "bi-arrow-right text-muted" %>
                 <% roc_derivative_trend_text = case roc_derivative_trend_icon
@@ -595,28 +615,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                                  when /text-danger/ then "Rückgang"
                                                  else "Gleichbleibend"
                                                end %>
-                <%# Hole vorherigen Wert aus dem Cache %>
-                <% previous_roc_derivative = historical_data&.last&.dig(:roc_derivative) %>
-                <% tooltip_text = if previous_roc_derivative
-                                   roc_derivative_difference = crypto.roc_derivative - previous_roc_derivative
-                                   difference_text = if roc_derivative_difference > 0
-                                                      "(+#{roc_derivative_difference.round(3)})"
-                                                    elsif roc_derivative_difference < 0
-                                                      "(#{roc_derivative_difference.round(3)})"
-                                                    else
-                                                      "(0.000)"
-                                                    end
-                                   "Vorheriger Wert: #{previous_roc_derivative.round(3)} #{difference_text}"
-                                 else
-                                   "Keine historischen Daten verfügbar"
-                                 end %>
+                <%# ROC Derivative ist derzeit nicht verfügbar %>
+                <% tooltip_text = "ROC Derivative ist derzeit nicht verfügbar" %>
                 <%= link_to chart_cryptocurrency_path(crypto), 
                     target: '_blank',
                     class: 'text-decoration-none',
                     title: tooltip_text do %>
                   <i class="bi <%= roc_derivative_trend_icon %> me-1"></i>
-                  <span class="badge <%= crypto.roc_derivative_color_class %> chart-link">
-                    <%= crypto.roc_derivative_formatted %>
+                  <span class="badge bg-secondary chart-link">
+                    N/A
                   </span>
                 <% end %>
               <% else %>

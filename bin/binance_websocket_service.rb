@@ -9,9 +9,11 @@ require 'concurrent' # Für Concurrent-Programmierung, z.B. Timer
 require_relative '../config/environment' # Rails-Umgebung laden (stellt Cryptocurrency und CryptoHistoryData bereit)
 
 # Test-Ausgabe beim Laden der Datei (nur für Debugging)
-Rails.logger.info "🔧 WebSocket Service Datei wird geladen..." if defined?(Rails.logger)
-Rails.logger.info "🔧 ENV DEBUG_MODE: #{ENV.fetch('DEBUG_MODE', 'not_set')}" if defined?(Rails.logger)
-Rails.logger.info "🔧 ENV VERBOSE_LOGGING: #{ENV.fetch('VERBOSE_LOGGING', 'not_set')}" if defined?(Rails.logger)
+if defined?(Rails.logger) && !defined?(Rails::Console)
+  Rails.logger.info "🔧 WebSocket Service Datei wird geladen..."
+  Rails.logger.info "🔧 ENV DEBUG_MODE: #{ENV.fetch('DEBUG_MODE', 'not_set')}"
+  Rails.logger.info "🔧 ENV VERBOSE_LOGGING: #{ENV.fetch('VERBOSE_LOGGING', 'not_set')}"
+end
 
 # --- Debug-Konfiguration ---
 # Setze auf false, um detaillierte Logs zu deaktivieren (bessere Performance)
@@ -20,11 +22,24 @@ VERBOSE_LOGGING = ENV.fetch('VERBOSE_LOGGING', 'false').downcase == 'true'
 
 # Hilfsfunktion für bedingte Logs
 def debug_log(message)
+  return if ENV['RAILS_CONSOLE'] == 'true'
   Rails.logger.debug(message) if DEBUG_MODE && Rails.logger
 end
 
 def verbose_log(message)
+  return if ENV['RAILS_CONSOLE'] == 'true'
   Rails.logger.info(message) if VERBOSE_LOGGING && Rails.logger
+end
+
+def console_safe_log(message, level = :info)
+  return if ENV['RAILS_CONSOLE'] == 'true' || defined?(Rails::Console)
+  Rails.logger.send(level, message) if Rails.logger
+end
+
+# Globale Funktion um alle Rails.logger Aufrufe zu ersetzen
+def safe_rails_log(message, level = :info)
+  return if ENV['RAILS_CONSOLE'] == 'true' || defined?(Rails::Console)
+  Rails.logger.send(level, message) if Rails.logger
 end
 
 # --- Konfiguration und Konstanten ---
@@ -82,7 +97,7 @@ class PairSelector
     whitelist = config.dig('exchange', 'pair_whitelist') || []
     blacklist = config.dig('exchange', 'pair_blacklist') || []
 
-    Rails.logger.info "Lade aktive Trading-Paare von Binance API..."
+    console_safe_log "Lade aktive Trading-Paare von Binance API..."
     uri = URI(BINANCE_REST_API_BASE_URL + "/exchangeInfo")
     response = Net::HTTP.get_response(uri)
 
@@ -119,7 +134,7 @@ class PairSelector
     end
 
     selected_pairs = active_pairs.map { |s| s['symbol'].downcase }
-    Rails.logger.info "Ausgewählte Paare für den Stream: #{selected_pairs.join(', ')} (#{selected_pairs.length} Paare)"
+    console_safe_log "Ausgewählte Paare für den Stream: #{selected_pairs.join(', ')} (#{selected_pairs.length} Paare)"
     selected_pairs
   end
 end
@@ -128,7 +143,7 @@ end
 # Diese Klasse ist für das Laden von Market Cap Daten von der CoinGecko API zuständig.
 class MarketCapService
   def self.fetch_market_cap_data
-    Rails.logger.info "📊 Lade Market Cap Daten von CoinGecko API..."
+    console_safe_log "📊 Lade Market Cap Daten von CoinGecko API..."
     
     begin
       # Lade Konfiguration für Symbol-Mapping
@@ -149,12 +164,12 @@ class MarketCapService
         return
       end
       
-      Rails.logger.info "📊 Verarbeite #{coin_data.length} Coins für Market Cap Update"
+      console_safe_log "📊 Verarbeite #{coin_data.length} Coins für Market Cap Update"
       
       # Aktualisiere die Datenbank
       update_market_cap_in_database(coin_data, symbol_mapping)
       
-      Rails.logger.info "✅ Market Cap Daten erfolgreich aktualisiert"
+      console_safe_log "✅ Market Cap Daten erfolgreich aktualisiert"
       
     rescue => e
       Rails.logger.error "❌ Fehler beim Laden der Market Cap Daten: #{e.class} - #{e.message}"
@@ -579,14 +594,14 @@ def handle_message(msg)
       elsif raw_data.respond_to?(:to_str)
         data_string = raw_data.to_str
       else
-        Rails.logger.warn "⚠️ Unbekannter msg.data Typ: #{raw_data.class}"
+        console_safe_log "⚠️ Unbekannter msg.data Typ: #{raw_data.class}"
         return
       end
     elsif msg.respond_to?(:to_s)
       # Fallback: Versuche msg direkt zu konvertieren
       data_string = msg.to_s
     else
-      Rails.logger.warn "⚠️ msg hat keine data Eigenschaft und kann nicht konvertiert werden"
+      console_safe_log "⚠️ msg hat keine data Eigenschaft und kann nicht konvertiert werden"
       return
     end
     
@@ -596,7 +611,7 @@ def handle_message(msg)
     # Ignoriere Ping/Pong Timeout Nachrichten und Invalid Requests
     if data_string.include?('Pong timeout') || data_string.include?('Ping timeout') || 
        data_string.include?('Invalid request') || data_string.include?('Invalid')
-      Rails.logger.warn "⏰ Timeout/Invalid Nachricht ignoriert: #{data_string}"
+      console_safe_log "⏰ Timeout/Invalid Nachricht ignoriert: #{data_string}"
       # Bei Timeout-Nachrichten sofort Reconnect erzwingen
       return
     end
@@ -628,14 +643,14 @@ def handle_message(msg)
     
   rescue TypeError => e
     # Behandle TypeError bei der Nachrichtenverarbeitung
-    Rails.logger.error "❌ TypeError bei WebSocket Nachricht: #{e.message}"
+    console_safe_log "❌ TypeError bei WebSocket Nachricht: #{e.message}"
     if msg.respond_to?(:data)
       debug_log "❌ msg.data Typ: #{msg.data.class}, Inhalt: #{msg.data.inspect}"
     else
       debug_log "❌ msg hat keine data Eigenschaft"
     end
   rescue => e
-    Rails.logger.error "❌ Fehler beim Verarbeiten der WebSocket Nachricht: #{e.class} - #{e.message}"
+    console_safe_log "❌ Fehler beim Verarbeiten der WebSocket Nachricht: #{e.class} - #{e.message}"
   end
 end
 
@@ -653,7 +668,7 @@ private def process_kline_data(symbol, kline)
     debug_log "⏳ Überspringe Datenbank-Speicherung für unvollständige Kerze #{symbol} (Preis bereits gebroadcastet)"
     end
   rescue StandardError => e
-    Rails.logger.error "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}"
+          safe_rails_log "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}", :error
   end
 
   # Speichert die Kline-Daten in der Datenbank.
@@ -665,7 +680,7 @@ private def process_kline_data(symbol, kline)
       # Typkonvertierung und Mapping
       cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
       unless cryptocurrency
-        Rails.logger.info "🆕 Erstelle neue Kryptowährung: #{symbol}"
+        safe_rails_log "🆕 Erstelle neue Kryptowährung: #{symbol}"
         cryptocurrency = Cryptocurrency.create!(
           symbol: symbol,
           name: symbol, # Fallback, besser wäre Mapping
@@ -681,9 +696,13 @@ private def process_kline_data(symbol, kline)
     # Berechne und aktualisiere 24h Änderung
     update_24h_change(cryptocurrency, kline['c'].to_f)
     
-    # Berechne RSI nur für abgeschlossene Kerzen
+    # Berechne RSI nur für abgeschlossene Kerzen (verwendet jetzt den neuen IndicatorCalculationService)
     if kline['x'] == true
-      calculate_rsi_for_cryptocurrency(cryptocurrency)
+      begin
+        IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', 14)
+      rescue => e
+        console_safe_log "❌ RSI-Berechnung fehlgeschlagen für #{cryptocurrency.symbol}: #{e.message}"
+      end
     end
       
       attrs = {
@@ -708,12 +727,12 @@ private def process_kline_data(symbol, kline)
         debug_log "⏭️ Datensatz bereits vorhanden für #{symbol} um #{attrs[:timestamp].strftime('%H:%M:%S')}"
         end
       rescue => e
-        Rails.logger.error "❌ Fehler beim Speichern in CryptoHistoryData: #{e.class} - #{e.message}"
+        safe_rails_log "❌ Fehler beim Speichern in CryptoHistoryData: #{e.class} - #{e.message}", :error
     end
   end
-rescue => e
-  Rails.logger.error "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}"
-end
+  rescue => e
+    safe_rails_log "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}", :error
+  end
 
 # Berechne und aktualisiere die 24h Preisänderung
 private def update_24h_change(cryptocurrency, current_price)
@@ -818,10 +837,10 @@ private def calculate_rsi_for_cryptocurrency(cryptocurrency)
     timeframe = get_current_timeframe
     period = get_current_rsi_period
     
-    # Verwende den RSI-Berechnungsservice mit Frontend-Parametern
-    RsiCalculationService.calculate_rsi_for_cryptocurrency(cryptocurrency, timeframe, period)
+    # Verwende den neuen IndicatorCalculationService
+    IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, timeframe, period)
   rescue => e
-    Rails.logger.error "❌ Fehler bei RSI-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+    console_safe_log "❌ Fehler bei RSI-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
   end
 end
 
@@ -979,16 +998,16 @@ end
 # --- Modul-Funktion für Rails-Integration ---
 # Diese Funktion kann von Rails aufgerufen werden, um den Service zu starten
 def start_binance_websocket_service
-  Rails.logger.info "🚀 Starte Binance WebSocket Service..."
+  console_safe_log "🚀 Starte Binance WebSocket Service..."
   
   # DEBUG-AUSGABE zum Testen
-  Rails.logger.info "🔧 DEBUG_MODE: #{DEBUG_MODE}"
-  Rails.logger.info "🔧 VERBOSE_LOGGING: #{VERBOSE_LOGGING}"
-  Rails.logger.info "🔧 Rails.logger verfügbar: #{!Rails.logger.nil?}"
+  console_safe_log "🔧 DEBUG_MODE: #{DEBUG_MODE}"
+  console_safe_log "🔧 VERBOSE_LOGGING: #{VERBOSE_LOGGING}"
+  console_safe_log "🔧 Rails.logger verfügbar: #{!Rails.logger.nil?}"
   
   # Starte Market Cap Updates in separatem Thread
   Thread.new do
-    Rails.logger.info "📊 Starte Market Cap Update Timer..."
+    console_safe_log "📊 Starte Market Cap Update Timer..."
     
     loop do
       begin

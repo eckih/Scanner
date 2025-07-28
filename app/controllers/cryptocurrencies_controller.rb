@@ -27,7 +27,7 @@ class CryptocurrenciesController < ApplicationController
 
   def show
     @cryptocurrency = Cryptocurrency.find(params[:id])
-    @chart_data = create_chart_data(@cryptocurrency.rsi_histories, @cryptocurrency.roc_histories, @cryptocurrency.roc_derivative_histories)
+    @chart_data = create_indicator_chart_data(@cryptocurrency, '15m', 14)
   end
 
   def settings
@@ -55,30 +55,31 @@ class CryptocurrenciesController < ApplicationController
 
   def averages_chart
     @cryptocurrencies = Cryptocurrency.all
-    @chart_data = create_chart_data(
-      RsiHistory.all,
-      RocHistory.all,
-      RocDerivativeHistory.all
-    )
+    # Verwende die neue indicators Tabelle für Chart-Daten
+    @chart_data = {
+      rsi: Indicator.rsi.latest.limit(100).pluck(:calculated_at, :value).map { |timestamp, value| { x: timestamp.to_i * 1000, y: value } },
+      roc: Indicator.roc.latest.limit(100).pluck(:calculated_at, :value).map { |timestamp, value| { x: timestamp.to_i * 1000, y: value } },
+      roc_derivative: Indicator.roc_derivative.latest.limit(100).pluck(:calculated_at, :value).map { |timestamp, value| { x: timestamp.to_i * 1000, y: value } }
+    }
   end
 
   def chart
     @cryptocurrency = Cryptocurrency.find(params[:id])
-    @chart_data = create_chart_data(@cryptocurrency.rsi_histories, @cryptocurrency.roc_histories, @cryptocurrency.roc_derivative_histories)
+    @chart_data = create_indicator_chart_data(@cryptocurrency, '15m', 14)
   end
 
   def chart_data
     @cryptocurrency = Cryptocurrency.find(params[:id])
-    @chart_data = create_chart_data(@cryptocurrency.rsi_histories, @cryptocurrency.roc_histories, @cryptocurrency.roc_derivative_histories)
+    @chart_data = create_indicator_chart_data(@cryptocurrency, '15m', 14)
     
     render json: @chart_data
   end
 
   def last_update
     begin
-      last_rsi_update = RsiHistory.maximum(:created_at)
-      last_roc_update = RocHistory.maximum(:created_at)
-      last_roc_derivative_update = RocDerivativeHistory.maximum(:created_at)
+      last_rsi_update = Indicator.rsi.maximum(:calculated_at)
+      last_roc_update = Indicator.roc.maximum(:calculated_at)
+      last_roc_derivative_update = Indicator.roc_derivative.maximum(:calculated_at)
       last_update = [last_rsi_update, last_roc_update, last_roc_derivative_update].compact.max
       if last_update.nil?
         last_update = Cryptocurrency.maximum(:updated_at)
@@ -111,16 +112,22 @@ class CryptocurrenciesController < ApplicationController
       return
     end
     
-    # Starte Background-Job für RSI-Berechnung
-    RsiCalculationJob.perform_later(timeframe, period)
+    # Verwende den neuen IndicatorCalculationService
+    results = {}
     
-    Rails.logger.info "🚀 RSI-Berechnung gestartet (Timeframe: #{timeframe}, Periode: #{period})"
+    Cryptocurrency.find_each do |crypto|
+      rsi_value = IndicatorCalculationService.calculate_and_save_rsi(crypto, timeframe, period)
+      results[crypto.symbol] = rsi_value
+    end
+    
+    Rails.logger.info "🚀 RSI-Berechnung abgeschlossen (Timeframe: #{timeframe}, Periode: #{period})"
     
     render json: {
       success: true,
-      message: "RSI-Berechnung gestartet (Timeframe: #{timeframe}, Periode: #{period})",
+      message: "RSI-Berechnung abgeschlossen (Timeframe: #{timeframe}, Periode: #{period})",
       timeframe: timeframe,
-      period: period
+      period: period,
+      results: results
     }
   rescue => e
     Rails.logger.error "❌ Fehler beim Starten der RSI-Berechnung: #{e.message}"
@@ -196,6 +203,15 @@ class CryptocurrenciesController < ApplicationController
       rsi: rsi_histories.map { |h| { x: h.created_at.to_i * 1000, y: h.value } },
       roc: roc_histories.map { |h| { x: h.created_at.to_i * 1000, y: h.value } },
       roc_derivative: roc_derivative_histories.map { |h| { x: h.created_at.to_i * 1000, y: h.value } }
+    }
+  end
+  
+  # Neue Methode für die indicators Tabelle
+  def create_indicator_chart_data(cryptocurrency, timeframe = '15m', period = 14)
+    {
+      rsi: cryptocurrency.rsi_history(timeframe, period, 100),
+      roc: cryptocurrency.roc_history(timeframe, period, 100),
+      roc_derivative: [] # Noch nicht implementiert
     }
   end
 end 

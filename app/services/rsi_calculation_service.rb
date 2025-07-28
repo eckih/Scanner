@@ -2,19 +2,20 @@ class RsiCalculationService
   def self.calculate_rsi_for_cryptocurrency(cryptocurrency, timeframe = '1m', period = 14)
     Rails.logger.info "📊 Berechne RSI für #{cryptocurrency.symbol} (Timeframe: #{timeframe}, Periode: #{period})"
     
-    # Hole die letzten 14 abgeschlossenen Kerzen für RSI-Berechnung
+    # Hole die letzten period+1 abgeschlossenen Kerzen für RSI-Berechnung
+    # (Für 14 Änderungen brauchen wir 15 Kerzen)
     historical_data = CryptoHistoryData.where(
       cryptocurrency: cryptocurrency,
       interval: timeframe
-    ).order(:timestamp).limit(period) # Nur die letzten 14 Kerzen
+    ).order(timestamp: :desc).limit(period + 1) # Neueste zuerst, period+1 Kerzen
     
-    if historical_data.count < period
-      Rails.logger.warn "⚠️ Nicht genügend Daten für RSI-Berechnung: #{historical_data.count} von #{period} benötigt"
+    if historical_data.count < period + 1
+      Rails.logger.warn "⚠️ Nicht genügend Daten für RSI-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
       return nil
     end
     
-    # Extrahiere Close-Preise
-    close_prices = historical_data.pluck(:close_price)
+    # Extrahiere Close-Preise und sortiere chronologisch (älteste zuerst)
+    close_prices = historical_data.reverse.pluck(:close_price)
     
     # Berechne RSI
     rsi_value = calculate_rsi_from_prices(close_prices, period)
@@ -41,7 +42,7 @@ class RsiCalculationService
   private
   
   def self.calculate_rsi_from_prices(prices, period)
-    return nil if prices.length < period
+    return nil if prices.length < period + 1
     
     # Berechne Preisänderungen zwischen aufeinanderfolgenden Close-Preisen
     changes = []
@@ -49,14 +50,16 @@ class RsiCalculationService
       changes << prices[i] - prices[i-1]
     end
     
+    # Verwende nur die letzten 'period' Änderungen für RSI-Berechnung
+    recent_changes = changes.last(period)
+    
     # Trenne Gewinne und Verluste
-    gains = changes.map { |change| change > 0 ? change : 0 }
-    losses = changes.map { |change| change < 0 ? change.abs : 0 }
+    gains = recent_changes.map { |change| change > 0 ? change : 0 }
+    losses = recent_changes.map { |change| change < 0 ? change.abs : 0 }
     
     # Berechne durchschnittliche Gewinne und Verluste für die Periode
-    # Verwende alle verfügbaren Änderungen (period-1 Änderungen für period Kerzen)
-    avg_gain = gains.sum.to_f / gains.length
-    avg_loss = losses.sum.to_f / losses.length
+    avg_gain = gains.sum.to_f / period
+    avg_loss = losses.sum.to_f / period
     
     # Vermeide Division durch Null
     return 50.0 if avg_loss == 0
@@ -75,15 +78,16 @@ class RsiCalculationService
     # Prüfe ob bereits ein RSI-Historie-Eintrag für diesen Zeitpunkt existiert
     existing_history = RsiHistory.where(
       cryptocurrency: cryptocurrency,
-      interval: timeframe,
+      timeframe: timeframe,
       calculated_at: Time.current
     ).first
     
     unless existing_history
       RsiHistory.create!(
         cryptocurrency: cryptocurrency,
-        value: rsi_value,
-        interval: timeframe,
+        rsi_value: rsi_value,
+        period: 14, # Standard-Periode
+        timeframe: timeframe,
         calculated_at: Time.current
       )
       Rails.logger.debug "📊 RSI-Historie gespeichert für #{cryptocurrency.symbol}"

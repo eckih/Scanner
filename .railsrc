@@ -1,0 +1,7 @@
+# Rails Console Konfiguration
+# Diese Datei wird automatisch beim Start der Rails Console geladen
+
+# SQL-Queries unterdrücken (das Wichtigste!)
+ActiveRecord::Base.logger = nil if defined?(ActiveRecord::Base)
+
+puts "🔧 Rails Console: SQL-Logs unterdrückt" 

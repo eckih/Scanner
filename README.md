@@ -1,189 +1,308 @@
-# Crypto Scanner
+# 🚀 Crypto Scanner - Kryptowährungs-Trading Scanner
 
-Ein Rails-basierter Kryptowährungs-Scanner mit Echtzeit-Preis-Updates über ActionCable/WebSockets.
+Ein Rails-basierter Kryptowährungs-Scanner mit Echtzeit-Preisüberwachung, RSI-Berechnung und WebSocket-Integration für Binance.
 
-## 🚀 Features
+## 📋 Inhaltsverzeichnis
 
-- **Echtzeit-Preis-Updates** über ActionCable/WebSockets
-- **Live-Market-Cap-Daten** von CoinGecko API
-- **24h-Preisänderungen** mit automatischer Berechnung
-- **Docker-Containerisierung** mit PostgreSQL
-- **Optimierte Performance** mit konfigurierbaren Debug-Schaltern
+- [Installation](#installation)
+- [Verfügbare Tasks](#verfügbare-tasks)
+- [Webinterface](#webinterface)
+- [Datenbank-Admin](#datenbank-admin)
+- [Konfiguration](#konfiguration)
 
-## 🔧 Debug-Schalter
-
-Das System verfügt über konfigurierbare Debug-Schalter, um die Logging-Performance zu optimieren:
-
-### Umgebungsvariablen
-
-   ```bash
-# Debug-Modus (detaillierte Logs)
-DEBUG_MODE=true
-VERBOSE_LOGGING=true
-
-# Produktions-Modus (minimale Logs)
-DEBUG_MODE=false
-VERBOSE_LOGGING=false
-```
-
-### Docker Compose Konfiguration
-
-```yaml
-environment:
-  - DEBUG_MODE=false      # Debug-Logs deaktivieren
-  - VERBOSE_LOGGING=false # Verbose-Logs deaktivieren
-```
-
-### Logging-Level
-
-- **DEBUG_MODE=true**: Zeigt alle Debug-Logs (Echtzeit-Broadcasts, Ping/Pong, etc.)
-- **VERBOSE_LOGGING=true**: Zeigt detaillierte Info-Logs (Kline-Speicherung, Market Cap Updates)
-- **Beide false**: Nur kritische Fehler und wichtige Status-Updates
-- **Rails-interne Logs**: Werden automatisch reduziert (ActiveRecord Query Logs, ActionCable Broadcasting)
-
-### Performance-Optimierung
-
-Bei hoher Last empfehlen wir:
-```yaml
-environment:
-  - DEBUG_MODE=false
-  - VERBOSE_LOGGING=false
-```
-
-Für Entwicklung/Debugging:
-```yaml
-environment:
-  - DEBUG_MODE=true
-  - VERBOSE_LOGGING=true
-```
-
-### Rails-Logging-Optimierung
-
-Das System reduziert automatisch:
-- **ActiveRecord Query Logs** (`Cryptocurrency Load`) - gesteuert durch `DEBUG_MODE`
-- **ActionCable Broadcasting Logs** - gesteuert durch `VERBOSE_LOGGING`
-- **Rails Debug-Level Logs** - gesteuert durch `VERBOSE_LOGGING`
-
-## 🐳 Docker Setup
+## 🛠️ Installation
 
 ### Voraussetzungen
+- Docker & Docker Compose
+- Git
 
-- Docker
-- Docker Compose
-
-### Installation
-
-1. **Repository klonen:**
+### Setup
 ```bash
+# Repository klonen
 git clone <repository-url>
-cd scanner
+cd Scanner
+
+# Container starten
+docker compose up -d
+
+# Datenbank einrichten
+docker compose exec web bin/rails db:create db:migrate
+
+# Komplette Einrichtung (empfohlen)
+docker compose exec web bin/rails crypto:setup_complete_v2
 ```
 
-2. **Container starten:**
+## 📊 Verfügbare Tasks
+
+### 🚀 Setup & Einrichtung
+
+#### `crypto:setup_complete_v2`
+**Komplette Einrichtung aller Komponenten**
 ```bash
-docker compose up --build -d
+docker compose exec web bin/rails crypto:setup_complete_v2
+```
+- Synchronisiert Datenbank mit bot.json Whitelist
+- Lädt historische Daten für alle Pairs (letzte 2 Tage)
+- Berechnet RSI für alle Timeframes
+- Zeigt finale Statistiken
+
+#### `crypto:sync_whitelist`
+**Synchronisiert Datenbank mit bot.json**
+```bash
+docker compose exec web bin/rails crypto:sync_whitelist
+```
+- Entfernt nicht-whitelistierte Kryptowährungen
+- Fügt fehlende Whitelist-Pairs hinzu
+- Löscht zugehörige historische Daten
+
+#### `crypto:fix_symbol_format`
+**Standardisiert Kryptowährungs-Symbole**
+```bash
+docker compose exec web bin/rails crypto:fix_symbol_format
+```
+- Konvertiert "BTCUSDC" zu "BTC/USDC"
+- Entfernt Duplikate
+- Standardisiert alle Symbole
+
+#### `crypto:cleanup_database`
+**Bereinigt die Datenbank**
+```bash
+docker compose exec web bin/rails crypto:cleanup_database
+```
+- Entfernt alle nicht-whitelistierten Pairs
+- Löscht zugehörige historische Daten
+- Behält nur Whitelist-Pairs
+
+### 📈 Daten laden
+
+#### `crypto:load_all_whitelist_data`
+**Lädt historische Daten für alle Whitelist-Pairs**
+```bash
+docker compose exec web bin/rails crypto:load_all_whitelist_data
+```
+- Lädt Daten der letzten 2 Tage
+- 5 Timeframes: 1m, 5m, 15m, 1h, 4h
+- Berechnet RSI für alle Timeframes
+- Aktualisiert aktuelle Preise
+
+#### `crypto:load_historical_data`
+**Lädt historische Daten für alle Kryptowährungen**
+```bash
+docker compose exec web bin/rails crypto:load_historical_data
+```
+- Lädt Daten für alle verfügbaren Pairs
+- Verschiedene Timeframes
+- Speichert OHLCV-Daten
+
+#### `crypto:load_whitelist_pairs`
+**Lädt nur Whitelist-Pairs in die Datenbank**
+```bash
+docker compose exec web bin/rails crypto:load_whitelist_pairs
+```
+- Erstellt Kryptowährungen aus bot.json
+- Lädt aktuelle Preise von Binance
+- Aktualisiert Market Cap Daten
+
+#### `crypto:load_newt_data`
+**Lädt speziell NEWT/USDT Daten**
+```bash
+docker compose exec web bin/rails crypto:load_newt_data
+```
+- Lädt NEWT/USDT Daten der letzten 2 Tage
+- Alle Timeframes
+- RSI-Berechnung
+
+#### `crypto:load_current_prices`
+**Lädt aktuelle Preise von Binance**
+```bash
+docker compose exec web bin/rails crypto:load_current_prices
+```
+- Aktualisiert Preise für Whitelist-Pairs
+- 24h Preisänderungen
+- Handelsvolumen
+
+### 📊 RSI & Indikatoren
+
+#### `crypto:calculate_rsi_now`
+**Berechnet RSI für alle Kryptowährungen**
+```bash
+docker compose exec web bin/rails crypto:calculate_rsi_now
+```
+- Berechnet RSI für alle verfügbaren Pairs
+- Verschiedene Timeframes
+- Speichert RSI-Historie
+
+#### `crypto:test_rsi_calculation`
+**Testet und debuggt RSI-Berechnung**
+```bash
+docker compose exec web bin/rails crypto:test_rsi_calculation
+```
+- Zeigt detaillierte RSI-Berechnung
+- Vergleicht manuelle vs. Service-Berechnung
+- Debug-Informationen für alle Timeframes
+
+### 🔧 Wartung & Debugging
+
+#### `crypto:setup_complete`
+**Legacy Setup-Task**
+```bash
+docker compose exec web bin/rails crypto:setup_complete
+```
+- Führt sync_whitelist und calculate_rsi_now aus
+- Ältere Version des Setup-Tasks
+
+## 🌐 Webinterface
+
+### Hauptanwendung
+```
+http://localhost:3005/cryptocurrencies
+```
+- Echtzeit-Preisüberwachung
+- RSI-Anzeige mit Farbkodierung
+- Timeframe-Wechsel
+- Live-Updates über WebSocket
+
+### Datenbank-Admin (Adminer)
+```
+http://localhost:3006
+```
+**Login-Daten:**
+- System: PostgreSQL
+- Server: db
+- Benutzer: scanner_user
+- Passwort: scanner_password
+- Datenbank: scanner_development
+
+## ⚙️ Konfiguration
+
+### bot.json
+```json
+{
+  "exchange": {
+    "pair_whitelist": [
+      "BTC/USDC", "ETH/USDC", "BNB/USDC", 
+      "ADA/USDC", "SOL/USDC", "NEWT/USDC"
+    ],
+    "pair_blacklist": []
+  }
+}
 ```
 
-3. **Datenbank einrichten:**
-```bash
-docker compose exec web bundle exec bin/rails db:create
-docker compose exec web bundle exec bin/rails db:migrate
+### Umgebungsvariablen
+   ```bash
+RAILS_ENV=development
+DATABASE_URL=postgresql://scanner_user:scanner_password@db:5432/scanner_development
+DEBUG_MODE=true
+VERBOSE_LOGGING=true
 ```
 
-4. **Crypto History Tabelle erstellen:**
+## 📊 Verfügbare Daten
+
+### Kryptowährungen
+- **BTC/USDC** - Bitcoin
+- **ETH/USDC** - Ethereum
+- **BNB/USDC** - Binance Coin
+- **ADA/USDC** - Cardano
+- **SOL/USDC** - Solana
+- **NEWT/USDC** - Newton Project
+
+### Timeframes
+- **1m** - 1 Minute
+- **5m** - 5 Minuten
+- **15m** - 15 Minuten
+- **1h** - 1 Stunde
+- **4h** - 4 Stunden
+
+### Indikatoren
+- **RSI** - Relative Strength Index (Periode 14)
+- **Preisänderung 24h**
+- **Handelsvolumen**
+- **Market Cap**
+
+## 🔄 Live-Updates
+
+### WebSocket-Integration
+- Echtzeit-Preisupdates von Binance
+- ActionCable-Broadcasting
+- Automatische RSI-Berechnung
+- Live-Tabellen-Updates
+
+### Background-Jobs
+- RsiCalculationJob
+- BalanceUpdateJob
+- CryptocurrencyUpdateJob
+
+## 🛠️ Entwicklung
+
+### Container starten
 ```bash
-docker compose exec web bundle exec bin/rails r "ActiveRecord::Base.connection.execute(File.read('db/migrate/20241223_create_crypto_history_data_manual_postgresql.sql'))"
+docker compose up -d
 ```
 
-### Anwendung starten
-
-Die Anwendung ist verfügbar unter: **http://localhost:3005**
-
-## 📊 Features
-
-### Echtzeit-Preis-Updates
-- WebSocket-Verbindung zu Binance
-- Sofortige Preis-Updates ohne Seiten-Reload
-- ActionCable-Broadcasts an Frontend
-
-### Market Cap Integration
-- Automatische Updates von CoinGecko API
-- Alle 5 Minuten Market Cap und Rank Updates
-- Korrekte Market Cap Berechnung (Preis × Circulating Supply)
-
-### 24h-Preisänderungen
-- Automatische Berechnung bei abgeschlossenen Kerzen
-- Fallback auf älteste verfügbare Daten
-- Visuelle Kennzeichnung unvollständiger Daten
-
-### Datenbank-Optimierung
-- PostgreSQL für bessere Multi-Threading-Unterstützung
-- Optimierte Connection Pool Konfiguration
-- 20 gleichzeitige Datenbankverbindungen
-
-## 🔍 Troubleshooting
-
-### Debug-Schalter aktivieren
+### Logs anzeigen
 ```bash
-# Container mit Debug-Modus neu starten
+docker compose logs -f web
+```
+
+### Rails Console
+```bash
+docker compose exec web bin/rails console
+```
+
+### Datenbank-Reset
+```bash
+docker compose exec web bin/rails db:reset
+```
+
+## 📝 Troubleshooting
+
+### Häufige Probleme
+
+**1. Container startet nicht**
+```bash
 docker compose down
 docker compose up -d
 ```
 
-### Logs überprüfen
+**2. Datenbank-Verbindung**
 ```bash
-# Web-Container Logs
-docker compose logs web --tail=50
-
-# Datenbank-Container Logs
-docker compose logs db --tail=20
+docker compose exec web bin/rails db:create db:migrate
 ```
 
-### Datenbank-Status
+**3. RSI-Werte zeigen "N/A"**
 ```bash
-# PostgreSQL-Verbindung testen
-docker compose exec web bundle exec bin/rails db:version
+docker compose exec web bin/rails crypto:load_all_whitelist_data
 ```
 
-## 📝 Entwicklung
-
-### Debug-Modus aktivieren
-```yaml
-# docker-compose.yml
-environment:
-  - DEBUG_MODE=true
-  - VERBOSE_LOGGING=true
+**4. WebSocket-Verbindung**
+```bash
+docker compose restart web
 ```
 
-### Logs filtern
-```bash
-# Nur Debug-Logs
-docker compose logs web | grep "DEBUG"
+## 🚀 Deployment
 
-# Nur Fehler
-docker compose logs web | grep "ERROR"
+### Production
+```bash
+# Umgebungsvariablen setzen
+RAILS_ENV=production
+
+# Assets kompilieren
+docker compose exec web bin/rails assets:precompile
+
+# Datenbank migrieren
+docker compose exec web bin/rails db:migrate
 ```
 
-## 🎯 Performance-Tipps
+## 📄 Lizenz
 
-1. **Debug-Schalter deaktivieren** für Produktionsumgebung
-2. **Log-Rotation** konfigurieren für große Log-Dateien
-3. **Connection Pool** an Workload anpassen
-4. **Market Cap Updates** auf längere Intervalle setzen bei hoher Last
+Dieses Projekt ist für Bildungs- und Entwicklungszwecke gedacht.
 
-## 📈 Monitoring
+---
 
-### Wichtige Metriken
-- WebSocket-Verbindungsstatus
-- Datenbankverbindungen
-- ActionCable-Broadcast-Rate
-- Market Cap Update-Frequenz
+**Hinweis:** Dieser Scanner ist für Bildungszwecke entwickelt. Verwenden Sie ihn nicht für echtes Trading ohne gründliche Tests und Risikobewertung.
 
-### Log-Monitoring
-```bash
-# Echtzeit-Logs
-docker compose logs -f web
 
-# Fehler-Monitoring
-docker compose logs web | grep -i error
+# Rails Console starten
+```
+docker compose exec -e RAILS_CONSOLE=true web bin/rails console
 ```

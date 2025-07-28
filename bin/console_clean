@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+
+# Saubere Rails Console ohne störende Logs
+ENV['RAILS_CONSOLE'] = 'true'
+ENV['RAILS_LOG_LEVEL'] = 'error'
+
+# Rails-Umgebung laden
+require_relative '../config/environment'
+
+# Alle Logger deaktivieren
+Rails.logger = Logger.new('/dev/null') if defined?(Rails.logger)
+ActiveRecord::Base.logger = nil if defined?(ActiveRecord::Base)
+ActionCable.server.config.logger = nil if defined?(ActionCable)
+
+# IRB starten
+require 'irb'
+IRB.start 

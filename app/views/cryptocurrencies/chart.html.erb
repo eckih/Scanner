@@ -16,14 +16,14 @@
                 <%= @cryptocurrency.rsi %>
               </span>
             <% end %>
-            <% if @cryptocurrency.roc %>
-              | ROC: <span class="badge <%= @cryptocurrency.roc >= 0 ? 'bg-success' : 'bg-danger' %>">
-                <%= @cryptocurrency.roc.round(2) %>%
+            <% if @cryptocurrency.current_roc %>
+              | ROC: <span class="badge <%= @cryptocurrency.current_roc >= 0 ? 'bg-success' : 'bg-danger' %>">
+                <%= @cryptocurrency.current_roc.round(2) %>%
               </span>
             <% end %>
-            <% if @cryptocurrency.roc_derivative %>
-              | ROC': <span class="badge <%= @cryptocurrency.roc_derivative >= 0 ? 'bg-success' : 'bg-danger' %>">
-                <%= @cryptocurrency.roc_derivative.round(2) %>%
+            <% if @cryptocurrency.current_roc_derivative %>
+              | ROC': <span class="badge <%= @cryptocurrency.current_roc_derivative >= 0 ? 'bg-success' : 'bg-danger' %>">
+                <%= @cryptocurrency.current_roc_derivative.round(2) %>%
               </span>
             <% end %>
           </p>

@@ -62,6 +62,8 @@ Rails.application.configure do
   # Logging-Level basierend auf Umgebungsvariablen
   if ENV.fetch('VERBOSE_LOGGING', 'false').downcase == 'true'
     config.log_level = :debug
+  elsif ENV.fetch('QUIET_LOGGING', 'false').downcase == 'true'
+    config.log_level = :error
   else
     config.log_level = :warn
   end
@@ -71,6 +73,19 @@ Rails.application.configure do
     config.action_cable.log_tags = []
     # Nicht den Logger komplett deaktivieren, da Rails.logger.debug verwendet wird
     # config.action_cable.logger = nil
+  end
+  
+  # Spezielle Konfiguration für Rails Console
+  if ENV['RAILS_CONSOLE'] == 'true'
+    # SQL-Queries komplett deaktivieren für Console
+    config.active_record.verbose_query_logs = false
+    config.log_level = :error
+    
+    # Asset-Logging komplett deaktivieren
+    config.assets.quiet = true
+    
+    # Deprecation Warnings komplett unterdrücken
+    config.active_support.deprecation = :silence
   end
 
   # Raises error for missing translations.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
+ActiveRecord::Schema[7.1].define(version: 2025_07_28_064337) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -36,9 +36,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
     t.decimal "low_price", precision: 20, scale: 8
     t.decimal "close_price", precision: 20, scale: 8
     t.decimal "volume", precision: 20, scale: 8
-    t.decimal "rsi", precision: 5, scale: 2
-    t.decimal "roc", precision: 10, scale: 2
-    t.decimal "roc_derivative", precision: 10, scale: 2
     t.string "interval", limit: 10, default: "1h"
     t.datetime "created_at", precision: nil, default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.datetime "updated_at", precision: nil, default: -> { "CURRENT_TIMESTAMP" }, null: false
@@ -60,7 +57,6 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
     t.datetime "last_updated"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.decimal "roc_derivative", precision: 10, scale: 2
     t.boolean "price_change_24h_complete"
     t.index ["last_updated"], name: "index_cryptocurrencies_on_last_updated"
     t.index ["market_cap"], name: "index_cryptocurrencies_on_market_cap"
@@ -68,41 +64,22 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_26_150819) do
     t.index ["symbol"], name: "index_cryptocurrencies_on_symbol", unique: true
   end
 
-  create_table "roc_derivative_histories", force: :cascade do |t|
+  create_table "indicators", force: :cascade do |t|
     t.bigint "cryptocurrency_id", null: false
-    t.float "value", null: false
-    t.string "interval", default: "1h", null: false
+    t.string "timeframe", limit: 10, null: false
+    t.integer "period", default: 14, null: false
+    t.string "indicator_type", limit: 20, null: false
+    t.decimal "value", precision: 10, scale: 4, null: false
     t.datetime "calculated_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["cryptocurrency_id", "interval", "calculated_at"], name: "index_roc_derivative_histories_on_crypto_interval_time", unique: true
-    t.index ["cryptocurrency_id"], name: "index_roc_derivative_histories_on_cryptocurrency_id"
-  end
-
-  create_table "roc_histories", force: :cascade do |t|
-    t.bigint "cryptocurrency_id", null: false
-    t.float "value", null: false
-    t.string "interval", default: "1h", null: false
-    t.datetime "calculated_at", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["cryptocurrency_id", "interval", "calculated_at"], name: "index_roc_histories_on_crypto_interval_time", unique: true
-    t.index ["cryptocurrency_id"], name: "index_roc_histories_on_cryptocurrency_id"
-  end
-
-  create_table "rsi_histories", force: :cascade do |t|
-    t.bigint "cryptocurrency_id", null: false
-    t.float "value", null: false
-    t.string "interval", default: "1h", null: false
-    t.datetime "calculated_at", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["cryptocurrency_id", "interval", "calculated_at"], name: "index_rsi_histories_on_crypto_interval_time", unique: true
-    t.index ["cryptocurrency_id"], name: "index_rsi_histories_on_cryptocurrency_id"
+    t.index ["calculated_at"], name: "index_indicators_on_calculated_at"
+    t.index ["cryptocurrency_id", "timeframe", "period", "indicator_type", "calculated_at"], name: "idx_indicators_unique", unique: true
+    t.index ["cryptocurrency_id", "timeframe"], name: "index_indicators_on_cryptocurrency_id_and_timeframe"
+    t.index ["cryptocurrency_id"], name: "index_indicators_on_cryptocurrency_id"
+    t.index ["indicator_type"], name: "index_indicators_on_indicator_type"
   end
 
   add_foreign_key "crypto_history_data", "cryptocurrencies", name: "fk_crypto_history_cryptocurrency"
-  add_foreign_key "roc_derivative_histories", "cryptocurrencies"
-  add_foreign_key "roc_histories", "cryptocurrencies"
-  add_foreign_key "rsi_histories", "cryptocurrencies"
+  add_foreign_key "indicators", "cryptocurrencies"
 end

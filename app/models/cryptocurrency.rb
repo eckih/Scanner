@@ -5,15 +5,9 @@ class Cryptocurrency < ApplicationRecord
   validates :market_cap, presence: true, numericality: { greater_than: 0 }
   validates :market_cap_rank, presence: true, numericality: { greater_than: 0 }
   
-  # Explizit roc-Attribut definieren
-  attribute :roc, :decimal, default: nil
-  attribute :roc_derivative, :decimal, default: nil
-  
-  # Beziehungen - temporär deaktiviert um Seeds-Fehler zu beheben
+  # Beziehungen
   has_many :crypto_history_data, class_name: 'CryptoHistoryDatum', dependent: :destroy
-  has_many :rsi_histories, dependent: :destroy
-  has_many :roc_histories, dependent: :destroy
-  has_many :roc_derivative_histories, dependent: :destroy
+  has_many :indicators, dependent: :destroy
   
   scope :top_50, -> { order(:market_cap_rank).limit(50) }
   scope :by_market_cap, -> { order(market_cap: :desc) }
@@ -132,78 +126,37 @@ class Cryptocurrency < ApplicationRecord
     end
   end
 
-  def roc_color_class
-    return "roc-neutral" if roc.nil?
-    
-    if roc >= 5
-      "roc-positive"
-    elsif roc <= -5
-      "roc-negative"
-    else
-      "roc-neutral"
-    end
+  # Convenience methods für aktuelle Indikatoren
+  def current_rsi(timeframe = '15m', period = 14)
+    indicators.rsi.for_timeframe(timeframe).for_period(period).latest.first&.value || rsi
   end
-
-  def roc_signal
-    return "Neutral" if roc.nil?
-    
-    if roc >= 5
-      "Positiv"
-    elsif roc <= -5
-      "Negativ"
-    else
-      "Neutral"
-    end
+  
+  def current_roc(timeframe = '15m', period = 14)
+    indicators.roc.for_timeframe(timeframe).for_period(period).latest.first&.value
   end
-
-  def roc_formatted
-    return "N/A" if roc.nil?
-    
-    sign = roc >= 0 ? "+" : ""
-    "#{sign}#{roc}%"
+  
+  def current_roc_derivative(timeframe = '15m', period = 14)
+    indicators.roc_derivative.for_timeframe(timeframe).for_period(period).latest.first&.value
   end
-
-  def roc_derivative_color_class
-    return "roc-derivative-neutral" if roc_derivative.nil?
-    
-    if roc_derivative >= 1
-      "roc-derivative-positive"
-    elsif roc_derivative <= -1
-      "roc-derivative-negative"
-    else
-      "roc-derivative-neutral"
-    end
+  
+  def rsi_history(timeframe = '15m', period = 14, limit = 100)
+    indicators.rsi.for_timeframe(timeframe).for_period(period)
+             .order(:calculated_at)
+             .limit(limit)
+             .pluck(:calculated_at, :value)
+             .map { |timestamp, value| { x: timestamp.to_i * 1000, y: value } }
   end
-
-  def roc_derivative_signal
-    return "Neutral" if roc_derivative.nil?
-    
-    if roc_derivative >= 1
-      "Beschleunigung"
-    elsif roc_derivative <= -1
-      "Verlangsamung"
-    else
-      "Stabil"
-    end
+  
+  def roc_history(timeframe = '15m', period = 14, limit = 100)
+    indicators.roc.for_timeframe(timeframe).for_period(period)
+             .order(:calculated_at)
+             .limit(limit)
+             .pluck(:calculated_at, :value)
+             .map { |timestamp, value| { x: timestamp.to_i * 1000, y: value } }
   end
-
-  def roc_derivative_formatted
-    return "N/A" if roc_derivative.nil?
-    
-    sign = roc_derivative >= 0 ? "+" : ""
-    "#{sign}#{roc_derivative.round(2)}"
-  end
-
+  
   # Einfache Hilfsmethoden für Trend-Anzeige
   def has_rsi?
     rsi.present? && rsi > 0
-  end
-
-  def has_roc?
-    roc.present? && roc != 0
-  end
-
-  def has_roc_derivative?
-    roc_derivative.present? && roc_derivative != 0
   end
 end 
