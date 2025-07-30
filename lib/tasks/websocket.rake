@@ -1,16 +1,26 @@
 namespace :websocket do
   desc "Start Binance WebSocket Service (sauber ohne doppelte Einträge)"
   task start: :environment do
-    puts "🚀 Starte Binance WebSocket Service (sauber)..."
+    puts "🚀 Starte Binance WebSocket Service (direkt)..."
     
-    # Stoppe alle laufenden Services
-    system("docker compose exec web pkill -f binance_websocket_service")
-    sleep 2
+    # Stoppe alle laufenden Services (nur innerhalb des Containers)
+    system("pkill -f binance_websocket_service 2>/dev/null || true")
+    sleep 1
     
-    # Starte den Service manuell
-    system("docker compose exec -d web bin/rails runner \"load 'bin/binance_websocket_service.rb'; start_binance_websocket_service\"")
+    # Starte den Service direkt in einem Thread
+    Thread.new do
+      begin
+        require_relative '../../bin/binance_websocket_service'
+        Rails.logger.info "🚀 WebSocket Service wird in Thread gestartet..."
+        start_binance_websocket_service
+      rescue => e
+        Rails.logger.error "❌ Fehler beim Starten des WebSocket Service: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+      end
+    end
     
-    puts "✅ WebSocket Service gestartet"
+    sleep 2 # Kurz warten, damit der Thread startet
+    puts "✅ WebSocket Service gestartet (in Thread)"
     puts "📊 Prüfe Logs mit: docker compose logs web --tail=10"
   end
   

@@ -710,47 +710,36 @@ private def process_kline_data(symbol, kline)
   # Zähler für Preis-Updates erhöhen
   increment_websocket_counter(:price_update)
   
-  # Berechne RSI bei jeder Kursänderung - VEREINFACHT UND DIREKT
-  begin
-    # Finde Kryptowährung - VERWENDE NUR BESTEHENDE AUS BOT.JSON
-    db_symbol = convert_websocket_symbol_to_db_format(symbol)
-    cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
-    
-    unless cryptocurrency
-      # KEINE NEUE ERSTELLUNG - nur Warnung und Abbruch
-      console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe RSI-Berechnung"
-      return
+  # RSI-Berechnung nur bei geschlossenen Kerzen (Performance-Optimierung)
+  if kline['x'] # Nur bei abgeschlossenen Kerzen
+    begin
+      # Finde Kryptowährung - VERWENDE NUR BESTEHENDE AUS BOT.JSON
+      db_symbol = convert_websocket_symbol_to_db_format(symbol)
+      cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
+      
+      if cryptocurrency
+        # Aktualisiere Preis
+        cryptocurrency.update!(current_price: kline['c'].to_f)
+        
+        # Berechne RSI nur einmal pro abgeschlossene Kerze
+        period = get_current_rsi_period
+        rsi_value = IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', period)
+        
+        # Zähler für RSI-Berechnungen erhöhen
+        increment_websocket_counter(:rsi_calculation)
+        
+        debug_log "📊 RSI berechnet für #{cryptocurrency.symbol}: #{rsi_value} (nur bei geschlossener Kerze)"
+      else
+        # Warnung nur beim ersten Mal pro Symbol
+        @warned_rsi_symbols ||= Set.new
+        unless @warned_rsi_symbols.include?(symbol)
+          console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe RSI-Berechnung"
+          @warned_rsi_symbols.add(symbol)
+        end
+      end
+    rescue => e
+      console_safe_log "❌ FEHLER bei RSI-Berechnung für #{symbol}: #{e.message}"
     end
-    
-    # Aktualisiere Preis
-    cryptocurrency.update!(current_price: kline['c'].to_f)
-    
-    # Berechne RSI mit 1m Daten (da wir diese haben)
-    period = get_current_rsi_period
-    rsi_value = IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', period)
-    
-    # Zähler für RSI-Berechnungen erhöhen
-    increment_websocket_counter(:rsi_calculation)
-    
-    if rsi_value && rsi_value > 0
-      # DIREKTER ActionCable Broadcast - GARANTIERT
-      ActionCable.server.broadcast("prices", {
-        cryptocurrency_id: cryptocurrency.id,
-        symbol: cryptocurrency.symbol,
-        indicator_type: 'rsi',
-        value: rsi_value,
-        timeframe: '1m',
-        period: period,
-        timestamp: Time.now.iso8601,
-        update_type: 'indicator'
-      })
-      console_safe_log "🚀 RSI DIREKT gebroadcastet für #{cryptocurrency.symbol}: #{rsi_value}"
-    else
-      console_safe_log "⚠️ RSI-Berechnung für #{cryptocurrency.symbol} ergab: #{rsi_value}"
-    end
-  rescue => e
-    console_safe_log "❌ FEHLER bei RSI-Berechnung für #{symbol}: #{e.message}"
-    console_safe_log "❌ Backtrace: #{e.backtrace.first(3).join(' | ')}"
   end
   
   # Speichere nur abgeschlossene Kerzen in die Datenbank für konsistente historische Daten
@@ -785,15 +774,8 @@ private def process_kline_data(symbol, kline)
     # Berechne und aktualisiere 24h Änderung
     update_24h_change(cryptocurrency, kline['c'].to_f)
     
-    # Berechne RSI bei jeder Kursänderung
-    begin
-      timeframe = get_current_timeframe
-      period = get_current_rsi_period
-      IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, timeframe, period)
-      console_safe_log "📊 RSI sofort berechnet für #{cryptocurrency.symbol}: Timeframe=#{timeframe}, Periode=#{period}"
-    rescue => e
-      console_safe_log "❌ RSI-Berechnung fehlgeschlagen für #{cryptocurrency.symbol}: #{e.message}"
-    end
+    # RSI wird bereits in process_kline_data berechnet - keine doppelte Berechnung nötig
+    debug_log "📊 RSI bereits berechnet in process_kline_data für #{cryptocurrency.symbol}"
       
       attrs = {
         cryptocurrency: cryptocurrency,
