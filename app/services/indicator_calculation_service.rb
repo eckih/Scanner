@@ -25,9 +25,6 @@ class IndicatorCalculationService
       # Speichere in indicators Tabelle
       save_indicator(cryptocurrency, 'rsi', rsi_value, timeframe, period)
       
-      # Aktualisiere cryptocurrencies Tabelle für schnelle Anzeige
-      cryptocurrency.update!(rsi: rsi_value.round(2))
-      
       # Broadcaste Update
       broadcast_indicator_update(cryptocurrency, 'rsi', rsi_value, timeframe, period)
       

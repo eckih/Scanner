@@ -36,8 +36,8 @@ services:
       - POSTGRES_DB=scanner_development
       - POSTGRES_USER=scanner_user
       - POSTGRES_PASSWORD=scanner_password
-      - DEBUG_MODE=false
-      - VERBOSE_LOGGING=false
+      - DEBUG_MODE=true
+      - VERBOSE_LOGGING=true
     working_dir: /app
     command: bundle exec rails server -b 0.0.0.0 -e development
     depends_on:

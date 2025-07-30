@@ -39,9 +39,9 @@ namespace :average_history do
     
     if cryptocurrencies.any?
       # Berechne aktuelle Durchschnittswerte
-      valid_rsi_values = cryptocurrencies.select { |c| c.rsi && c.rsi > 0 }.map(&:rsi)
-      valid_roc_values = cryptocurrencies.select { |c| c.roc && c.roc != 0 }.map(&:roc)
-      valid_roc_derivative_values = cryptocurrencies.select { |c| c.roc_derivative && c.roc_derivative != 0 }.map(&:roc_derivative)
+      valid_rsi_values = cryptocurrencies.map(&:current_rsi).compact.select { |rsi| rsi > 0 }
+      valid_roc_values = cryptocurrencies.map(&:current_roc).compact.select { |roc| roc != 0 }
+      valid_roc_derivative_values = cryptocurrencies.map(&:current_roc_derivative).compact.select { |roc_der| roc_der != 0 }
       
       # Erstelle historische Einträge für die letzten 10 Perioden
       10.times do |i|

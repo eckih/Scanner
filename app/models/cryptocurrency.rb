@@ -103,11 +103,12 @@ class Cryptocurrency < ApplicationRecord
   end
 
   def rsi_color_class
-    return "rsi-neutral" if rsi.nil?
+    current_rsi_value = current_rsi
+    return "rsi-neutral" if current_rsi_value.nil?
     
-    if rsi <= 30
+    if current_rsi_value <= 30
       "rsi-oversold"
-    elsif rsi >= 70
+    elsif current_rsi_value >= 70
       "rsi-overbought"
     else
       "rsi-neutral"
@@ -115,11 +116,12 @@ class Cryptocurrency < ApplicationRecord
   end
 
   def rsi_signal
-    return "Neutral" if rsi.nil?
+    current_rsi_value = current_rsi
+    return "Neutral" if current_rsi_value.nil?
     
-    if rsi <= 30
+    if current_rsi_value <= 30
       "Überverkauft"
-    elsif rsi >= 70
+    elsif current_rsi_value >= 70
       "Überkauft"
     else
       "Neutral"
@@ -128,7 +130,8 @@ class Cryptocurrency < ApplicationRecord
 
   # Convenience methods für aktuelle Indikatoren
   def current_rsi(timeframe = '15m', period = 14)
-    indicators.rsi.for_timeframe(timeframe).for_period(period).latest.first&.value || rsi
+    # Fallback auf Datenbank (Cache wird im WebSocket-Service verwaltet)
+    indicators.rsi.for_timeframe(timeframe).for_period(period).latest.first&.value
   end
   
   def current_roc(timeframe = '15m', period = 14)
@@ -157,6 +160,6 @@ class Cryptocurrency < ApplicationRecord
   
   # Einfache Hilfsmethoden für Trend-Anzeige
   def has_rsi?
-    rsi.present? && rsi > 0
+    current_rsi.present?
   end
 end 

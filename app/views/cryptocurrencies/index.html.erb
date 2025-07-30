@@ -65,12 +65,22 @@ document.addEventListener('DOMContentLoaded', function() {
                               received(data) {
                // Debug: Zeige die vollständige Nachrichtenstruktur
                console.log("📨 Rohe ActionCable-Nachricht:", data);
+               console.log("📨 Nachrichtentyp:", typeof data);
+               console.log("📨 Nachricht hat message:", 'message' in data);
                
                // ActionCable-Nachrichten sind oft in einem 'message'-Objekt verschachtelt
                const messageData = data.message || data; // Nutze data.message, falls vorhanden, sonst direkt data
                console.log("📨 Verarbeitete Nachrichtendaten:", messageData);
+               console.log("🔍 Update-Type:", messageData.update_type);
                
-               // Ignoriere Nachrichten ohne cryptocurrency_id
+               // Behandle Zähler-Updates zuerst (diese haben keine cryptocurrency_id)
+               if (messageData.update_type === 'counters') {
+                 console.log("📊 Zähler-Update erhalten:", messageData);
+                 handleCounterUpdate(messageData);
+                 return;
+               }
+               
+               // Ignoriere Nachrichten ohne cryptocurrency_id oder symbol (außer Zähler-Updates)
                if (!messageData.cryptocurrency_id || !messageData.symbol) {
                  console.log("⚠️ Nachricht ohne cryptocurrency_id oder symbol ignoriert:", messageData);
                  return;
@@ -88,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  handleIndicatorUpdate(messageData);
                  return;
                }
-
+               
                // Unterscheide zwischen Echtzeit-Updates und abgeschlossenen Kerzen (für Preis-Updates)
                const updateType = messageData.realtime ? "🚀 ECHTZEIT" : "📊 KERZE";
                console.log(`📨 ${updateType} Preis-Update erhalten:`, messageData);
@@ -232,31 +242,89 @@ document.addEventListener('DOMContentLoaded', function() {
    }).catch((error) => {
      console.error("❌ Fehler beim Laden von ActionCable:", error);
    });
- });
 
  // Funktion zum Behandeln von RSI-Updates
  function handleRsiUpdate(data) {
    console.log("📊 Verarbeite RSI-Update für", data.symbol, ":", data.rsi);
+   console.log("🔍 Suche nach Crypto ID:", data.cryptocurrency_id);
+   
+   // Debug: Zeige alle verfügbaren data-crypto-id Attribute
+   const allRows = document.querySelectorAll('[data-crypto-id]');
+   console.log("🔍 Verfügbare data-crypto-id:", Array.from(allRows).map(r => ({
+     id: r.getAttribute('data-crypto-id'),
+     symbol: r.querySelector('td span.badge')?.textContent?.trim()
+   })));
    
    const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`);
    if (!row) {
      console.log("⚠️ Zeile nicht gefunden für Crypto ID:", data.cryptocurrency_id);
+     console.log("🔍 Versuche Symbol-basierte Suche für:", data.symbol);
+     
+     // Fallback: Suche nach Symbol
+     const searchSymbol = data.symbol.replace('USDC', '').replace('USDT', '');
+     const allTableRows = document.querySelectorAll('tbody tr');
+     let foundRow = null;
+     
+     for (const tableRow of allTableRows) {
+       const symbolCell = tableRow.querySelector('td span.badge');
+       if (symbolCell && symbolCell.textContent.trim() === searchSymbol) {
+         foundRow = tableRow;
+         console.log("✅ Zeile gefunden über Symbol-Matching:", data.symbol, "->", searchSymbol);
+         break;
+       }
+     }
+     
+     if (!foundRow) {
+       console.log("❌ Keine Zeile gefunden für Symbol:", data.symbol);
+       return;
+     }
+     
+     // Verwende die gefundene Zeile
+     const rsiCell = foundRow.querySelector('.rsi-cell');
+     if (rsiCell) {
+       const rsiValue = parseFloat(data.rsi);
+       console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
+       rsiCell.textContent = rsiValue.toFixed(2);
+       
+       // RSI-Farbe basierend auf Wert
+       rsiCell.className = 'badge rsi-cell';
+       if (rsiValue >= 70) {
+         rsiCell.classList.add('rsi-overbought'); // Überkauft
+       } else if (rsiValue <= 30) {
+         rsiCell.classList.add('rsi-oversold'); // Überverkauft  
+       } else {
+         rsiCell.classList.add('rsi-neutral'); // Neutral
+       }
+       
+       // Animation für RSI-Update
+       rsiCell.style.transition = 'background-color 0.8s ease';
+       rsiCell.style.backgroundColor = '#fff3cd'; // Gelber Hintergrund
+       setTimeout(() => {
+         rsiCell.style.backgroundColor = '';
+       }, 800);
+       
+       console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
+     } else {
+       console.log("⚠️ RSI-Zelle nicht gefunden in Symbol-basierter Zeile");
+       console.log("🔍 Zeilen-HTML:", foundRow.innerHTML);
+     }
      return;
    }
    
    const rsiCell = row.querySelector('.rsi-cell');
    if (rsiCell) {
      const rsiValue = parseFloat(data.rsi);
+     console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
      rsiCell.textContent = rsiValue.toFixed(2);
      
      // RSI-Farbe basierend auf Wert
-     rsiCell.className = 'rsi-cell';
+     rsiCell.className = 'badge rsi-cell';
      if (rsiValue >= 70) {
-       rsiCell.classList.add('text-danger', 'fw-bold'); // Überkauft - Rot
+       rsiCell.classList.add('rsi-overbought'); // Überkauft
      } else if (rsiValue <= 30) {
-       rsiCell.classList.add('text-success', 'fw-bold'); // Überverkauft - Grün
+       rsiCell.classList.add('rsi-oversold'); // Überverkauft
      } else {
-       rsiCell.classList.add('text-warning'); // Neutral - Orange
+       rsiCell.classList.add('rsi-neutral'); // Neutral
      }
      
      // Animation für RSI-Update
@@ -269,6 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
      console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
    } else {
      console.log("⚠️ RSI-Zelle nicht gefunden für Crypto ID:", data.cryptocurrency_id);
+     console.log("🔍 Zeilen-HTML:", row.innerHTML);
    }
  }
  
@@ -302,591 +371,39 @@ document.addEventListener('DOMContentLoaded', function() {
        console.log(`📊 Unbekannter Indikator-Typ: ${data.indicator_type}`);
    }
  }
-</script>
 
-<div class="container mt-4">
-  <div class="row">
-    <div class="col-12">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Kryptowährungen Scanner</h1>
-        <!-- Button Einstellungen entfernt -->
-      </div>
-
-      <!-- Timeframe und RSI-Konfiguration -->
-      <div class="mb-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="d-flex align-items-center gap-3">
-            <div class="d-flex align-items-center">
-              <label for="timeframe-selector" class="form-label me-2 mb-0">
-                <i class="bi bi-clock"></i> Timeframe:
-              </label>
-              <select id="timeframe-selector" class="form-select form-select-sm" style="width: auto;">
-                <option value="1m">1 Minute</option>
-                <option value="5m">5 Minuten</option>
-                <option value="15m">15 Minuten</option>
-                <option value="1h">1 Stunde</option>
-                <option value="4h">4 Stunden</option>
-                <option value="1d">1 Tag</option>
-              </select>
-            </div>
-            
-            <div class="d-flex align-items-center">
-              <label for="rsi-period-input" class="form-label me-2 mb-0">
-                <i class="bi bi-graph-up"></i> RSI-Periode:
-              </label>
-              <input type="number" id="rsi-period-input" class="form-control form-control-sm" 
-                     value="14" min="1" max="50" style="width: 80px;"
-                     title="Anzahl der Kerzen für RSI-Berechnung (Standard: 14)">
-            </div>
-          </div>
-          
-          <!-- Live-Daten Status -->
-          <div>
-            <small class="text-success">
-              <i class="bi bi-check-circle"></i> Live-Daten von Binance API (1m Updates)
-            </small>
-          </div>
-        </div>
-      </div>
-
-      <!-- Durchschnittswerte -->
-        <% if @average_rsi || @average_roc || @average_roc_derivative %>
-          <div class="mb-2">
-            <div class="d-flex gap-3 justify-content-end">
-              <% if @average_rsi %>
-                <% rsi_trend_icon = case @rsi_trend
-                                     when 'up' then 'bi-arrow-up-right text-success'
-                                     when 'down' then 'bi-arrow-down-right text-danger'
-                                     else 'bi-arrow-right text-muted'
-                                   end %>
-                <small class="text-info averages-tooltip" 
-                       data-bs-toggle="tooltip" 
-                       data-bs-html="true"
-                       data-bs-placement="bottom"
-                       data-bs-custom-class="chart-tooltip"
-                       data-chart-type="rsi"
-                       title="<div class='text-center'>
-                         <strong>RSI Durchschnitt</strong><br>
-                         <span class='h5 text-info'><%= @average_rsi %></span><br>
-                         <small class='text-muted'>Relative Strength Index</small><br>
-                         <div class='mt-2'>
-                           <i class='bi <%= rsi_trend_icon %>'></i>
-                           <small class='text-muted ms-1'>Trend: <%= @rsi_trend == 'up' ? 'Anstieg' : (@rsi_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
-                         </div>
-                         <div class='mt-2'>
-                           <canvas id='rsi-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
-                         </div>
-                       </div>">
-                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-info' do %>
-                    <i class="bi bi-speedometer2"></i> RSI Ø: <strong><%= @average_rsi %></strong>
-                    <i class="bi <%= rsi_trend_icon %> ms-1"></i>
-                  <% end %>
-                </small>
-              <% end %>
-              <% if @average_roc %>
-                <% roc_trend_icon = case @roc_trend
-                                     when 'up' then 'bi-arrow-up-right text-success'
-                                     when 'down' then 'bi-arrow-down-right text-danger'
-                                     else 'bi-arrow-right text-muted'
-                                   end %>
-                <small class="text-warning averages-tooltip" 
-                       data-bs-toggle="tooltip" 
-                       data-bs-html="true"
-                       data-bs-placement="bottom"
-                       data-bs-custom-class="chart-tooltip"
-                       data-chart-type="roc"
-                       title="<div class='text-center'>
-                         <strong>ROC Durchschnitt</strong><br>
-                         <span class='h5 text-warning'><%= @average_roc %>%</span><br>
-                         <small class='text-muted'>Rate of Change</small><br>
-                         <div class='mt-2'>
-                           <i class='bi <%= roc_trend_icon %>'></i>
-                           <small class='text-muted ms-1'>Trend: <%= @roc_trend == 'up' ? 'Anstieg' : (@roc_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
-                         </div>
-                         <div class='mt-2'>
-                           <canvas id='roc-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
-                         </div>
-                       </div>">
-                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-warning' do %>
-                    <i class="bi bi-arrow-up-right"></i> ROC Ø: <strong><%= @average_roc %>%</strong>
-                    <i class="bi <%= roc_trend_icon %> ms-1"></i>
-                  <% end %>
-                </small>
-              <% end %>
-              <% if @average_roc_derivative %>
-                <% roc_derivative_trend_icon = case @roc_derivative_trend
-                                                 when 'up' then 'bi-arrow-up-right text-success'
-                                                 when 'down' then 'bi-arrow-down-right text-danger'
-                                                 else 'bi-arrow-right text-muted'
-                                               end %>
-                <small class="text-success averages-tooltip" 
-                       data-bs-toggle="tooltip" 
-                       data-bs-html="true"
-                       data-bs-placement="bottom"
-                       data-bs-custom-class="chart-tooltip"
-                       data-chart-type="roc-derivative"
-                       title="<div class='text-center'>
-                         <strong>ROC' Durchschnitt</strong><br>
-                         <span class='h5 text-success'><%= @average_roc_derivative %>%</span><br>
-                         <small class='text-muted'>ROC-Ableitung</small><br>
-                         <div class='mt-2'>
-                           <i class='bi <%= roc_derivative_trend_icon %>'></i>
-                           <small class='text-muted ms-1'>Trend: <%= @roc_derivative_trend == 'up' ? 'Anstieg' : (@roc_derivative_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
-                         </div>
-                         <div class='mt-2'>
-                           <canvas id='roc-derivative-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
-                         </div>
-                       </div>">
-                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-success' do %>
-                    <i class="bi bi-arrow-up-right"></i> ROC' Ø: <strong><%= @average_roc_derivative %>%</strong>
-                    <i class="bi <%= roc_derivative_trend_icon %> ms-1"></i>
-                  <% end %>
-                </small>
-              <% end %>
-            </div>
-          </div>
-        <% end %>
-      </div>
-    </div>
-  </div>
-</div>
-
-<% if @cryptocurrencies.any? %>
-  <!-- Responsive Table View (alle Bildschirmgrößen) -->
-  <div class="table-responsive">
-    <table id="crypto-table" class="table table-hover">
-      <thead class="table-dark">
-        <tr>
-          <th class="d-none d-md-table-cell">Rang</th>
-          <th class="d-none d-lg-table-cell">Name</th>
-          <th>Symbol</th>
-          <th>Preis</th>
-          <th class="d-none d-lg-table-cell">24h Änderung</th>
-          <th class="d-none d-xl-table-cell">Market Cap</th>
-          <th class="d-none d-xl-table-cell">Volumen 24h (USD)</th>
-          <th>
-            RSI (1h)
-            <% if @average_rsi %>
-              <br><small class="text-info d-none d-md-inline">Ø <%= @average_rsi %></small>
-            <% end %>
-          </th>
-          <th>
-            ROC (14h)
-            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
-          </th>
-          <th>
-            ROC' (14h)
-            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @cryptocurrencies.each_with_index do |crypto, crypto_index| %>
-          <tr data-crypto-id="<%= crypto.id %>">
-            <td class="d-none d-md-table-cell">
-              <span class="badge bg-secondary">#<%= crypto.market_cap_rank %></span>
-            </td>
-            <td class="d-none d-lg-table-cell">
-              <strong><%= crypto.display_name %></strong>
-            </td>
-            <td>
-              <%= link_to "https://www.binance.com/en/trade/#{crypto.base_symbol}_USDC?_from=markets&type=spot", 
-                  target: '_blank',
-                  class: 'text-decoration-none',
-                  title: "#{crypto.display_name} auf Binance handeln" do %>
-                <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
-              <% end %>
-              <span class="d-md-none">
-                <br><small class="text-muted">#<%= crypto.market_cap_rank %></small>
-              </span>
-            </td>
-            <td data-sort="<%= @latest_prices[crypto.id] || 0 %>">
-              <strong class="price-cell">
-                <% price = @latest_prices[crypto.id] %>
-                <% if price.present? %>
-                  <%= link_to (price >= 1 ? "$#{price.round(2)}" : "$#{price.round(6)}"), chart_cryptocurrency_path(crypto), target: '_blank', class: 'text-decoration-none text-primary chart-link', title: 'Chart anzeigen' %>
-                <% else %>
-                  <span class="text-muted">N/A</span>
-                <% end %>
-              </strong>
-            </td>
-            <td class="d-none d-lg-table-cell">
-              <% if crypto.price_change_percentage_24h %>
-                <%# Bestimme die Farbe basierend auf Vollständigkeit der 24h-Daten %>
-                <% color_class = if crypto.price_change_24h_complete?
-                                   crypto.price_change_percentage_24h >= 0 ? 'text-success' : 'text-danger'
-                                 else
-                                   'text-danger' # Unvollständige Daten immer rot
-                                 end %>
-                <span class="<%= color_class %>">
-                  <% if crypto.price_change_percentage_24h >= 0 %>
-                    <i class="bi bi-arrow-up"></i>
-                  <% else %>
-                    <i class="bi bi-arrow-down"></i>
-                  <% end %>
-                  <%= crypto.price_change_percentage_24h_formatted %>
-                </span>
-              <% else %>
-                <span class="text-muted">0.00%</span>
-              <% end %>
-            </td>
-            <td class="d-none d-xl-table-cell"><%= crypto.formatted_market_cap %></td>
-            <td class="d-none d-xl-table-cell">
-              <%= crypto.formatted_volume_24h %>
-            </td>
-            <td data-sort="<%= crypto.rsi || -1 %>">
-              <% if crypto.rsi %>
-                <% rsi_class = if crypto.rsi <= 30
-                                 "rsi-oversold"
-                               elsif crypto.rsi >= 70
-                                 "rsi-overbought"
-                               else
-                                 "rsi-neutral"
-                               end %>
-                <%# Verwende echte Trend-Daten aus dem Controller %>
-                <% rsi_trend_icon = crypto.instance_variable_get(:@rsi_trend_icon) || "bi-arrow-right text-muted" %>
-                <% rsi_trend_text = case rsi_trend_icon
-                                     when /text-success/ then "Anstieg"
-                                     when /text-danger/ then "Rückgang"
-                                     else "Gleichbleibend"
-                                   end %>
-                <%# Hole vorherigen Wert aus dem Cache %>
-                <% cache_key = "crypto_history_#{crypto.id}" %>
-                <% historical_data = Rails.cache.read(cache_key) %>
-                <% previous_rsi = historical_data&.last&.dig(:rsi) %>
-                <% tooltip_text = if previous_rsi
-                                   rsi_difference = crypto.rsi - previous_rsi
-                                   difference_text = if rsi_difference > 0
-                                                      "(+#{rsi_difference.round(2)})"
-                                                    elsif rsi_difference < 0
-                                                      "(#{rsi_difference.round(2)})"
-                                                    else
-                                                      "(0.00)"
-                                                    end
-                                   "Vorheriger Wert: #{previous_rsi.round(2)} #{difference_text}"
-                                 else
-                                   "Keine historischen Daten verfügbar"
-                                 end %>
-                <%= link_to chart_cryptocurrency_path(crypto), 
-                    target: '_blank',
-                    class: 'text-decoration-none',
-                    title: tooltip_text do %>
-                  <i class="bi <%= rsi_trend_icon %> me-1"></i>
-                  <span class="badge <%= rsi_class %> chart-link rsi-cell">
-                    <%= crypto.rsi %>
-                  </span>
-                <% end %>
-              <% else %>
-                <span class="badge bg-secondary rsi-cell">N/A</span>
-              <% end %>
-            </td>
-            
-            <td data-sort="-1">
-              <% if false %>
-                <%# Verwende echte Trend-Daten aus dem Controller %>
-                <% roc_trend_icon = crypto.instance_variable_get(:@roc_trend_icon) || "bi-arrow-right text-muted" %>
-                <% roc_trend_text = case roc_trend_icon
-                                     when /text-success/ then "Anstieg"
-                                     when /text-danger/ then "Rückgang"
-                                     else "Gleichbleibend"
-                                   end %>
-                <%# ROC ist derzeit nicht verfügbar %>
-                <% tooltip_text = "ROC ist derzeit nicht verfügbar" %>
-                <%= link_to chart_cryptocurrency_path(crypto), 
-                    target: '_blank',
-                    class: 'text-decoration-none',
-                    title: tooltip_text do %>
-                  <i class="bi <%= roc_trend_icon %> me-1"></i>
-                  <span class="badge bg-secondary chart-link">
-                    N/A
-                  </span>
-                <% end %>
-              <% else %>
-                <span class="badge bg-secondary">N/A</span>
-              <% end %>
-            </td>
-            
-            <td data-sort="-1">
-              <% if false %>
-                <%# Verwende echte Trend-Daten aus dem Controller %>
-                <% roc_derivative_trend_icon = crypto.instance_variable_get(:@roc_derivative_trend_icon) || "bi-arrow-right text-muted" %>
-                <% roc_derivative_trend_text = case roc_derivative_trend_icon
-                                                 when /text-success/ then "Anstieg"
-                                                 when /text-danger/ then "Rückgang"
-                                                 else "Gleichbleibend"
-                                               end %>
-                <%# ROC Derivative ist derzeit nicht verfügbar %>
-                <% tooltip_text = "ROC Derivative ist derzeit nicht verfügbar" %>
-                <%= link_to chart_cryptocurrency_path(crypto), 
-                    target: '_blank',
-                    class: 'text-decoration-none',
-                    title: tooltip_text do %>
-                  <i class="bi <%= roc_derivative_trend_icon %> me-1"></i>
-                  <span class="badge bg-secondary chart-link">
-                    N/A
-                  </span>
-                <% end %>
-              <% else %>
-                <span class="badge bg-secondary">N/A</span>
-              <% end %>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- RSI & ROC Legend -->
-  <div class="row mt-4">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="mb-0">Indikator Legende</h5>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <h6>RSI (1h Timeframe)</h6>
-              <div class="row">
-                <div class="col-md-4">
-                  <span class="badge rsi-oversold me-2">≤ 30</span>
-                  <strong>Überverkauft</strong> - Potentieller Kaufsignal
-                </div>
-                <div class="col-md-4">
-                  <span class="badge rsi-neutral me-2">31-69</span>
-                  <strong>Neutral</strong> - Normale Marktbedingungen
-                </div>
-                <div class="col-md-4">
-                  <span class="badge rsi-overbought me-2">≥ 70</span>
-                  <strong>Überkauft</strong> - Potentieller Verkaufssignal
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <h6>ROC (14h Timeframe)</h6>
-              <div class="row">
-                <div class="col-md-4">
-                  <span class="badge roc-positive me-2">≥ +5%</span>
-                  <strong>Positiv</strong> - Starke Aufwärtsbewegung
-                </div>
-                <div class="col-md-4">
-                  <span class="badge roc-neutral me-2">-5% bis +5%</span>
-                  <strong>Neutral</strong> - Normale Volatilität
-                </div>
-                <div class="col-md-4">
-                  <span class="badge roc-negative me-2">≤ -5%</span>
-                  <strong>Negativ</strong> - Starke Abwärtsbewegung
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row mt-3">
-            <div class="col-md-6">
-              <h6>ROC' (14h Timeframe)</h6>
-              <div class="row">
-                <div class="col-md-4">
-                  <span class="badge roc-derivative-positive me-2">≥ +1</span>
-                  <strong>Beschleunigung</strong> - Zunehmende Dynamik
-                </div>
-                <div class="col-md-4">
-                  <span class="badge roc-derivative-neutral me-2">-1 bis +1</span>
-                  <strong>Stabil</strong> - Gleichbleibende Dynamik
-                </div>
-                <div class="col-md-4">
-                  <span class="badge roc-derivative-negative me-2">≤ -1</span>
-                  <strong>Verlangsamung</strong> - Abnehmende Dynamik
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <h6>Trend-Pfeile</h6>
-              <div class="row">
-                <div class="col-md-4">
-                  <i class="bi bi-arrow-up-right text-success me-2"></i>
-                  <strong>Anstieg</strong> - Höherer Wert
-                </div>
-                <div class="col-md-4">
-                  <i class="bi bi-arrow-down-right text-danger me-2"></i>
-                  <strong>Rückgang</strong> - Niedrigerer Wert
-                </div>
-                <div class="col-md-4">
-                  <i class="bi bi-arrow-right text-muted me-2"></i>
-                  <strong>Gleich</strong> - Gleicher Wert
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-<% else %>
-  <!-- Empty State -->
-  <div class="text-center py-5">
-    <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
-    <h3 class="mt-3">Keine Daten verfügbar</h3>
-    <p class="text-muted">
-      Es konnten keine Kryptowährungsdaten geladen werden. 
-      Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.
-    </p>
-    <%= link_to refresh_data_cryptocurrencies_path, method: :post, 
-        class: "btn btn-primary btn-lg" do %>
-      <i class="bi bi-arrow-clockwise"></i> Daten laden
-    <% end %>
-  </div>
-<% end %>
-
-<!-- Tooltip-Initialisierung für Durchschnittswerte -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  // Chart-Daten für Tooltips
-  var chartData = {
-    rsi: <%= raw @rsi_chart_data.to_json %>,
-    roc: <%= raw @roc_chart_data.to_json %>,
-    rocDerivative: <%= raw @roc_derivative_chart_data.to_json %>
-  };
-  
-  console.log('Chart-Daten geladen:', chartData);
-
-  // Initialisiere Bootstrap Tooltips
-  var tooltipTriggerList = [].slice.call(document.querySelectorAll('.averages-tooltip'));
-  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl, {
-      html: true,
-      placement: 'bottom',
-      trigger: 'hover',
-      customClass: 'chart-tooltip',
-      template: '<div class="tooltip chart-tooltip" role="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner"></div></div>'
-    });
-  });
-
-  // Event-Listener für Tooltip-Anzeige
-  document.addEventListener('show.bs.tooltip', function (event) {
-    var tooltip = event.target;
-    var chartType = tooltip.getAttribute('data-chart-type');
+  // Funktion zum Behandeln von Zähler-Updates
+  function handleCounterUpdate(data) {
+    console.log("📊 Verarbeite Zähler-Update:", data);
     
-    console.log('Tooltip geöffnet für Chart-Typ:', chartType);
-    
-    setTimeout(function() {
-      var tooltipElement = document.querySelector('.tooltip-inner');
-      
-      if (tooltipElement) {
-        console.log('Tooltip-Element gefunden, erstelle Chart...');
-        
-        var chartId = '';
-        var chartDataArray = [];
-        var chartColor = '';
-        
-        switch(chartType) {
-          case 'rsi':
-            chartId = 'rsi-chart';
-            chartDataArray = chartData.rsi;
-            chartColor = '#17a2b8';
-            break;
-          case 'roc':
-            chartId = 'roc-chart';
-            chartDataArray = chartData.roc;
-            chartColor = '#ffc107';
-            break;
-          case 'roc-derivative':
-            chartId = 'roc-derivative-chart';
-            chartDataArray = chartData.rocDerivative;
-            chartColor = '#28a745';
-            break;
-        }
-        
-        console.log('Suche nach Canvas mit ID:', chartId);
-        
-        if (chartId && chartDataArray && chartDataArray.length > 0) {
-          var chartCanvas = tooltipElement.querySelector('#' + chartId);
-          if (chartCanvas) {
-            console.log('Chart Canvas gefunden für', chartType, 'Daten:', chartDataArray);
-            createMiniChart(chartCanvas, chartDataArray, chartColor);
-          } else {
-            console.log('Chart Canvas nicht gefunden für', chartType);
-            console.log('Verfügbare Canvas-Elemente im Tooltip:');
-            var allCanvases = tooltipElement.querySelectorAll('canvas');
-            allCanvases.forEach(function(canvas, index) {
-              console.log('Canvas', index, 'ID:', canvas.id, 'Element:', canvas);
-            });
-          }
-        } else {
-          console.log('Keine Daten für Chart-Typ:', chartType);
-        }
-      } else {
-        console.log('Tooltip-Element nicht gefunden');
-      }
-    }, 300);
-  });
-});
+    const messageCounter = document.getElementById('message-counter');
+    const klineCounter = document.getElementById('kline-counter');
+    const priceUpdateCounter = document.getElementById('price-update-counter');
+    const dataRateCounter = document.getElementById('data-rate-counter');
 
-// Funktion zum Erstellen von Mini-Charts
-function createMiniChart(canvas, data, color) {
-  console.log('Erstelle Mini-Chart mit Daten:', data, 'Farbe:', color);
-  
-  var ctx = canvas.getContext('2d');
-  var width = canvas.width;
-  var height = canvas.height;
-  
-  console.log('Canvas Dimensionen:', width, 'x', height);
-  
-  // Lösche vorherige Zeichnung
-  ctx.clearRect(0, 0, width, height);
-  
-  if (!data || data.length < 2) {
-    console.log('Nicht genügend Daten für Chart');
-    return;
-  }
-  
-  // Berechne Skalierung
-  var min = Math.min(...data);
-  var max = Math.max(...data);
-  var range = max - min;
-  if (range === 0) range = 1;
-  
-  console.log('Chart Skalierung - Min:', min, 'Max:', max, 'Range:', range);
-  
-  // Zeichne Hintergrund
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
-  ctx.fillRect(0, 0, width, height);
-  
-  // Zeichne Linie
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  
-  data.forEach(function(value, index) {
-    var x = (index / (data.length - 1)) * width;
-    var y = height - ((value - min) / range) * height;
-    
-    console.log(`Punkt ${index}: (${x}, ${y}) - Wert: ${value}`);
-    
-    if (index === 0) {
-      ctx.moveTo(x, y);
-    } else {
-      ctx.lineTo(x, y);
+    if (messageCounter) {
+      messageCounter.textContent = data.message_counter || 0;
+      console.log("💬 Nachrichten-Zähler aktualisiert:", data.message_counter);
     }
-  });
-  
-  ctx.stroke();
-  
-  // Zeichne Punkte
-  ctx.fillStyle = color;
-  data.forEach(function(value, index) {
-    var x = (index / (data.length - 1)) * width;
-    var y = height - ((value - min) / range) * height;
-    
-    ctx.beginPath();
-    ctx.arc(x, y, 2, 0, 2 * Math.PI);
-    ctx.fill();
-  });
-  
-  console.log('Mini-Chart erstellt');
-}
+    if (klineCounter) {
+      klineCounter.textContent = data.kline_counter || 0;
+      console.log("📈 Klines-Zähler aktualisiert:", data.kline_counter);
+    }
+    if (priceUpdateCounter) {
+      priceUpdateCounter.textContent = data.price_update_counter || 0;
+      console.log("💰 Preis-Updates-Zähler aktualisiert:", data.price_update_counter);
+    }
+    if (rsiCalculationCounter) {
+      rsiCalculationCounter.textContent = data.rsi_calculation_counter || 0;
+      console.log("📊 RSI-Berechnungen-Zähler aktualisiert:", data.rsi_calculation_counter);
+    }
+    if (dataRateCounter) {
+      dataRateCounter.textContent = data.data_rate || 0;
+      console.log("💾 Datenrate aktualisiert:", data.data_rate);
+    }
+  }
 
-// Timeframe und RSI-Konfiguration Funktionalität (nur Frontend)
-document.addEventListener('DOMContentLoaded', function() {
+  // Timeframe und RSI-Konfiguration Funktionalität (nur Frontend)
   const timeframeSelector = document.getElementById('timeframe-selector');
   const rsiPeriodInput = document.getElementById('rsi-period-input');
   
@@ -1146,7 +663,318 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }, 3000);
     }
+    
+    // Funktion zum Behandeln von Zähler-Updates
+    function handleCounterUpdate(data) {
+      console.log("📊 Verarbeite Zähler-Update:", data);
+      
+      const messageCounter = document.getElementById('message-counter');
+      const klineCounter = document.getElementById('kline-counter');
+      const priceUpdateCounter = document.getElementById('price-update-counter');
+      const rsiCalculationCounter = document.getElementById('rsi-calculation-counter');
+      const dataRateCounter = document.getElementById('data-rate-counter');
+      
+      console.log("🔍 Gefundene Zähler-Elemente:", {
+        messageCounter: messageCounter,
+        klineCounter: klineCounter,
+        priceUpdateCounter: priceUpdateCounter,
+        dataRateCounter: dataRateCounter
+      });
+      
+      if (messageCounter) {
+        messageCounter.textContent = data.message_counter || 0;
+        console.log("💬 Nachrichten-Zähler aktualisiert:", data.message_counter);
+      } else {
+        console.log("⚠️ message-counter Element nicht gefunden");
+      }
+      if (klineCounter) {
+        klineCounter.textContent = data.kline_counter || 0;
+        console.log("📈 Klines-Zähler aktualisiert:", data.kline_counter);
+      } else {
+        console.log("⚠️ kline-counter Element nicht gefunden");
+      }
+      if (priceUpdateCounter) {
+        priceUpdateCounter.textContent = data.price_update_counter || 0;
+        console.log("💰 Preis-Updates-Zähler aktualisiert:", data.price_update_counter);
+      } else {
+        console.log("⚠️ price-update-counter Element nicht gefunden");
+      }
+              if (dataRateCounter) {
+          dataRateCounter.textContent = data.data_rate || 0;
+          console.log("💾 Datenrate aktualisiert:", data.data_rate);
+        } else {
+          console.log("⚠️ data-rate-counter Element nicht gefunden");
+        }
+    }
+    
+    // Starte automatische Zähler-Updates
+    // ENTFERNT: Keine simulierten Zähler mehr - wir verwenden echte Daten vom WebSocket-Service...
+    console.log("🎯 Warte auf echte Zähler-Updates vom WebSocket-Service...");
   }
 });
+</script>
 
-</script> 
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Kryptowährungen Scanner</h1>
+        <!-- Button Einstellungen entfernt -->
+      </div>
+
+      <!-- WebSocket Zähler -->
+      <div class="mb-3">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="card border-primary">
+              <div class="card-body text-center py-2">
+                <h6 class="card-title text-primary mb-1">
+                  <i class="bi bi-envelope"></i> Nachrichten
+                </h6>
+                <div class="h4 mb-0 text-primary" id="message-counter">0</div>
+                <small class="text-muted">Empfangen</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-success">
+              <div class="card-body text-center py-2">
+                <h6 class="card-title text-success mb-1">
+                  <i class="bi bi-graph-up"></i> Klines
+                </h6>
+                <div class="h4 mb-0 text-success" id="kline-counter">0</div>
+                <small class="text-muted">Verarbeitet</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-warning">
+              <div class="card-body text-center py-2">
+                <h6 class="card-title text-warning mb-1">
+                  <i class="bi bi-currency-dollar"></i> Preis-Updates
+                </h6>
+                <div class="h4 mb-0 text-warning" id="price-update-counter">0</div>
+                <small class="text-muted">Gesendet</small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card border-info">
+              <div class="card-body text-center py-2">
+                <h6 class="card-title text-info mb-1">
+                  <i class="bi bi-speedometer"></i> Datenrate
+                </h6>
+                <div class="h4 mb-0 text-info" id="data-rate-counter">0</div>
+                <small class="text-muted">Nachrichten/min</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeframe und RSI-Konfiguration -->
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center">
+              <label for="timeframe-selector" class="form-label me-2 mb-0">
+                <i class="bi bi-clock"></i> Timeframe:
+              </label>
+              <select id="timeframe-selector" class="form-select form-select-sm" style="width: auto;">
+                <option value="1m">1 Minute</option>
+                <option value="5m">5 Minuten</option>
+                <option value="15m">15 Minuten</option>
+                <option value="1h">1 Stunde</option>
+                <option value="4h">4 Stunden</option>
+                <option value="1d">1 Tag</option>
+              </select>
+            </div>
+            
+            <div class="d-flex align-items-center">
+              <label for="rsi-period-input" class="form-label me-2 mb-0">
+                <i class="bi bi-graph-up"></i> RSI-Periode:
+              </label>
+              <input type="number" id="rsi-period-input" class="form-control form-control-sm" 
+                     value="14" min="1" max="50" style="width: 80px;"
+                     title="Anzahl der Kerzen für RSI-Berechnung (Standard: 14)">
+            </div>
+          </div>
+          
+          <!-- Live-Daten Status -->
+          <div>
+            <small class="text-success">
+              <i class="bi bi-check-circle"></i> Live-Daten von Binance API (1m Updates)
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Durchschnittswerte -->
+        <% if @average_rsi || @average_roc || @average_roc_derivative %>
+          <div class="mb-2">
+            <div class="d-flex gap-3 justify-content-end">
+              <% if @average_rsi %>
+                <% rsi_trend_icon = case @rsi_trend
+                                     when 'up' then 'bi-arrow-up-right text-success'
+                                     when 'down' then 'bi-arrow-down-right text-danger'
+                                     else 'bi-arrow-right text-muted'
+                                   end %>
+                <small class="text-info averages-tooltip" 
+                       data-bs-toggle="tooltip" 
+                       data-bs-html="true"
+                       data-bs-placement="bottom"
+                       data-bs-custom-class="chart-tooltip"
+                       data-chart-type="rsi"
+                       title="<div class='text-center'>
+                         <strong>RSI Durchschnitt</strong><br>
+                         <span class='h5 text-info'><%= @average_rsi %></span><br>
+                         <small class='text-muted'>Relative Strength Index</small><br>
+                         <div class='mt-2'>
+                           <i class='bi <%= rsi_trend_icon %>'></i>
+                           <small class='text-muted ms-1'>Trend: <%= @rsi_trend == 'up' ? 'Anstieg' : (@rsi_trend == 'down' ? 'Rückgang' : 'Gleichbleibend') %></small>
+                         </div>
+                         <div class='mt-2'>
+                           <canvas id='rsi-chart' width='200' height='60' style='max-width: 200px; max-height: 60px; border: 1px solid rgba(255,255,255,0.2);'></canvas>
+                         </div>
+                       </div>">
+                  <%= link_to averages_chart_cryptocurrencies_path, target: '_blank', class: 'text-decoration-none text-info' do %>
+                    <i class="bi bi-speedometer2"></i> RSI Ø: <strong><%= @average_rsi %></strong>
+                    <i class="bi <%= rsi_trend_icon %> ms-1"></i>
+                  <% end %>
+                </small>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+    </div>
+  </div>
+</div>
+
+<% if @cryptocurrencies.any? %>
+  <!-- Responsive Table View (alle Bildschirmgrößen) -->
+  <div class="table-responsive">
+    <table id="crypto-table" class="table table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th class="d-none d-md-table-cell">Rang</th>
+          <th class="d-none d-lg-table-cell">Name</th>
+          <th>Symbol</th>
+          <th>Preis</th>
+          <th class="d-none d-lg-table-cell">24h Änderung</th>
+          <th class="d-none d-xl-table-cell">Market Cap</th>
+          <th class="d-none d-xl-table-cell">Volumen 24h (USD)</th>
+          <th>
+            RSI
+            <% if @average_rsi %>
+              <br><small class="text-info d-none d-md-inline">Ø <%= @average_rsi %></small>
+            <% end %>
+          </th>
+          <th>
+            ROC
+            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
+          </th>
+          <th>
+            ROC'
+            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @cryptocurrencies.each_with_index do |crypto, crypto_index| %>
+          <tr data-crypto-id="<%= crypto.id %>">
+            <td class="d-none d-md-table-cell">
+              <span class="badge bg-secondary">#<%= crypto.market_cap_rank %></span>
+            </td>
+            <td class="d-none d-lg-table-cell">
+              <strong><%= crypto.display_name %></strong>
+            </td>
+            <td>
+              <%= link_to "https://www.binance.com/en/trade/#{crypto.base_symbol}_USDC?_from=markets&type=spot", 
+                  target: '_blank',
+                  class: 'text-decoration-none',
+                  title: "#{crypto.display_name} auf Binance handeln" do %>
+                <span class="badge bg-light text-dark"><%= crypto.base_symbol %></span>
+              <% end %>
+              <span class="d-md-none">
+                <br><small class="text-muted">#<%= crypto.market_cap_rank %></small>
+              </span>
+            </td>
+            <td data-sort="<%= @latest_prices[crypto.id] || 0 %>">
+              <strong class="price-cell">
+                <% price = @latest_prices[crypto.id] %>
+                <% if price.present? %>
+                  <%= link_to (price >= 1 ? "$#{price.round(2)}" : "$#{price.round(6)}"), chart_cryptocurrency_path(crypto), target: '_blank', class: 'text-decoration-none text-primary chart-link', title: 'Chart anzeigen' %>
+                <% else %>
+                  <span class="text-muted">N/A</span>
+                <% end %>
+              </strong>
+            </td>
+            <td class="d-none d-lg-table-cell">
+              <% if crypto.price_change_percentage_24h %>
+                <%# Bestimme die Farbe basierend auf Vollständigkeit der 24h-Daten %>
+                <% color_class = if crypto.price_change_24h_complete?
+                                   crypto.price_change_percentage_24h >= 0 ? 'text-success' : 'text-danger'
+                                 else
+                                   'text-danger' # Unvollständige Daten immer rot
+                                 end %>
+                <span class="<%= color_class %>">
+                  <% if crypto.price_change_percentage_24h >= 0 %>
+                    <i class="bi bi-arrow-up"></i>
+                  <% else %>
+                    <i class="bi bi-arrow-down"></i>
+                  <% end %>
+                  <%= crypto.price_change_percentage_24h_formatted %>
+                </span>
+              <% else %>
+                <span class="text-muted">0.00%</span>
+              <% end %>
+            </td>
+            <td class="d-none d-xl-table-cell"><%= crypto.formatted_market_cap %></td>
+            <td class="d-none d-xl-table-cell">
+              <%= crypto.formatted_volume_24h %>
+            </td>
+            <td data-sort="<%= crypto.current_rsi(@current_timeframe) || -1 %>">
+              <% if crypto.current_rsi(@current_timeframe) %>
+                <% rsi_class = if crypto.current_rsi(@current_timeframe) <= 30
+                                 "rsi-oversold"
+                               elsif crypto.current_rsi(@current_timeframe) >= 70
+                                 "rsi-overbought"
+                               else
+                                 "rsi-neutral"
+                               end %>
+                <%= link_to chart_cryptocurrency_path(crypto), 
+                    target: '_blank',
+                    class: 'text-decoration-none',
+                    title: "RSI Chart anzeigen" do %>
+                  <span class="badge <%= rsi_class %> chart-link rsi-cell">
+                    <%= crypto.current_rsi(@current_timeframe) %>
+                  </span>
+                <% end %>
+              <% else %>
+                <span class="badge bg-secondary rsi-cell">N/A</span>
+              <% end %>
+            </td>
+            
+            <td data-sort="-1">
+              <span class="badge bg-secondary">N/A</span>
+            </td>
+            
+            <td data-sort="-1">
+              <span class="badge bg-secondary">N/A</span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <!-- Empty State -->
+  <div class="text-center py-5">
+    <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+    <h3 class="mt-3">Keine Daten verfügbar</h3>
+    <p class="text-muted">
+      Es konnten keine Kryptowährungsdaten geladen werden. 
+      Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.
+    </p>
+  </div>
+<% end %> 

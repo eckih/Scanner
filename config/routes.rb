@@ -55,4 +55,15 @@ Rails.application.routes.draw do
       end
     end
   end
+  
+  # Test-Routes
+  get '/test', to: 'test#index'
+  post '/test/rsi', to: 'test#rsi'
+  post '/test/price', to: 'test#price'
+  post '/test/counter', to: 'test#counter'
+  get '/test/start_simulator', to: 'test#start_simulator'
+  get '/test/start_websocket_service', to: 'test#start_websocket_service'
+  
+  # WebSocket-Zähler Route
+  post '/websocket_counters/send', to: 'websocket_counters#send_counters'
 end 

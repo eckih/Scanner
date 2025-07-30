@@ -80,7 +80,64 @@ end
 # --- Logger-Konfiguration ---
 # Verwende Rails.logger statt eigener Logger-Konstante
 
+# --- WebSocket Zähler ---
+# Globale Zähler für empfangene Daten
+$websocket_message_counter = 0
+$websocket_kline_counter = 0
+$websocket_price_update_counter = 0
+$websocket_rsi_calculation_counter = 0
 
+# Datenrate-Tracking (Nachrichten pro Minute)
+$message_timestamps = []
+$last_data_rate = 0
+
+# Hilfsfunktion für Zähler-Updates
+def increment_websocket_counter(counter_type)
+  case counter_type
+  when :message
+    $websocket_message_counter += 1
+    # Füge Zeitstempel für Datenrate-Berechnung hinzu
+    current_time = Time.now
+    $message_timestamps << current_time
+    
+    # Behalte nur Nachrichten der letzten 60 Sekunden für Datenrate-Berechnung
+    cutoff_time = current_time - 60
+    $message_timestamps.reject! { |timestamp| timestamp < cutoff_time }
+    
+    # Berechne aktuelle Datenrate (Nachrichten pro Minute)
+    $last_data_rate = ($message_timestamps.length * 60.0 / 60.0).round(1)
+  when :kline
+    $websocket_kline_counter += 1
+  when :price_update
+    $websocket_price_update_counter += 1
+  when :rsi_calculation
+    $websocket_rsi_calculation_counter += 1
+  end
+end
+
+def log_websocket_counters
+  console_safe_log "📊 WebSocket Zähler - Nachrichten: #{$websocket_message_counter}, Klines: #{$websocket_kline_counter}, Preis-Updates: #{$websocket_price_update_counter}, RSI-Berechnungen: #{$websocket_rsi_calculation_counter}, Datenrate: #{$last_data_rate}/min"
+  
+  # Broadcast Zähler per ActionCable
+  broadcast_websocket_counters
+end
+
+def broadcast_websocket_counters
+  begin
+    ActionCable.server.broadcast("prices", {
+      update_type: 'counters',
+      message_counter: $websocket_message_counter,
+      kline_counter: $websocket_kline_counter,
+      price_update_counter: $websocket_price_update_counter,
+      rsi_calculation_counter: $websocket_rsi_calculation_counter,
+      data_rate: $last_data_rate,
+      timestamp: Time.now.iso8601
+    })
+    console_safe_log "📡 Zähler gebroadcastet: Nachrichten=#{$websocket_message_counter}, Klines=#{$websocket_kline_counter}, Preis-Updates=#{$websocket_price_update_counter}, RSI-Berechnungen=#{$websocket_rsi_calculation_counter}, Datenrate=#{$last_data_rate}/min"
+  rescue => e
+    console_safe_log "❌ Fehler beim Broadcast der Zähler: #{e.message}"
+  end
+end
 
 # --- Hilfsfunktion: Lese und filtere Paare aus bot.json ---
 # Diese Klasse ist für das Laden und Filtern der Handelspaare zuständig.
@@ -97,43 +154,22 @@ class PairSelector
     whitelist = config.dig('exchange', 'pair_whitelist') || []
     blacklist = config.dig('exchange', 'pair_blacklist') || []
 
-    console_safe_log "Lade aktive Trading-Paare von Binance API..."
-    uri = URI(BINANCE_REST_API_BASE_URL + "/exchangeInfo")
-    response = Net::HTTP.get_response(uri)
+    console_safe_log "Lade Paare direkt aus bot.json (ohne Binance API)..."
 
-    unless response.is_a?(Net::HTTPSuccess)
-      Rails.logger.error "Fehler beim Laden der Binance-Paare: #{response.code} - #{response.message}"
-      raise "Fehler beim Laden der Binance-Paare: #{response.code} #{response.message}"
+    if whitelist.empty?
+      Rails.logger.warn "Keine Whitelist konfiguriert. Service wird beendet."
+      return []
     end
 
-    data = JSON.parse(response.body)
-    symbols = data['symbols']
-
-    active_pairs = symbols.select { |s| s['status'] == 'TRADING' }
-
-    # Whitelist-Filterung: Erlaubt explizite Paare oder Regex-Muster
-    if whitelist.any?
-      if whitelist.any? { |w| w.include?('.*') || w.include?('*') } # Prüfen auf Regex-Muster
-        regexes = whitelist.map { |w| Regexp.new(w.gsub('/', '').gsub('*', '.*'), Regexp::IGNORECASE) }
-        active_pairs = active_pairs.select { |s| regexes.any? { |r| s['symbol'] =~ r } }
-        verbose_log "Whitelist (Regex) angewendet: #{whitelist.inspect}"
-      else # Explizite Paare
-        allowed_symbols = whitelist.map { |p| p.gsub('/', '').upcase }.to_set
-        active_pairs = active_pairs.select { |s| allowed_symbols.include?(s['symbol'].upcase) }
-        verbose_log "Whitelist (explizit) angewendet: #{whitelist.inspect}"
-      end
-    else
-      Rails.logger.warn "Keine Whitelist konfiguriert. Alle TRADING-Paare werden berücksichtigt."
-    end
-
-    # Blacklist-Filterung: Entfernt unerwünschte Paare
+    # Konvertiere bot.json Format (BTC/USDC) zu Binance WebSocket Format (btcusdc)
+    selected_pairs = whitelist.map { |pair| pair.gsub('/', '').downcase }
+    
+    # Entferne Blacklist-Paare falls vorhanden
     if blacklist.any?
-      blocked_symbols = blacklist.map { |p| p.gsub('/', '').upcase }.to_set
-      active_pairs = active_pairs.reject { |s| blocked_symbols.include?(s['symbol'].upcase) }
+      blacklist_symbols = blacklist.map { |p| p.gsub('/', '').downcase }.to_set
+      selected_pairs = selected_pairs.reject { |pair| blacklist_symbols.include?(pair) }
       verbose_log "Blacklist angewendet: #{blacklist.inspect}"
     end
-
-    selected_pairs = active_pairs.map { |s| s['symbol'].downcase }
     console_safe_log "Ausgewählte Paare für den Stream: #{selected_pairs.join(', ')} (#{selected_pairs.length} Paare)"
     selected_pairs
   end
@@ -581,6 +617,9 @@ class MarketCapService
 # --- WebSocket Message Handler ---
 def handle_message(msg)
   begin
+    # Zähler für empfangene Nachrichten erhöhen
+    increment_websocket_counter(:message)
+    
     # Sichere Typkonvertierung für msg.data
     data_string = nil
     
@@ -649,8 +688,12 @@ def handle_message(msg)
     else
       debug_log "❌ msg hat keine data Eigenschaft"
     end
+    # Ignoriere TypeError und fahre fort
+    return
   rescue => e
     console_safe_log "❌ Fehler beim Verarbeiten der WebSocket Nachricht: #{e.class} - #{e.message}"
+    # Ignoriere andere Fehler und fahre fort
+    return
   end
 end
 
@@ -658,8 +701,57 @@ end
 private def process_kline_data(symbol, kline)
   debug_log "In process_kline_data für #{symbol}. Ist abgeschlossen: #{kline['x']}" # Debug-Log
   
+  # Zähler für Kline-Daten erhöhen
+  increment_websocket_counter(:kline)
+  
   # 🚀 ECHTZEIT-UPDATE: Broadcaste JEDEN Preis sofort (auch unvollständige Kerzen)
   broadcast_price_realtime(symbol, kline['c'].to_f)
+  
+  # Zähler für Preis-Updates erhöhen
+  increment_websocket_counter(:price_update)
+  
+  # Berechne RSI bei jeder Kursänderung - VEREINFACHT UND DIREKT
+  begin
+    # Finde Kryptowährung - VERWENDE NUR BESTEHENDE AUS BOT.JSON
+    db_symbol = convert_websocket_symbol_to_db_format(symbol)
+    cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
+    
+    unless cryptocurrency
+      # KEINE NEUE ERSTELLUNG - nur Warnung und Abbruch
+      console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe RSI-Berechnung"
+      return
+    end
+    
+    # Aktualisiere Preis
+    cryptocurrency.update!(current_price: kline['c'].to_f)
+    
+    # Berechne RSI mit 1m Daten (da wir diese haben)
+    period = get_current_rsi_period
+    rsi_value = IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', period)
+    
+    # Zähler für RSI-Berechnungen erhöhen
+    increment_websocket_counter(:rsi_calculation)
+    
+    if rsi_value && rsi_value > 0
+      # DIREKTER ActionCable Broadcast - GARANTIERT
+      ActionCable.server.broadcast("prices", {
+        cryptocurrency_id: cryptocurrency.id,
+        symbol: cryptocurrency.symbol,
+        indicator_type: 'rsi',
+        value: rsi_value,
+        timeframe: '1m',
+        period: period,
+        timestamp: Time.now.iso8601,
+        update_type: 'indicator'
+      })
+      console_safe_log "🚀 RSI DIREKT gebroadcastet für #{cryptocurrency.symbol}: #{rsi_value}"
+    else
+      console_safe_log "⚠️ RSI-Berechnung für #{cryptocurrency.symbol} ergab: #{rsi_value}"
+    end
+  rescue => e
+    console_safe_log "❌ FEHLER bei RSI-Berechnung für #{symbol}: #{e.message}"
+    console_safe_log "❌ Backtrace: #{e.backtrace.first(3).join(' | ')}"
+  end
   
   # Speichere nur abgeschlossene Kerzen in die Datenbank für konsistente historische Daten
     if kline['x'] == true
@@ -677,17 +769,14 @@ private def process_kline_data(symbol, kline)
     
     # Verwende die wiederverwendete Datenbankverbindung
   with_database_connection do
-      # Typkonvertierung und Mapping
-      cryptocurrency = Cryptocurrency.find_by(symbol: symbol)
+      # Konvertiere WebSocket-Symbol zu Datenbank-Format
+      db_symbol = convert_websocket_symbol_to_db_format(symbol)
+      
+      # Suche nur nach bestehenden Cryptocurrencies - KEINE NEUE ERSTELLUNG
+      cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
       unless cryptocurrency
-        safe_rails_log "🆕 Erstelle neue Kryptowährung: #{symbol}"
-        cryptocurrency = Cryptocurrency.create!(
-          symbol: symbol,
-          name: symbol, # Fallback, besser wäre Mapping
-          current_price: kline['c'].to_f > 0 ? kline['c'].to_f : 1,
-          market_cap: 1,
-          market_cap_rank: 9999
-        )
+        console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe Kline-Speicherung"
+        return
       end
       
       # Aktualisiere den aktuellen Preis der Kryptowährung
@@ -696,13 +785,14 @@ private def process_kline_data(symbol, kline)
     # Berechne und aktualisiere 24h Änderung
     update_24h_change(cryptocurrency, kline['c'].to_f)
     
-    # Berechne RSI nur für abgeschlossene Kerzen (verwendet jetzt den neuen IndicatorCalculationService)
-    if kline['x'] == true
-      begin
-        IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', 14)
-      rescue => e
-        console_safe_log "❌ RSI-Berechnung fehlgeschlagen für #{cryptocurrency.symbol}: #{e.message}"
-      end
+    # Berechne RSI bei jeder Kursänderung
+    begin
+      timeframe = get_current_timeframe
+      period = get_current_rsi_period
+      IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, timeframe, period)
+      console_safe_log "📊 RSI sofort berechnet für #{cryptocurrency.symbol}: Timeframe=#{timeframe}, Periode=#{period}"
+    rescue => e
+      console_safe_log "❌ RSI-Berechnung fehlgeschlagen für #{cryptocurrency.symbol}: #{e.message}"
     end
       
       attrs = {
@@ -844,23 +934,26 @@ private def calculate_rsi_for_cryptocurrency(cryptocurrency)
   end
 end
 
-# Lade aktuellen Timeframe aus Frontend-Einstellungen
-private def get_current_timeframe
-  # Standard-Timeframe falls keine Einstellung gefunden wird
-  default_timeframe = '1m'
+
+
   
-  # Versuche Timeframe aus Rails-Cache zu lesen (wird vom Frontend gesetzt)
-  cached_timeframe = Rails.cache.read('frontend_selected_timeframe')
-  
-  if cached_timeframe && ['1m', '5m', '15m', '1h', '4h', '1d'].include?(cached_timeframe)
-    cached_timeframe
-  else
-    default_timeframe
+  # Lade aktuellen Timeframe aus Frontend-Einstellungen
+  private def get_current_timeframe
+    # Standard-Timeframe falls keine Einstellung gefunden wird
+    default_timeframe = '1m'  # Geändert zurück zu '1m' da wir 1m-Daten haben
+    
+    # Versuche Timeframe aus Rails-Cache zu lesen (wird vom Frontend gesetzt)
+    cached_timeframe = Rails.cache.read('frontend_selected_timeframe')
+    
+    if cached_timeframe && ['1m', '5m', '15m', '1h', '4h', '1d'].include?(cached_timeframe)
+      cached_timeframe
+    else
+      default_timeframe
+    end
+  rescue => e
+    Rails.logger.error "❌ Fehler beim Laden des Timeframes: #{e.message}"
+    '1m' # Fallback - geändert zurück zu '1m'
   end
-rescue => e
-  Rails.logger.error "❌ Fehler beim Laden des Timeframes: #{e.message}"
-  '1m' # Fallback
-end
 
 # Lade aktuelle RSI-Periode aus Frontend-Einstellungen
 private def get_current_rsi_period
@@ -891,13 +984,8 @@ def broadcast_price_realtime(symbol, price)
       # Konvertiere WebSocket-Symbol zu Datenbank-Format (btcusdc -> BTC/USDC)
       db_symbol = convert_websocket_symbol_to_db_format(symbol)
       
-      # Versuche zuerst zu finden, erstelle falls nicht vorhanden
-      Cryptocurrency.find_or_create_by(symbol: db_symbol) do |crypto|
-        crypto.name = db_symbol
-        crypto.current_price = price
-        crypto.market_cap = 1
-        crypto.market_cap_rank = 9999
-      end
+      # Suche nur nach bestehenden Cryptocurrencies - KEINE NEUE ERSTELLUNG
+      Cryptocurrency.find_by(symbol: db_symbol)
     end
     
     if cryptocurrency
@@ -908,15 +996,19 @@ def broadcast_price_realtime(symbol, price)
           price: price,
           symbol: symbol,
           timestamp: Time.now.iso8601,
-          realtime: true # Flag für Echtzeit-Updates
+          realtime: true
         })
-        
-        debug_log "⚡ Echtzeit-Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id})"
+        debug_log "🚀 Preis-Broadcast für #{symbol}: #{price}"
       rescue => e
-        Rails.logger.error "❌ Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
+        console_safe_log "❌ FEHLER beim Preis-Broadcast für #{symbol}: #{e.message}"
       end
     else
-      Rails.logger.warn "⚠️ Kryptowährung konnte nicht erstellt/gefunden werden für Symbol: #{symbol}"
+      # Warnung nur beim ersten Mal pro Symbol
+      @warned_symbols ||= Set.new
+      unless @warned_symbols.include?(symbol)
+        console_safe_log "⚠️ Symbol #{symbol} (#{convert_websocket_symbol_to_db_format(symbol)}) nicht in Whitelist - überspringe Preis-Update"
+        @warned_symbols.add(symbol)
+      end
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
@@ -952,13 +1044,8 @@ def broadcast_price(symbol, price)
       # Konvertiere WebSocket-Symbol zu Datenbank-Format (btcusdc -> BTC/USDC)
       db_symbol = convert_websocket_symbol_to_db_format(symbol)
       
-      # Versuche zuerst zu finden, erstelle falls nicht vorhanden
-      Cryptocurrency.find_or_create_by(symbol: db_symbol) do |crypto|
-        crypto.name = db_symbol
-        crypto.current_price = price
-        crypto.market_cap = 1
-        crypto.market_cap_rank = 9999
-      end
+      # Suche nur nach bestehenden Cryptocurrencies - KEINE NEUE ERSTELLUNG
+      Cryptocurrency.find_by(symbol: db_symbol)
     end
     
     if cryptocurrency
@@ -972,22 +1059,19 @@ def broadcast_price(symbol, price)
           symbol: symbol,
           timestamp: Time.now.iso8601,
           candle_closed: true, # Flag für abgeschlossene Kerzen
-          price_change_24h: cryptocurrency.price_change_percentage_24h,
-          price_change_24h_formatted: cryptocurrency.price_change_percentage_24h_formatted,
-          price_change_24h_complete: cryptocurrency.price_change_24h_complete?,
-          market_cap: cryptocurrency.market_cap,
-          market_cap_formatted: cryptocurrency.formatted_market_cap,
-          volume_24h: cryptocurrency.volume_24h,
-          volume_24h_formatted: cryptocurrency.formatted_volume_24h
         })
         
-        Rails.logger.info "✅ ActionCable Broadcast erfolgreich gesendet"
+        verbose_log "✅ Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id})"
       rescue => e
-        Rails.logger.error "❌ Fehler beim ActionCable Broadcast: #{e.class} - #{e.message}"
-        Rails.logger.error "❌ Backtrace: #{e.backtrace.first(3).join("\n")}"
+        Rails.logger.error "❌ Fehler beim Broadcast: #{e.class} - #{e.message}"
       end
     else
-      Rails.logger.warn "⚠️ Kryptowährung konnte nicht erstellt/gefunden werden für Symbol: #{symbol}"
+      # Warnung nur beim ersten Mal pro Symbol für broadcast_price
+      @warned_symbols_broadcast ||= Set.new
+      unless @warned_symbols_broadcast.include?(symbol)
+        console_safe_log "⚠️ Symbol #{symbol} (#{convert_websocket_symbol_to_db_format(symbol)}) nicht in Whitelist - überspringe abgeschlossene Kerze"
+        @warned_symbols_broadcast.add(symbol)
+      end
     end
   rescue => e
     Rails.logger.error "❌ Fehler beim ActionCable Broadcast: #{e.class} - #{e.message}"
@@ -1016,6 +1100,21 @@ def start_binance_websocket_service
       rescue => e
         Rails.logger.error "❌ Fehler im Market Cap Update Timer: #{e.class} - #{e.message}"
         sleep 60 # Warte 1 Minute bei Fehler
+      end
+    end
+  end
+  
+  # Starte Zähler-Ausgabe Timer in separatem Thread
+  Thread.new do
+    console_safe_log "📊 Starte WebSocket Zähler Timer..."
+    
+    loop do
+      begin
+        log_websocket_counters
+        sleep 10 # Alle 10 Sekunden Zähler ausgeben
+      rescue => e
+        Rails.logger.error "❌ Fehler im Zähler Timer: #{e.class} - #{e.message}"
+        sleep 10 # Warte 10 Sekunden bei Fehler
       end
     end
   end

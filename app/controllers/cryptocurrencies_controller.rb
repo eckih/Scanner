@@ -14,6 +14,10 @@ class CryptocurrenciesController < ApplicationController
     # @last_update entfernt - nicht mehr benötigt für Live-Updates
     calculate_trends_for_cryptocurrencies
 
+    # Lade aktuelle Frontend-Einstellungen für RSI
+    @current_timeframe = Rails.cache.read('frontend_selected_timeframe') || '1m'
+    @current_rsi_period = Rails.cache.read('frontend_selected_rsi_period') || 14
+
     # Effizient: Hash mit den letzten Preisen für alle Cryptos (immer 1m für Echtzeit-Updates)
     subquery = CryptoHistoryData.select('MAX(timestamp) as max_time, cryptocurrency_id')
                                 .where(interval: '1m')
