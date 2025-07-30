@@ -710,36 +710,57 @@ private def process_kline_data(symbol, kline)
   # Zähler für Preis-Updates erhöhen
   increment_websocket_counter(:price_update)
   
-  # RSI-Berechnung nur bei geschlossenen Kerzen (Performance-Optimierung)
-  if kline['x'] # Nur bei abgeschlossenen Kerzen
-    begin
-      # Finde Kryptowährung - VERWENDE NUR BESTEHENDE AUS BOT.JSON
-      db_symbol = convert_websocket_symbol_to_db_format(symbol)
-      cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
+  # Indikator-Berechnungen für alle Kerzen (auch unvollständige)
+  begin
+    # Finde Kryptowährung - VERWENDE NUR BESTEHENDE AUS BOT.JSON
+    db_symbol = convert_websocket_symbol_to_db_format(symbol)
+    cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
+    
+    if cryptocurrency
+      # Aktualisiere Preis
+      cryptocurrency.update!(current_price: kline['c'].to_f)
       
-      if cryptocurrency
-        # Aktualisiere Preis
-        cryptocurrency.update!(current_price: kline['c'].to_f)
-        
-        # Berechne RSI nur einmal pro abgeschlossene Kerze
-        period = get_current_rsi_period
+      current_timeframe = get_current_timeframe
+      period = get_current_rsi_period
+      
+      # RSI-Berechnung nur bei geschlossenen Kerzen (Performance-Optimierung)
+      if kline['x'] # Nur bei abgeschlossenen Kerzen
         rsi_value = IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', period)
-        
-        # Zähler für RSI-Berechnungen erhöhen
         increment_websocket_counter(:rsi_calculation)
-        
-        debug_log "📊 RSI berechnet für #{cryptocurrency.symbol}: #{rsi_value} (nur bei geschlossener Kerze)"
-      else
-        # Warnung nur beim ersten Mal pro Symbol
-        @warned_rsi_symbols ||= Set.new
-        unless @warned_rsi_symbols.include?(symbol)
-          console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe RSI-Berechnung"
-          @warned_rsi_symbols.add(symbol)
+        debug_log "📊 RSI berechnet für #{cryptocurrency.symbol}: #{rsi_value} (geschlossene Kerze)"
+      end
+      
+      # ROC und ROC' alle 30 Sekunden (auch für unvollständige Kerzen)
+      @last_roc_calculation ||= {}
+      current_time = Time.now
+      last_roc_time = @last_roc_calculation[cryptocurrency.id] || (current_time - 31)
+      
+      if current_time - last_roc_time >= 30 # Alle 30 Sekunden
+        begin
+          # ROC-Berechnung mit aktuellem Close-Kurs
+          roc_value = IndicatorCalculationService.calculate_and_save_roc(cryptocurrency, '1m', 14)
+          debug_log "📊 ROC berechnet für #{cryptocurrency.symbol}: #{roc_value}% (alle 30s)"
+          
+          # ROC Derivative-Berechnung mit aktuellem Close-Kurs
+          roc_derivative_value = IndicatorCalculationService.calculate_and_save_roc_derivative(cryptocurrency, '1m', 14)
+          debug_log "📊 ROC' berechnet für #{cryptocurrency.symbol}: #{roc_derivative_value}% (alle 30s)"
+          
+          @last_roc_calculation[cryptocurrency.id] = current_time
+        rescue => e
+          debug_log "⚠️ ROC/ROC' Berechnung für #{cryptocurrency.symbol} fehlgeschlagen: #{e.message}"
         end
       end
-    rescue => e
-      console_safe_log "❌ FEHLER bei RSI-Berechnung für #{symbol}: #{e.message}"
+      
+    else
+      # Warnung nur beim ersten Mal pro Symbol
+      @warned_indicator_symbols ||= Set.new
+      unless @warned_indicator_symbols.include?(symbol)
+        console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe Indikator-Berechnungen"
+        @warned_indicator_symbols.add(symbol)
+      end
     end
+  rescue => e
+    console_safe_log "❌ FEHLER bei Indikator-Berechnungen für #{symbol}: #{e.message}"
   end
   
   # Speichere nur abgeschlossene Kerzen in die Datenbank für konsistente historische Daten

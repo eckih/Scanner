@@ -362,13 +362,85 @@ document.addEventListener('DOMContentLoaded', function() {
        break;
        
      case 'roc':
+       handleRocUpdate({
+         cryptocurrency_id: data.cryptocurrency_id,
+         symbol: data.symbol,
+         roc: data.value
+       });
+       break;
+       
      case 'roc_derivative':
-       // ROC und ROC Derivative sind derzeit nicht in der Tabelle sichtbar
-       console.log(`📊 ${data.indicator_type.toUpperCase()} Update erhalten: ${data.value} (${data.timeframe}, ${data.period})`);
+       handleRocDerivativeUpdate({
+         cryptocurrency_id: data.cryptocurrency_id,
+         symbol: data.symbol,
+         roc_derivative: data.value
+       });
        break;
        
      default:
        console.log(`📊 Unbekannter Indikator-Typ: ${data.indicator_type}`);
+   }
+ }
+
+ // Funktion zum Behandeln von ROC-Updates
+ function handleRocUpdate(data) {
+   console.log("📊 Verarbeite ROC-Update für", data.symbol, ":", data.roc);
+   
+   const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`);
+   if (!row) {
+     console.log("⚠️ Zeile nicht gefunden für ROC Update, Crypto ID:", data.cryptocurrency_id);
+     return;
+   }
+   
+   const rocCell = row.querySelector('.roc-cell');
+   if (rocCell) {
+     const rocValue = parseFloat(data.roc);
+     rocCell.textContent = `${rocValue.toFixed(2)}%`;
+     
+     // Aktualisiere CSS-Klassen basierend auf ROC-Wert
+     rocCell.className = 'badge roc-cell';
+     if (rocValue >= 5) {
+       rocCell.classList.add('bg-success');
+     } else if (rocValue <= -5) {
+       rocCell.classList.add('bg-danger');
+     } else {
+       rocCell.classList.add('bg-secondary');
+     }
+     
+     console.log(`✅ ROC aktualisiert für ${data.symbol}: ${rocValue.toFixed(2)}%`);
+   } else {
+     console.log("⚠️ ROC-Zelle nicht gefunden für", data.symbol);
+   }
+ }
+
+ // Funktion zum Behandeln von ROC Derivative Updates
+ function handleRocDerivativeUpdate(data) {
+   console.log("📊 Verarbeite ROC' Update für", data.symbol, ":", data.roc_derivative);
+   
+   const row = document.querySelector(`[data-crypto-id='${data.cryptocurrency_id}']`);
+   if (!row) {
+     console.log("⚠️ Zeile nicht gefunden für ROC' Update, Crypto ID:", data.cryptocurrency_id);
+     return;
+   }
+   
+   const rocDerivativeCell = row.querySelector('.roc-derivative-cell');
+   if (rocDerivativeCell) {
+     const rocDerivativeValue = parseFloat(data.roc_derivative);
+     rocDerivativeCell.textContent = `${rocDerivativeValue.toFixed(2)}%`;
+     
+     // Aktualisiere CSS-Klassen basierend auf ROC' Wert
+     rocDerivativeCell.className = 'badge roc-derivative-cell';
+     if (rocDerivativeValue >= 2) {
+       rocDerivativeCell.classList.add('bg-success');
+     } else if (rocDerivativeValue <= -2) {
+       rocDerivativeCell.classList.add('bg-danger');
+     } else {
+       rocDerivativeCell.classList.add('bg-secondary');
+     }
+     
+     console.log(`✅ ROC' aktualisiert für ${data.symbol}: ${rocDerivativeValue.toFixed(2)}%`);
+   } else {
+     console.log("⚠️ ROC'-Zelle nicht gefunden für", data.symbol);
    }
  }
 
@@ -871,11 +943,11 @@ document.addEventListener('DOMContentLoaded', function() {
           </th>
           <th>
             ROC
-            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
+            <br><small class="text-muted d-none d-md-inline">Rate of Change</small>
           </th>
           <th>
             ROC'
-            <br><small class="text-muted d-none d-md-inline">Nicht verfügbar</small>
+            <br><small class="text-muted d-none d-md-inline">ROC Derivative</small>
           </th>
         </tr>
       </thead>
@@ -955,12 +1027,38 @@ document.addEventListener('DOMContentLoaded', function() {
               <% end %>
             </td>
             
-            <td data-sort="-1">
-              <span class="badge bg-secondary">N/A</span>
+            <td data-sort="<%= crypto.current_roc(@current_timeframe) || -999 %>">
+              <% if crypto.current_roc(@current_timeframe) %>
+                <% roc_class = if crypto.current_roc(@current_timeframe) >= 5
+                                 "bg-success"
+                               elsif crypto.current_roc(@current_timeframe) <= -5
+                                 "bg-danger"
+                               else
+                                 "bg-secondary"
+                               end %>
+                <span class="badge <%= roc_class %> roc-cell">
+                  <%= crypto.current_roc(@current_timeframe).round(2) %>%
+                </span>
+              <% else %>
+                <span class="badge bg-secondary roc-cell">N/A</span>
+              <% end %>
             </td>
             
-            <td data-sort="-1">
-              <span class="badge bg-secondary">N/A</span>
+            <td data-sort="<%= crypto.current_roc_derivative(@current_timeframe) || -999 %>">
+              <% if crypto.current_roc_derivative(@current_timeframe) %>
+                <% roc_derivative_class = if crypto.current_roc_derivative(@current_timeframe) >= 2
+                                            "bg-success"
+                                          elsif crypto.current_roc_derivative(@current_timeframe) <= -2
+                                            "bg-danger"
+                                          else
+                                            "bg-secondary"
+                                          end %>
+                <span class="badge <%= roc_derivative_class %> roc-derivative-cell">
+                  <%= crypto.current_roc_derivative(@current_timeframe).round(2) %>%
+                </span>
+              <% else %>
+                <span class="badge bg-secondary roc-derivative-cell">N/A</span>
+              <% end %>
             </td>
           </tr>
         <% end %>
