@@ -319,31 +319,102 @@
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         if (document.getElementById('crypto-table')) {
-          // Custom sorting function for RSI column using data-sort attribute
-          $.fn.dataTable.ext.type.order['rsi-pre'] = function(data, type, row) {
-            // Try to get the data-sort attribute from the cell
+          // Custom sorting functions for each indicator column
+          // These functions work with live data updated by ActionCable
+          $.fn.dataTable.ext.type.order['rsi-pre'] = function(data, type, row, meta) {
+            // Try to get data-sort attribute from the cell first (updated by ActionCable)
             if (row && row.cells && row.cells[7]) {
               var sortValue = row.cells[7].getAttribute('data-sort');
-              if (sortValue !== null) {
-                return parseFloat(sortValue);
+              if (sortValue !== null && sortValue !== '-1') {
+                var numValue = parseFloat(sortValue);
+                if (!isNaN(numValue)) {
+                  return numValue;
+                }
               }
             }
             
-            // Fallback: extract from HTML content
+            // Fallback: use current visible content
             if (!data || data === 'N/A' || data.includes('N/A')) {
-              return -1; // N/A values go to bottom
+              return -1; // N/A values go to bottom for RSI
             }
             
-            // Remove all HTML tags and extract just the number
+            // Remove all HTML tags and extract just the text content
             var textOnly = data.replace(/<[^>]*>/g, '').trim();
             
-            // Extract RSI value - look for any number (including decimals)
+            // Extract RSI value (0-100)
             var match = textOnly.match(/(\d+\.?\d*)/);
             if (match) {
-              return parseFloat(match[1]);
+              var numValue = parseFloat(match[1]);
+              if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+                return numValue;
+              }
             }
             
             return -1; // Unknown values go to bottom
+          };
+
+          $.fn.dataTable.ext.type.order['roc-pre'] = function(data, type, row, meta) {
+            // Try to get data-sort attribute from the cell first (updated by ActionCable)
+            if (row && row.cells && row.cells[8]) {
+              var sortValue = row.cells[8].getAttribute('data-sort');
+              if (sortValue !== null && sortValue !== '-999') {
+                var numValue = parseFloat(sortValue);
+                if (!isNaN(numValue)) {
+                  return numValue;
+                }
+              }
+            }
+            
+            // Fallback: use current visible content
+            if (!data || data === 'N/A' || data.includes('N/A')) {
+              return -999; // N/A values go to bottom for ROC
+            }
+            
+            // Remove all HTML tags and extract just the text content
+            var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            
+            // Extract ROC value (can be negative) - look for -12.34% or 12.34%
+            var match = textOnly.match(/([+-]?\d+\.?\d*)/);
+            if (match) {
+              var numValue = parseFloat(match[1]);
+              if (!isNaN(numValue)) {
+                return numValue;
+              }
+            }
+            
+            return -999; // Unknown values go to bottom
+          };
+
+          $.fn.dataTable.ext.type.order['roc-derivative-pre'] = function(data, type, row, meta) {
+            // Try to get data-sort attribute from the cell first (updated by ActionCable)
+            if (row && row.cells && row.cells[9]) {
+              var sortValue = row.cells[9].getAttribute('data-sort');
+              if (sortValue !== null && sortValue !== '-999') {
+                var numValue = parseFloat(sortValue);
+                if (!isNaN(numValue)) {
+                  return numValue;
+                }
+              }
+            }
+            
+            // Fallback: use current visible content
+            if (!data || data === 'N/A' || data.includes('N/A')) {
+              return -999; // N/A values go to bottom for ROC'
+            }
+            
+            // Remove all HTML tags and extract just the text content
+            var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            
+            // Extract ROC' value (can be negative) - look for -12.34% or 12.34%
+            var match = textOnly.match(/([+-]?\d+\.?\d*)/);
+            if (match) {
+              var numValue = parseFloat(match[1]);
+              if (!isNaN(numValue)) {
+                return numValue;
+              }
+            }
+            
+            return -999; // Unknown values go to bottom
           };
           
           // Custom sorting function for rank column (extracts number from badge)
@@ -441,6 +512,14 @@
               {
                 "targets": [7], // RSI Spalte
                 "type": "rsi"
+              },
+              {
+                "targets": [8], // ROC Spalte
+                "type": "roc"
+              },
+              {
+                "targets": [9], // ROC' Spalte
+                "type": "roc-derivative"
               }
             ]
           });

@@ -279,66 +279,80 @@ document.addEventListener('DOMContentLoaded', function() {
        return;
      }
      
-     // Verwende die gefundene Zeile
-     const rsiCell = foundRow.querySelector('.rsi-cell');
-     if (rsiCell) {
-       const rsiValue = parseFloat(data.rsi);
-       console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
-       rsiCell.textContent = rsiValue.toFixed(2);
-       
-       // RSI-Farbe basierend auf Wert
-       rsiCell.className = 'badge rsi-cell';
-       if (rsiValue >= 70) {
-         rsiCell.classList.add('rsi-overbought'); // Überkauft
-       } else if (rsiValue <= 30) {
-         rsiCell.classList.add('rsi-oversold'); // Überverkauft  
-       } else {
-         rsiCell.classList.add('rsi-neutral'); // Neutral
-       }
-       
-       // Animation für RSI-Update
-       rsiCell.style.transition = 'background-color 0.8s ease';
-       rsiCell.style.backgroundColor = '#fff3cd'; // Gelber Hintergrund
-       setTimeout(() => {
-         rsiCell.style.backgroundColor = '';
-       }, 800);
-       
-       console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
-     } else {
-       console.log("⚠️ RSI-Zelle nicht gefunden in Symbol-basierter Zeile");
-       console.log("🔍 Zeilen-HTML:", foundRow.innerHTML);
-     }
+         // Verwende die gefundene Zeile
+    const rsiCell = foundRow.querySelector('.rsi-cell');
+    if (rsiCell) {
+      const rsiValue = parseFloat(data.rsi);
+      console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
+      rsiCell.textContent = rsiValue.toFixed(2);
+      
+      // Aktualisiere data-sort Attribut für korrekte Sortierung
+      const rsiTd = rsiCell.closest('td');
+      if (rsiTd) {
+        rsiTd.setAttribute('data-sort', rsiValue);
+        console.log("📊 data-sort Attribut aktualisiert:", rsiValue);
+      }
+      
+      // RSI-Farbe basierend auf Wert
+      rsiCell.className = 'badge rsi-cell';
+      if (rsiValue >= 70) {
+        rsiCell.classList.add('rsi-overbought'); // Überkauft
+      } else if (rsiValue <= 30) {
+        rsiCell.classList.add('rsi-oversold'); // Überverkauft  
+      } else {
+        rsiCell.classList.add('rsi-neutral'); // Neutral
+      }
+      
+      // Animation für RSI-Update
+      rsiCell.style.transition = 'background-color 0.8s ease';
+      rsiCell.style.backgroundColor = '#fff3cd'; // Gelber Hintergrund
+      setTimeout(() => {
+        rsiCell.style.backgroundColor = '';
+      }, 800);
+      
+      console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
+    } else {
+      console.log("⚠️ RSI-Zelle nicht gefunden in Symbol-basierter Zeile");
+      console.log("🔍 Zeilen-HTML:", foundRow.innerHTML);
+    }
      return;
    }
    
-   const rsiCell = row.querySelector('.rsi-cell');
-   if (rsiCell) {
-     const rsiValue = parseFloat(data.rsi);
-     console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
-     rsiCell.textContent = rsiValue.toFixed(2);
-     
-     // RSI-Farbe basierend auf Wert
-     rsiCell.className = 'badge rsi-cell';
-     if (rsiValue >= 70) {
-       rsiCell.classList.add('rsi-overbought'); // Überkauft
-     } else if (rsiValue <= 30) {
-       rsiCell.classList.add('rsi-oversold'); // Überverkauft
-     } else {
-       rsiCell.classList.add('rsi-neutral'); // Neutral
-     }
-     
-     // Animation für RSI-Update
-     rsiCell.style.transition = 'background-color 0.8s ease';
-     rsiCell.style.backgroundColor = '#fff3cd'; // Gelber Hintergrund
-     setTimeout(() => {
-       rsiCell.style.backgroundColor = '';
-     }, 800);
-     
-     console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
-   } else {
-     console.log("⚠️ RSI-Zelle nicht gefunden für Crypto ID:", data.cryptocurrency_id);
-     console.log("🔍 Zeilen-HTML:", row.innerHTML);
-   }
+     const rsiCell = row.querySelector('.rsi-cell');
+  if (rsiCell) {
+    const rsiValue = parseFloat(data.rsi);
+    console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
+    rsiCell.textContent = rsiValue.toFixed(2);
+    
+    // Aktualisiere data-sort Attribut für korrekte Sortierung
+    const rsiTd = rsiCell.closest('td');
+    if (rsiTd) {
+      rsiTd.setAttribute('data-sort', rsiValue);
+      console.log("📊 data-sort Attribut aktualisiert:", rsiValue);
+    }
+    
+    // RSI-Farbe basierend auf Wert
+    rsiCell.className = 'badge rsi-cell';
+    if (rsiValue >= 70) {
+      rsiCell.classList.add('rsi-overbought'); // Überkauft
+    } else if (rsiValue <= 30) {
+      rsiCell.classList.add('rsi-oversold'); // Überverkauft
+    } else {
+      rsiCell.classList.add('rsi-neutral'); // Neutral
+    }
+    
+    // Animation für RSI-Update
+    rsiCell.style.transition = 'background-color 0.8s ease';
+    rsiCell.style.backgroundColor = '#fff3cd'; // Gelber Hintergrund
+    setTimeout(() => {
+      rsiCell.style.backgroundColor = '';
+    }, 800);
+    
+    console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
+  } else {
+    console.log("⚠️ RSI-Zelle nicht gefunden für Crypto ID:", data.cryptocurrency_id);
+    console.log("🔍 Zeilen-HTML:", row.innerHTML);
+  }
  }
  
  // Funktion zum Behandeln von Indikator-Updates
@@ -392,25 +406,32 @@ document.addEventListener('DOMContentLoaded', function() {
      return;
    }
    
-   const rocCell = row.querySelector('.roc-cell');
-   if (rocCell) {
-     const rocValue = parseFloat(data.roc);
-     rocCell.textContent = `${rocValue.toFixed(2)}%`;
-     
-     // Aktualisiere CSS-Klassen basierend auf ROC-Wert
-     rocCell.className = 'badge roc-cell';
-     if (rocValue >= 5) {
-       rocCell.classList.add('bg-success');
-     } else if (rocValue <= -5) {
-       rocCell.classList.add('bg-danger');
-     } else {
-       rocCell.classList.add('bg-secondary');
-     }
-     
-     console.log(`✅ ROC aktualisiert für ${data.symbol}: ${rocValue.toFixed(2)}%`);
-   } else {
-     console.log("⚠️ ROC-Zelle nicht gefunden für", data.symbol);
-   }
+     const rocCell = row.querySelector('.roc-cell');
+  if (rocCell) {
+    const rocValue = parseFloat(data.roc);
+    rocCell.textContent = `${rocValue.toFixed(2)}%`;
+    
+    // Aktualisiere data-sort Attribut für korrekte Sortierung
+    const rocTd = rocCell.closest('td');
+    if (rocTd) {
+      rocTd.setAttribute('data-sort', rocValue);
+      console.log("📊 ROC data-sort Attribut aktualisiert:", rocValue);
+    }
+    
+    // Aktualisiere CSS-Klassen basierend auf ROC-Wert
+    rocCell.className = 'badge roc-cell';
+    if (rocValue >= 5) {
+      rocCell.classList.add('bg-success');
+    } else if (rocValue <= -5) {
+      rocCell.classList.add('bg-danger');
+    } else {
+      rocCell.classList.add('bg-secondary');
+    }
+    
+    console.log(`✅ ROC aktualisiert für ${data.symbol}: ${rocValue.toFixed(2)}%`);
+  } else {
+    console.log("⚠️ ROC-Zelle nicht gefunden für", data.symbol);
+  }
  }
 
  // Funktion zum Behandeln von ROC Derivative Updates
@@ -423,25 +444,32 @@ document.addEventListener('DOMContentLoaded', function() {
      return;
    }
    
-   const rocDerivativeCell = row.querySelector('.roc-derivative-cell');
-   if (rocDerivativeCell) {
-     const rocDerivativeValue = parseFloat(data.roc_derivative);
-     rocDerivativeCell.textContent = `${rocDerivativeValue.toFixed(2)}%`;
-     
-     // Aktualisiere CSS-Klassen basierend auf ROC' Wert
-     rocDerivativeCell.className = 'badge roc-derivative-cell';
-     if (rocDerivativeValue >= 2) {
-       rocDerivativeCell.classList.add('bg-success');
-     } else if (rocDerivativeValue <= -2) {
-       rocDerivativeCell.classList.add('bg-danger');
-     } else {
-       rocDerivativeCell.classList.add('bg-secondary');
-     }
-     
-     console.log(`✅ ROC' aktualisiert für ${data.symbol}: ${rocDerivativeValue.toFixed(2)}%`);
-   } else {
-     console.log("⚠️ ROC'-Zelle nicht gefunden für", data.symbol);
-   }
+     const rocDerivativeCell = row.querySelector('.roc-derivative-cell');
+  if (rocDerivativeCell) {
+    const rocDerivativeValue = parseFloat(data.roc_derivative);
+    rocDerivativeCell.textContent = `${rocDerivativeValue.toFixed(2)}%`;
+    
+    // Aktualisiere data-sort Attribut für korrekte Sortierung
+    const rocDerivativeTd = rocDerivativeCell.closest('td');
+    if (rocDerivativeTd) {
+      rocDerivativeTd.setAttribute('data-sort', rocDerivativeValue);
+      console.log("📊 ROC' data-sort Attribut aktualisiert:", rocDerivativeValue);
+    }
+    
+    // Aktualisiere CSS-Klassen basierend auf ROC' Wert
+    rocDerivativeCell.className = 'badge roc-derivative-cell';
+    if (rocDerivativeValue >= 2) {
+      rocDerivativeCell.classList.add('bg-success');
+    } else if (rocDerivativeValue <= -2) {
+      rocDerivativeCell.classList.add('bg-danger');
+    } else {
+      rocDerivativeCell.classList.add('bg-secondary');
+    }
+    
+    console.log(`✅ ROC' aktualisiert für ${data.symbol}: ${rocDerivativeValue.toFixed(2)}%`);
+  } else {
+    console.log("⚠️ ROC'-Zelle nicht gefunden für", data.symbol);
+  }
  }
 
   // Funktion zum Behandeln von Zähler-Updates
@@ -893,11 +921,11 @@ document.addEventListener('DOMContentLoaded', function() {
               <br><small class="text-info d-none d-md-inline">Ø <%= @average_rsi %></small>
             <% end %>
           </th>
-          <th>
+          <th class="d-none d-lg-table-cell">
             ROC
             <br><small class="text-muted d-none d-md-inline">Rate of Change</small>
           </th>
-          <th>
+          <th class="d-none d-lg-table-cell">
             ROC'
             <br><small class="text-muted d-none d-md-inline">ROC Derivative</small>
           </th>
@@ -979,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', function() {
               <% end %>
             </td>
             
-            <td data-sort="<%= crypto.current_roc(@current_timeframe) || -999 %>">
+            <td class="d-none d-lg-table-cell" data-sort="<%= crypto.current_roc(@current_timeframe) || -999 %>">
               <% if crypto.current_roc(@current_timeframe) %>
                 <% roc_class = if crypto.current_roc(@current_timeframe) >= 5
                                  "bg-success"
@@ -996,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function() {
               <% end %>
             </td>
             
-            <td data-sort="<%= crypto.current_roc_derivative(@current_timeframe) || -999 %>">
+            <td class="d-none d-lg-table-cell" data-sort="<%= crypto.current_roc_derivative(@current_timeframe) || -999 %>">
               <% if crypto.current_roc_derivative(@current_timeframe) %>
                 <% roc_derivative_class = if crypto.current_roc_derivative(@current_timeframe) >= 2
                                             "bg-success"
