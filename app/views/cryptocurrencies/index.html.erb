@@ -794,55 +794,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <!-- Button Einstellungen entfernt -->
       </div>
 
-      <!-- WebSocket Zähler -->
-      <div class="mb-3">
-        <div class="row">
-          <div class="col-md-3">
-            <div class="card border-primary">
-              <div class="card-body text-center py-2">
-                <h6 class="card-title text-primary mb-1">
-                  <i class="bi bi-envelope"></i> Nachrichten
-                </h6>
-                <div class="h4 mb-0 text-primary" id="message-counter">0</div>
-                <small class="text-muted">Empfangen</small>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card border-success">
-              <div class="card-body text-center py-2">
-                <h6 class="card-title text-success mb-1">
-                  <i class="bi bi-graph-up"></i> Klines
-                </h6>
-                <div class="h4 mb-0 text-success" id="kline-counter">0</div>
-                <small class="text-muted">Verarbeitet</small>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card border-warning">
-              <div class="card-body text-center py-2">
-                <h6 class="card-title text-warning mb-1">
-                  <i class="bi bi-currency-dollar"></i> Preis-Updates
-                </h6>
-                <div class="h4 mb-0 text-warning" id="price-update-counter">0</div>
-                <small class="text-muted">Gesendet</small>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card border-info">
-              <div class="card-body text-center py-2">
-                <h6 class="card-title text-info mb-1">
-                  <i class="bi bi-speedometer"></i> Datenrate
-                </h6>
-                <div class="h4 mb-0 text-info" id="data-rate-counter">0</div>
-                <small class="text-muted">Nachrichten/min</small>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       <!-- Timeframe und RSI-Konfiguration -->
       <div class="mb-3">
@@ -1065,6 +1017,57 @@ document.addEventListener('DOMContentLoaded', function() {
       </tbody>
     </table>
   </div>
+
+  <!-- WebSocket Zähler unterhalb der Tabelle -->
+  <div class="mt-4">
+    <div class="row">
+      <div class="col-md-3">
+        <div class="card border-primary">
+          <div class="card-body text-center py-2">
+            <h6 class="card-title text-primary mb-1">
+              <i class="bi bi-envelope"></i> Nachrichten
+            </h6>
+            <div class="h4 mb-0 text-primary" id="message-counter">0</div>
+            <small class="text-muted">Empfangen</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-success">
+          <div class="card-body text-center py-2">
+            <h6 class="card-title text-success mb-1">
+              <i class="bi bi-graph-up"></i> Klines
+            </h6>
+            <div class="h4 mb-0 text-success" id="kline-counter">0</div>
+            <small class="text-muted">Verarbeitet</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-warning">
+          <div class="card-body text-center py-2">
+            <h6 class="card-title text-warning mb-1">
+              <i class="bi bi-currency-dollar"></i> Preis-Updates
+            </h6>
+            <div class="h4 mb-0 text-warning" id="price-update-counter">0</div>
+            <small class="text-muted">Gesendet</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card border-info">
+          <div class="card-body text-center py-2">
+            <h6 class="card-title text-info mb-1">
+              <i class="bi bi-speedometer"></i> Datenrate
+            </h6>
+            <div class="h4 mb-0 text-info" id="data-rate-counter">0</div>
+            <small class="text-muted">Nachrichten/min</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <% else %>
   <!-- Empty State -->
   <div class="text-center py-5">

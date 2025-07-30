@@ -712,9 +712,37 @@ private def process_kline_data(symbol, kline)
   
   # Indikator-Berechnungen für alle Kerzen (auch unvollständige)
   begin
-    # Finde Kryptowährung - VERWENDE NUR BESTEHENDE AUS BOT.JSON
+    # Finde Kryptowährung - ERSTELLE FEHLENDE AUS BOT.JSON
     db_symbol = convert_websocket_symbol_to_db_format(symbol)
     cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
+    
+    # Erstelle fehlende Cryptocurrency, wenn sie in der Whitelist ist
+    if cryptocurrency.nil?
+      begin
+        # Prüfe, ob das Symbol in der bot.json Whitelist ist
+        config_path = File.join(__dir__, '../config/bot.json')
+        if File.exist?(config_path)
+          config = JSON.parse(File.read(config_path))
+          whitelist = config.dig('exchange', 'pair_whitelist') || []
+          
+          if whitelist.include?(db_symbol)
+            coin_name = db_symbol.split('/').first
+            cryptocurrency = Cryptocurrency.create!(
+              symbol: db_symbol,
+              name: coin_name,
+              current_price: kline['c'].to_f,
+              market_cap: 1_000_000,  # Dummy-Wert
+              market_cap_rank: 999    # Dummy-Wert
+            )
+            console_safe_log "✅ Neues Pair #{db_symbol} automatisch erstellt (ID: #{cryptocurrency.id})"
+          else
+            console_safe_log "⚠️ Symbol #{db_symbol} nicht in Whitelist - überspringe"
+          end
+        end
+      rescue => e
+        console_safe_log "❌ Fehler beim Erstellen von #{db_symbol}: #{e.message}"
+      end
+    end
     
     if cryptocurrency
       # Aktualisiere Preis
