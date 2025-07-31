@@ -1360,7 +1360,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 drawMiniCandlesticks(canvas, candlestickData);
 
                 // Erstelle individuelle Tooltips für jede Kerze
+                console.log(`🕯️ Erstelle Tooltips für ${candlestickData.length} Kerzen`);
                 createIndividualTooltips(container, candlestickData.length);
+                
+                // Debug: Zeige alle erstellten Tooltips
+                const createdTooltips = container.querySelectorAll('.candlestick-tooltip');
+                console.log(`🔍 Erstellte Tooltips: ${createdTooltips.length}`);
+                createdTooltips.forEach((tooltip, index) => {
+                  console.log(`🔍 Tooltip ${index}:`, tooltip.className);
+                });
                 
                 // Tooltip-Funktionalität für Mini-Candlesticks (individuelle Kerzen)
                 canvas.addEventListener('mousemove', function(e) {
@@ -1371,6 +1379,8 @@ document.addEventListener('DOMContentLoaded', function() {
                   
                   // Begrenze den Index auf gültige Werte
                   const validIndex = Math.max(0, Math.min(candleIndex, candlestickData.length - 1));
+                  
+                  console.log(`🕯️ Mouse-Position: x=${x}, candleWidth=${candleWidth}, candleIndex=${candleIndex}, validIndex=${validIndex}`);
                   
                   // Zeige nur den Tooltip für die aktuelle Kerze
                   hideAllTooltips(container);
@@ -1386,6 +1396,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Aktualisiere Tooltips bei Mouse-Enter
                 canvas.addEventListener('mouseenter', function() {
                   console.log(`🕯️ Mouse-Enter für ${cryptoId} - ${candlestickData.length} Kerzen verfügbar`);
+                  
+                  // Test: Zeige alle verfügbaren Tooltips
+                  const allTooltips = container.querySelectorAll('.candlestick-tooltip');
+                  console.log(`🔍 Verfügbare Tooltips bei Mouse-Enter: ${allTooltips.length}`);
+                  allTooltips.forEach((tooltip, index) => {
+                    console.log(`🔍 Tooltip ${index}:`, tooltip.className, tooltip.classList.contains('d-none') ? '(versteckt)' : '(sichtbar)');
+                  });
                 });
               });
               
@@ -1562,72 +1579,7 @@ document.addEventListener('DOMContentLoaded', function() {
               return lastCandle;
             }
             
-            // Berechne prozentualen Maßstab für 1h Kerzen
-            function calculatePercentage1hScale() {
-              console.log(`🕯️ Berechne prozentualen Maßstab für 1h Kerzen`);
-              
-              const all1hData = [];
-              
-              // Sammle alle verfügbaren 1h Kerzen-Daten
-              Object.keys(current1hCandlesCache).forEach(cryptoId => {
-                const data = current1hCandlesCache[cryptoId];
-                if (data && Array.isArray(data)) {
-                  // Füge alle Kerzen aus dem Array hinzu
-                  data.forEach(candle => {
-                    all1hData.push(candle);
-                  });
-                }
-              });
-              
-              // Falls keine Daten im Cache, generiere aus Mini-Candlestick-Daten
-              if (all1hData.length === 0) {
-                Object.keys(candlestickDataCache).forEach(cryptoId => {
-                  const generatedData = generateCurrent1hCandlesData(cryptoId);
-                  if (generatedData && Array.isArray(generatedData)) {
-                    // Füge alle Kerzen aus dem generierten Array hinzu
-                    generatedData.forEach(candle => {
-                      all1hData.push(candle);
-                    });
-                  }
-                });
-              }
-              
-              if (all1hData.length === 0) {
-                console.log(`⚠️ Keine 1h Kerzen-Daten für Maßstab-Berechnung verfügbar`);
-                return null;
-              }
-              
-              // Berechne prozentuale Änderungen für alle Kerzen
-              const percentageChanges = all1hData.map(candle => {
-                const open = parseFloat(candle.open);
-                const high = parseFloat(candle.high);
-                const low = parseFloat(candle.low);
-                const close = parseFloat(candle.close);
-                
-                // Berechne prozentuale Änderungen
-                const highChange = ((high - open) / open) * 100;
-                const lowChange = ((low - open) / open) * 100;
-                const closeChange = ((close - open) / open) * 100;
-                
-                return {
-                  highChange: highChange,
-                  lowChange: lowChange,
-                  closeChange: closeChange,
-                  maxChange: Math.max(highChange, Math.abs(lowChange)),
-                  data: candle
-                };
-              });
-              
-              // Finde die maximale prozentuale Änderung
-              const maxPercentageChange = Math.max(...percentageChanges.map(p => p.maxChange));
-              
-              console.log(`📊 Prozentualer 1h Maßstab: Max. Änderung=${maxPercentageChange.toFixed(2)}%`);
-              
-              return {
-                maxPercentageChange: maxPercentageChange,
-                percentageChanges: percentageChanges
-              };
-            }
+
 
 // Zeichne Mini-Candlesticks
 function drawMiniCandlesticks(canvas, data) {
@@ -1741,10 +1693,12 @@ function updateCandlestickInfo(infoDiv, candle) {
 
 // Erstelle individuelle Tooltips für jede Kerze
 function createIndividualTooltips(container, candleCount) {
-  console.log(`🕯️ Erstelle ${candleCount} individuelle Tooltips`);
+  console.log(`🕯️ Erstelle ${candleCount} individuelle Tooltips für Container:`, container);
   
   // Entferne alte Tooltips
-  container.querySelectorAll('.candlestick-tooltip').forEach(t => t.remove());
+  const oldTooltips = container.querySelectorAll('.candlestick-tooltip');
+  console.log(`🔍 Entferne ${oldTooltips.length} alte Tooltips`);
+  oldTooltips.forEach(t => t.remove());
   
   // Erstelle Tooltips für jede Kerze
   for (let i = 0; i < candleCount; i++) {
@@ -1757,18 +1711,36 @@ function createIndividualTooltips(container, candleCount) {
       <small>C: <span class="close-price">-</span></small>
     `;
     container.appendChild(tooltip);
+    console.log(`✅ Tooltip ${i + 1} erstellt:`, tooltip.className);
   }
   
-  console.log(`✅ ${candleCount} individuelle Tooltips erstellt`);
+  // Verifiziere die erstellten Tooltips
+  const newTooltips = container.querySelectorAll('.candlestick-tooltip');
+  console.log(`✅ ${newTooltips.length} individuelle Tooltips erstellt und verifiziert`);
+  newTooltips.forEach((tooltip, index) => {
+    console.log(`🔍 Verifizierter Tooltip ${index + 1}:`, tooltip.className);
+  });
 }
 
 // Zeige Tooltip für spezifische Kerze
 function showTooltip(container, candleIndex, candleData) {
+  console.log(`🕯️ Versuche Tooltip für Kerze ${candleIndex + 1} anzuzeigen`);
+  
   const tooltip = container.querySelector(`.candlestick-tooltip-${candleIndex}`);
+  console.log(`🔍 Gefundener Tooltip:`, tooltip);
+  
   if (tooltip && candleData) {
     updateIndividualTooltip(tooltip, candleData, candleIndex);
     tooltip.classList.remove('d-none');
-    console.log(`🕯️ Tooltip für Kerze ${candleIndex + 1} angezeigt`);
+    console.log(`✅ Tooltip für Kerze ${candleIndex + 1} angezeigt`);
+  } else {
+    console.log(`❌ Tooltip nicht gefunden oder keine Daten für Kerze ${candleIndex + 1}`);
+    if (!tooltip) {
+      console.log(`🔍 Verfügbare Tooltips:`, container.querySelectorAll('.candlestick-tooltip').length);
+    }
+    if (!candleData) {
+      console.log(`🔍 Keine Candle-Daten für Index ${candleIndex}`);
+    }
   }
 }
 
@@ -1882,10 +1854,7 @@ function drawCurrent1hCandles(canvas, data) {
   const candles = data.slice(-3);
   console.log(`🕯️ Zeichne ${candles.length} 1h Kerzen:`, candles);
   
-  // Berechne prozentualen Maßstab für alle Kerzen
-  const percentageScale = calculatePercentage1hScale();
-  
-  // Zeichne jede Kerze
+  // Zeichne jede Kerze ohne prozentuale Skalierung
   const candleWidth = width / candles.length;
   const padding = 4;
   const availableWidth = width - (padding * 2);
@@ -1902,20 +1871,13 @@ function drawCurrent1hCandles(canvas, data) {
     const lowPrice = parseFloat(candle.low);
     const closePrice = parseFloat(candle.close);
     
-    // Berechne prozentuale Änderungen
-    const highChange = ((highPrice - openPrice) / openPrice) * 100;
-    const lowChange = ((lowPrice - openPrice) / openPrice) * 100;
-    const closeChange = ((closePrice - openPrice) / openPrice) * 100;
+    // Finde min/max Preise für lokale Skalierung
+    const allPrices = candles.flatMap(c => [parseFloat(c.low), parseFloat(c.high)]);
+    const minPrice = Math.min(...allPrices);
+    const maxPrice = Math.max(...allPrices);
+    const priceRange = maxPrice - minPrice;
     
-    // Verwende prozentualen Maßstab oder lokalen Maßstab
-    let maxPercentageChange;
-    if (percentageScale && percentageScale.maxPercentageChange > 0) {
-      maxPercentageChange = percentageScale.maxPercentageChange;
-    } else {
-      maxPercentageChange = Math.max(highChange, Math.abs(lowChange));
-    }
-    
-    if (maxPercentageChange === 0) {
+    if (priceRange === 0) {
       // Doji - nur horizontale Linie
       ctx.strokeStyle = candle.isGreen ? '#28a745' : '#dc3545';
       ctx.lineWidth = 2;
@@ -1924,16 +1886,12 @@ function drawCurrent1hCandles(canvas, data) {
       ctx.lineTo(candleX + candleW, height / 2);
       ctx.stroke();
     } else {
-      // Normale Kerze mit prozentualer Skalierung
-      const centerY = height / 2; // Mittellinie (Open-Preis)
-      
-      // Skaliere prozentuale Änderungen auf Canvas-Höhe
-      const scaleFactor = availableHeight / (maxPercentageChange * 2); // *2 für positive und negative Änderungen
-      
-      const highY = centerY - (highChange * scaleFactor);
-      const lowY = centerY - (lowChange * scaleFactor);
-      const openY = centerY; // Open-Preis ist immer in der Mitte
-      const closeY = centerY - (closeChange * scaleFactor);
+      // Normale Kerze mit lokaler Skalierung
+      // Skaliere Preise auf Canvas-Höhe
+      const highY = ((maxPrice - highPrice) / priceRange) * availableHeight + 2;
+      const lowY = ((maxPrice - lowPrice) / priceRange) * availableHeight + 2;
+      const openY = ((maxPrice - openPrice) / priceRange) * availableHeight + 2;
+      const closeY = ((maxPrice - closePrice) / priceRange) * availableHeight + 2;
       
       // Zeichne Docht (High-Low Linie)
       ctx.strokeStyle = candle.isGreen ? '#28a745' : '#dc3545';
@@ -2234,9 +2192,26 @@ function drawCurrent1hCandles(canvas, data) {
               });
             }, 1000);
             
-            // Funktion zum Neuziehen aller 1h Kerzen mit gleichem prozentualen Maßstab
+            // Test der Mini-Candlestick Tooltips nach 2 Sekunden
+            setTimeout(() => {
+              console.log('🕯️ Teste Mini-Candlestick Tooltips...');
+              
+              const miniContainers = document.querySelectorAll('.mini-candlestick-container');
+              console.log(`🔍 Test: Gefundene Mini-Container: ${miniContainers.length}`);
+              
+              miniContainers.forEach((container, index) => {
+                const tooltips = container.querySelectorAll('.candlestick-tooltip');
+                console.log(`🔍 Container ${index}: ${tooltips.length} Tooltips gefunden`);
+                
+                tooltips.forEach((tooltip, tooltipIndex) => {
+                  console.log(`🔍 Tooltip ${tooltipIndex}:`, tooltip.className);
+                });
+              });
+            }, 2000);
+            
+            // Funktion zum Neuziehen aller 1h Kerzen
             function redrawAll1hCandles() {
-              console.log(`🕯️ Zeichne alle 1h Kerzen mit gleichem prozentualen Maßstab neu`);
+              console.log(`🕯️ Zeichne alle 1h Kerzen neu`);
               
               const current1hCanvases = document.querySelectorAll('.current-1h-candles');
               current1hCanvases.forEach(canvas => {
@@ -2546,10 +2521,6 @@ function drawCurrent1hCandles(canvas, data) {
             // Funktion zum Aktualisieren der 1h Kerzen
             function refreshCurrent1hCandles() {
               console.log(`🕯️ Aktualisiere 1h Kerzen`);
-              
-              // Berechne zuerst den prozentualen Maßstab
-              const percentageScale = calculatePercentage1hScale();
-              console.log(`🕯️ Prozentualer Maßstab für Update:`, percentageScale);
               
               // Update alle 1h Kerzen mit generierten Daten
               const current1hCanvases = document.querySelectorAll('.current-1h-candles');
