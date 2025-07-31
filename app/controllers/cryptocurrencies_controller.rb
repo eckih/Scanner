@@ -357,49 +357,47 @@ class CryptocurrenciesController < ApplicationController
     Rails.logger.info "🕯️ Lade aktuelle 1h Kerzen für #{cryptocurrencies.count} Cryptos"
     
     cryptocurrencies.each do |crypto|
-      Rails.logger.info "🕯️ Verarbeite aktuelle 1h Kerze für: #{crypto.symbol} (ID: #{crypto.id})"
+      Rails.logger.info "🕯️ Verarbeite aktuelle 1h Kerzen für: #{crypto.symbol} (ID: #{crypto.id})"
       
-      # Finde die aktuelle 1h Kerze (auch wenn nicht abgeschlossen)
+      # Finde die letzten 3 1h Kerzen
       current_hour_start = Time.now.beginning_of_hour
       current_hour_end = Time.now.end_of_hour
       
-      # Suche nach der aktuellen 1h Kerze
-      current_candle = CryptoHistoryData.where(cryptocurrency: crypto, interval: '1h')
-                                       .where('timestamp >= ? AND timestamp <= ?', current_hour_start, current_hour_end)
+      # Suche nach den letzten 3 1h Kerzen
+      recent_candles = CryptoHistoryData.where(cryptocurrency: crypto, interval: '1h')
                                        .order(timestamp: :desc)
-                                       .first
+                                       .limit(3)
       
-      # Wenn keine Kerze für die aktuelle Stunde gefunden wurde, suche nach der neuesten 1h Kerze
-      if !current_candle
-        Rails.logger.warn "🕯️ Keine 1h Kerze für aktuelle Stunde gefunden für #{crypto.symbol}, suche nach neuester 1h Kerze"
+      if recent_candles.any?
+        Rails.logger.info "🕯️ #{recent_candles.count} 1h Kerzen gefunden für #{crypto.symbol}"
         
-        current_candle = CryptoHistoryData.where(cryptocurrency: crypto, interval: '1h')
-                                         .order(timestamp: :desc)
-                                         .first
-      end
-      
-      if current_candle
-        Rails.logger.info "🕯️ 1h Kerze gefunden für #{crypto.symbol}: #{current_candle.timestamp}"
+        # Konvertiere zu Array und sortiere chronologisch (älteste zuerst)
+        candles_array = recent_candles.reverse.map do |candle|
+          # Prüfe ob die Kerze für die aktuelle Stunde ist
+          is_current_hour = candle.timestamp >= current_hour_start && candle.timestamp <= current_hour_end
+          is_complete = Time.now >= current_hour_end && is_current_hour
+          
+          {
+            open: candle.open_price,
+            high: candle.high_price,
+            low: candle.low_price,
+            close: candle.close_price,
+            timestamp: candle.timestamp,
+            isGreen: candle.close_price > candle.open_price,
+            isComplete: is_complete,
+            isCurrentHour: is_current_hour
+          }
+        end
         
-        # Prüfe ob die Kerze für die aktuelle Stunde ist
-        is_current_hour = current_candle.timestamp >= current_hour_start && current_candle.timestamp <= current_hour_end
-        is_complete = Time.now >= current_hour_end && is_current_hour
+        current_candle_data[crypto.id] = candles_array
         
-        current_candle_data[crypto.id] = {
-          open: current_candle.open_price,
-          high: current_candle.high_price,
-          low: current_candle.low_price,
-          close: current_candle.close_price,
-          timestamp: current_candle.timestamp,
-          isGreen: current_candle.close_price > current_candle.open_price,
-          isComplete: is_complete,
-          isCurrentHour: is_current_hour
-        }
-        
-        Rails.logger.info "🕯️ 1h Kerze Details für #{crypto.symbol}: O:#{current_candle.open_price} H:#{current_candle.high_price} L:#{current_candle.low_price} C:#{current_candle.close_price} (Aktuelle Stunde: #{is_current_hour}, Abgeschlossen: #{is_complete})"
+        Rails.logger.info "🕯️ 1h Kerzen Details für #{crypto.symbol}: #{candles_array.length} Kerzen"
+        candles_array.each_with_index do |candle, index|
+          Rails.logger.info "🕯️ Kerze #{index + 1}: O:#{candle[:open]} H:#{candle[:high]} L:#{candle[:low]} C:#{candle[:close]} (Aktuelle Stunde: #{candle[:isCurrentHour]}, Abgeschlossen: #{candle[:isComplete]})"
+        end
       else
-        Rails.logger.warn "🕯️ Keine 1h Kerze gefunden für #{crypto.symbol}"
-        current_candle_data[crypto.id] = nil
+        Rails.logger.warn "🕯️ Keine 1h Kerzen gefunden für #{crypto.symbol}"
+        current_candle_data[crypto.id] = []
       end
     end
     

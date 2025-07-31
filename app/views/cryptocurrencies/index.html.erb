@@ -296,14 +296,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const rsiCell = foundRow.querySelector('.rsi-cell');
     if (rsiCell) {
       const rsiValue = parseFloat(data.rsi);
-      console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
-      rsiCell.textContent = rsiValue.toFixed(2);
+      console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(0));
+      rsiCell.textContent = rsiValue.toFixed(0);
       
       // Aktualisiere data-sort Attribut für korrekte Sortierung
       const rsiTd = rsiCell.closest('td');
       if (rsiTd) {
         rsiTd.setAttribute('data-sort', rsiValue);
         console.log("📊 data-sort Attribut aktualisiert:", rsiValue);
+        
+        // Zusätzliche Sicherheit: Aktualisiere auch das data-sort Attribut der Zelle selbst
+        rsiCell.setAttribute('data-sort', rsiValue);
       }
       
       // RSI-Farbe basierend auf Wert
@@ -323,7 +326,19 @@ document.addEventListener('DOMContentLoaded', function() {
         rsiCell.style.backgroundColor = '';
       }, 800);
       
-      console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
+      console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(0));
+      
+      // Sortiere die Tabelle neu nach dem Update
+      setTimeout(() => {
+        console.log(`🔄 Starte Neusortierung nach RSI-Update für ${data.symbol}`);
+        forceResortWithRetry();
+        
+        // Fallback: Manuelle Sortierung nach 500ms
+        setTimeout(() => {
+          console.log(`🔄 Fallback: Manuelle Sortierung nach RSI-Update`);
+          forceManualSort();
+        }, 500);
+      }, 100);
     } else {
       console.log("[!] RSI-Zelle nicht gefunden in Symbol-basierter Zeile");
       console.log("🔍 Zeilen-HTML:", foundRow.innerHTML);
@@ -334,14 +349,17 @@ document.addEventListener('DOMContentLoaded', function() {
      const rsiCell = row.querySelector('.rsi-cell');
   if (rsiCell) {
     const rsiValue = parseFloat(data.rsi);
-    console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(2));
-    rsiCell.textContent = rsiValue.toFixed(2);
+    console.log("🔍 RSI-Zelle gefunden, aktualisiere Wert:", rsiValue.toFixed(0));
+    rsiCell.textContent = rsiValue.toFixed(0);
     
     // Aktualisiere data-sort Attribut für korrekte Sortierung
     const rsiTd = rsiCell.closest('td');
     if (rsiTd) {
       rsiTd.setAttribute('data-sort', rsiValue);
       console.log("📊 data-sort Attribut aktualisiert:", rsiValue);
+      
+      // Zusätzliche Sicherheit: Aktualisiere auch das data-sort Attribut der Zelle selbst
+      rsiCell.setAttribute('data-sort', rsiValue);
     }
     
     // RSI-Farbe basierend auf Wert
@@ -361,7 +379,19 @@ document.addEventListener('DOMContentLoaded', function() {
       rsiCell.style.backgroundColor = '';
     }, 800);
     
-    console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(2));
+    console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(0));
+    
+    // Sortiere die Tabelle neu nach dem Update
+    setTimeout(() => {
+      console.log(`🔄 Starte Neusortierung nach RSI-Update für ${data.symbol}`);
+      forceResortWithRetry();
+      
+      // Fallback: Manuelle Sortierung nach 500ms
+      setTimeout(() => {
+        console.log(`🔄 Fallback: Manuelle Sortierung nach RSI-Update`);
+        forceManualSort();
+      }, 500);
+    }, 100);
   } else {
     console.log("[!] RSI-Zelle nicht gefunden für Crypto ID:", data.cryptocurrency_id);
     console.log("🔍 Zeilen-HTML:", row.innerHTML);
@@ -422,13 +452,16 @@ document.addEventListener('DOMContentLoaded', function() {
      const rocCell = row.querySelector('.roc-cell');
   if (rocCell) {
     const rocValue = parseFloat(data.roc);
-    rocCell.textContent = `${rocValue.toFixed(2)}%`;
+    rocCell.textContent = rocValue.toFixed(2);
     
     // Aktualisiere data-sort Attribut für korrekte Sortierung
     const rocTd = rocCell.closest('td');
     if (rocTd) {
       rocTd.setAttribute('data-sort', rocValue);
       console.log("📊 ROC data-sort Attribut aktualisiert:", rocValue);
+      
+      // Zusätzliche Sicherheit: Aktualisiere auch das data-sort Attribut der Zelle selbst
+      rocCell.setAttribute('data-sort', rocValue);
     }
     
     // Aktualisiere CSS-Klassen basierend auf ROC-Wert
@@ -441,7 +474,19 @@ document.addEventListener('DOMContentLoaded', function() {
       rocCell.classList.add('bg-secondary');
         }
     
-    console.log(`✅ ROC aktualisiert für ${data.symbol}: ${rocValue.toFixed(2)}%`);
+    console.log(`✅ ROC aktualisiert für ${data.symbol}: ${rocValue.toFixed(2)}`);
+    
+    // Sortiere die Tabelle neu nach dem Update
+    setTimeout(() => {
+      console.log(`🔄 Starte Neusortierung nach ROC-Update für ${data.symbol}`);
+      forceResortWithRetry();
+      
+      // Fallback: Manuelle Sortierung nach 500ms
+      setTimeout(() => {
+        console.log(`🔄 Fallback: Manuelle Sortierung nach ROC-Update`);
+        forceManualSort();
+      }, 500);
+    }, 100);
       } else {
     console.log("[!] ROC-Zelle nicht gefunden für", data.symbol);
   }
@@ -460,13 +505,16 @@ document.addEventListener('DOMContentLoaded', function() {
      const rocDerivativeCell = row.querySelector('.roc-derivative-cell');
   if (rocDerivativeCell) {
     const rocDerivativeValue = parseFloat(data.roc_derivative);
-    rocDerivativeCell.textContent = `${rocDerivativeValue.toFixed(2)}%`;
+    rocDerivativeCell.textContent = rocDerivativeValue.toFixed(2);
     
     // Aktualisiere data-sort Attribut für korrekte Sortierung
     const rocDerivativeTd = rocDerivativeCell.closest('td');
     if (rocDerivativeTd) {
       rocDerivativeTd.setAttribute('data-sort', rocDerivativeValue);
       console.log("📊 ROC' data-sort Attribut aktualisiert:", rocDerivativeValue);
+      
+      // Zusätzliche Sicherheit: Aktualisiere auch das data-sort Attribut der Zelle selbst
+      rocDerivativeCell.setAttribute('data-sort', rocDerivativeValue);
     }
     
     // Aktualisiere CSS-Klassen basierend auf ROC' Wert
@@ -479,7 +527,19 @@ document.addEventListener('DOMContentLoaded', function() {
       rocDerivativeCell.classList.add('bg-secondary');
     }
     
-    console.log(`✅ ROC' aktualisiert für ${data.symbol}: ${rocDerivativeValue.toFixed(2)}%`);
+    console.log(`✅ ROC' aktualisiert für ${data.symbol}: ${rocDerivativeValue.toFixed(2)}`);
+    
+    // Sortiere die Tabelle neu nach dem Update
+    setTimeout(() => {
+      console.log(`🔄 Starte Neusortierung nach ROC'-Update für ${data.symbol}`);
+      forceResortWithRetry();
+      
+      // Fallback: Manuelle Sortierung nach 500ms
+      setTimeout(() => {
+        console.log(`🔄 Fallback: Manuelle Sortierung nach ROC'-Update`);
+        forceManualSort();
+      }, 500);
+    }, 100);
     } else {
     console.log("[!] ROC'-Zelle nicht gefunden für", data.symbol);
   }
@@ -938,17 +998,14 @@ document.addEventListener('DOMContentLoaded', function() {
             <% end %>
           </th>
           <th class="d-none d-lg-table-cell">
-            ROC
-            <br><small class="text-muted d-none d-md-inline">Rate of Change</small>
+            ROC in %
           </th>
           <th class="d-none d-lg-table-cell">
-            ROC'
-            <br><small class="text-muted d-none d-md-inline">ROC Derivative</small>
+            ROC' in %
           </th>
           <th>Chart</th>
           <th class="d-none d-lg-table-cell">
             1h Kerze
-            <br><small class="text-muted d-none d-md-inline">Aktuelle Stunde</small>
           </th>
         </tr>
       </thead>
@@ -1020,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     class: 'text-decoration-none',
                     title: "RSI Chart anzeigen" do %>
                   <span class="badge <%= rsi_class %> chart-link rsi-cell">
-                    <%= crypto.current_rsi(@current_timeframe) %>
+                    <%= crypto.current_rsi(@current_timeframe).to_i %>
                   </span>
                 <% end %>
               <% else %>
@@ -1038,7 +1095,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                  "bg-secondary"
                                end %>
                 <span class="badge <%= roc_class %> roc-cell">
-                  <%= crypto.current_roc(@current_timeframe).round(2) %>%
+                  <%= crypto.current_roc(@current_timeframe).round(2) %>
                 </span>
               <% else %>
                 <span class="badge bg-secondary roc-cell">N/A</span>
@@ -1055,7 +1112,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                             "bg-secondary"
                                           end %>
                 <span class="badge <%= roc_derivative_class %> roc-derivative-cell">
-                  <%= crypto.current_roc_derivative(@current_timeframe).round(2) %>%
+                  <%= crypto.current_roc_derivative(@current_timeframe).round(2) %>
                 </span>
               <% else %>
                 <span class="badge bg-secondary roc-derivative-cell">N/A</span>
@@ -1064,17 +1121,12 @@ document.addEventListener('DOMContentLoaded', function() {
                          <td>
                <div class="mini-candlestick-container" data-crypto-id="<%= crypto.id %>" data-symbol="<%= crypto.symbol %>">
                  <canvas class="mini-candlestick" width="80" height="30" data-crypto-id="<%= crypto.id %>"></canvas>
-                 <div class="candlestick-info d-none">
-                   <small class="text-muted">O: <span class="open-price">-</span></small><br>
-                   <small class="text-muted">H: <span class="high-price">-</span></small><br>
-                   <small class="text-muted">L: <span class="low-price">-</span></small><br>
-                   <small class="text-muted">C: <span class="close-price">-</span></small>
-                 </div>
+                 <!-- Individuelle Tooltips für jede Kerze werden dynamisch erstellt -->
                </div>
              </td>
              <td class="d-none d-lg-table-cell">
-               <div class="current-1h-candle-container" data-crypto-id="<%= crypto.id %>" data-symbol="<%= crypto.symbol %>">
-                 <canvas class="current-1h-candle" width="60" height="40" data-crypto-id="<%= crypto.id %>"></canvas>
+               <div class="current-1h-candles-container" data-crypto-id="<%= crypto.id %>" data-symbol="<%= crypto.symbol %>">
+                 <canvas class="current-1h-candles" width="180" height="40" data-crypto-id="<%= crypto.id %>"></canvas>
                  <div class="candlestick-info d-none">
                    <small class="text-muted">O: <span class="open-price">-</span></small><br>
                    <small class="text-muted">H: <span class="high-price">-</span></small><br>
@@ -1171,13 +1223,13 @@ document.addEventListener('DOMContentLoaded', function() {
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
-/* Aktuelle 1h Kerze Styling */
-.current-1h-candle-container {
+/* Aktuelle 1h Kerzen Styling */
+.current-1h-candles-container {
   position: relative;
   display: inline-block;
 }
 
-.current-1h-candle {
+.current-1h-candles {
   border: 1px solid #dee2e6;
   border-radius: 4px;
   background-color: #f8f9fa;
@@ -1185,22 +1237,22 @@ document.addEventListener('DOMContentLoaded', function() {
   transition: all 0.2s ease;
 }
 
-.current-1h-candle:hover {
+.current-1h-candles:hover {
   border-color: #28a745;
   box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
 }
 
-.current-1h-candle.incomplete {
+.current-1h-candles.incomplete {
   border-color: #ffc107;
   background-color: #fff3cd;
 }
 
-.current-1h-candle.complete {
+.current-1h-candles.complete {
   border-color: #28a745;
   background-color: #d4edda;
 }
 
-.current-1h-candle.old {
+.current-1h-candles.old {
   border-color: #6c757d;
   background-color: #f8f9fa;
   opacity: 0.7;
@@ -1231,6 +1283,38 @@ document.addEventListener('DOMContentLoaded', function() {
   border-top-color: #343a40;
 }
 
+/* Individuelle Tooltips für jede Kerze */
+.candlestick-tooltip {
+  position: absolute;
+  background-color: #343a40;
+  color: white;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  z-index: 1000;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.candlestick-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #343a40;
+}
+
+/* Positionierung für verschiedene Kerzen */
+.candlestick-tooltip-0 { top: -80px; left: 10%; }
+.candlestick-tooltip-1 { top: -80px; left: 30%; }
+.candlestick-tooltip-2 { top: -80px; left: 50%; }
+.candlestick-tooltip-3 { top: -80px; left: 70%; }
+.candlestick-tooltip-4 { top: -80px; left: 90%; }
+
 /* Responsive Anpassungen */
 @media (max-width: 768px) {
   .mini-candlestick {
@@ -1238,8 +1322,8 @@ document.addEventListener('DOMContentLoaded', function() {
     height: 25px !important;
   }
   
-  .current-1h-candle {
-    width: 50px !important;
+  .current-1h-candles {
+    width: 150px !important;
     height: 30px !important;
   }
   
@@ -1253,6 +1337,15 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
             // Mini-Candlestick Charts für die Tabelle
             document.addEventListener('DOMContentLoaded', function() {
+              console.log('🕯️ DOMContentLoaded - Initialisiere Charts...');
+              
+              // Debug: Zeige alle 1h Kerzen-Canvases sofort
+              const current1hCanvases = document.querySelectorAll('.current-1h-candles');
+              console.log(`🔍 Sofort gefundene 1h Kerzen-Canvases: ${current1hCanvases.length}`);
+              current1hCanvases.forEach((canvas, index) => {
+                console.log(`🔍 Canvas ${index}:`, canvas);
+                console.log(`🔍 Crypto ID:`, canvas.dataset.cryptoId);
+              });
               const candlestickCanvases = document.querySelectorAll('.mini-candlestick');
 
               candlestickCanvases.forEach(canvas => {
@@ -1266,57 +1359,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Zeichne Mini-Candlesticks
                 drawMiniCandlesticks(canvas, candlestickData);
 
-                // Tooltip-Funktionalität für Mini-Candlesticks (letzte vollständige Kerze)
-                canvas.addEventListener('mouseenter', function() {
-                  infoDiv.classList.remove('d-none');
-                  const lastCompleteCandle = findLastCompleteCandle(cryptoId);
-                  if (lastCompleteCandle) {
-                    updateMiniCandlestickInfo(infoDiv, lastCompleteCandle);
+                // Erstelle individuelle Tooltips für jede Kerze
+                createIndividualTooltips(container, candlestickData.length);
+                
+                // Tooltip-Funktionalität für Mini-Candlesticks (individuelle Kerzen)
+                canvas.addEventListener('mousemove', function(e) {
+                  const rect = canvas.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const candleWidth = canvas.width / candlestickData.length;
+                  const candleIndex = Math.floor(x / candleWidth);
+                  
+                  // Begrenze den Index auf gültige Werte
+                  const validIndex = Math.max(0, Math.min(candleIndex, candlestickData.length - 1));
+                  
+                  // Zeige nur den Tooltip für die aktuelle Kerze
+                  hideAllTooltips(container);
+                  if (candlestickData[validIndex]) {
+                    showTooltip(container, validIndex, candlestickData[validIndex]);
                   }
                 });
 
                 canvas.addEventListener('mouseleave', function() {
-                  infoDiv.classList.add('d-none');
+                  hideAllTooltips(container);
+                });
+                
+                // Aktualisiere Tooltips bei Mouse-Enter
+                canvas.addEventListener('mouseenter', function() {
+                  console.log(`🕯️ Mouse-Enter für ${cryptoId} - ${candlestickData.length} Kerzen verfügbar`);
                 });
               });
               
               // Aktuelle 1h Kerzen für die Tabelle
-              const current1hCandleCanvases = document.querySelectorAll('.current-1h-candle');
-              console.log(`🕯️ Gefundene 1h Kerzen-Canvases: ${current1hCandleCanvases.length}`);
+              const current1hCandlesCanvases = document.querySelectorAll('.current-1h-candles');
+              console.log(`🕯️ Gefundene 1h Kerzen-Canvases: ${current1hCandlesCanvases.length}`);
 
-              current1hCandleCanvases.forEach(canvas => {
+              current1hCandlesCanvases.forEach(canvas => {
                 const cryptoId = canvas.dataset.cryptoId;
-                const container = canvas.closest('.current-1h-candle-container');
+                const container = canvas.closest('.current-1h-candles-container');
                 const infoDiv = container.querySelector('.candlestick-info');
 
-                console.log(`🕯️ Initialisiere 1h Kerze für Crypto ID: ${cryptoId}`);
+                console.log(`🕯️ Initialisiere 1h Kerzen für Crypto ID: ${cryptoId}`);
 
                 // Lade aktuelle 1h Kerzen-Daten vom Server
-                let current1hData = loadCurrent1hCandleData(cryptoId);
+                let current1hData = loadCurrent1hCandlesData(cryptoId);
                 console.log(`🕯️ Geladene 1h Daten für ${cryptoId}:`, current1hData);
 
                 // Falls keine Daten im Cache, generiere aus Mini-Candlestick-Daten
-                if (!current1hData) {
+                if (!current1hData || current1hData.length === 0) {
                   console.log(`🕯️ Keine 1h Daten im Cache für ${cryptoId}, generiere aus Mini-Candlestick-Daten...`);
-                  const generatedData = generateCurrent1hCandleData(cryptoId);
-                  if (generatedData) {
-                    current1hCandleCache[cryptoId] = generatedData;
-                    drawCurrent1hCandle(canvas, generatedData);
-                    console.log(`✅ 1h Kerze aus generierten Daten gezeichnet für ${cryptoId}`);
+                  const generatedData = generateCurrent1hCandlesData(cryptoId);
+                  if (generatedData && generatedData.length > 0) {
+                    current1hCandlesCache[cryptoId] = generatedData;
+                    drawCurrent1hCandles(canvas, generatedData);
+                    console.log(`✅ 1h Kerzen aus generierten Daten gezeichnet für ${cryptoId}`);
                   } else {
-                    console.log(`⚠️ Keine Daten für 1h Kerze verfügbar für ${cryptoId}`);
-                    drawCurrent1hCandle(canvas, null);
+                    console.log(`⚠️ Keine Daten für 1h Kerzen verfügbar für ${cryptoId}`);
+                    drawCurrent1hCandles(canvas, null);
                   }
                 } else {
-                  // Zeichne aktuelle 1h Kerze
-                  drawCurrent1hCandle(canvas, current1hData);
+                  // Zeichne aktuelle 1h Kerzen
+                  drawCurrent1hCandles(canvas, current1hData);
                 }
 
                 // Tooltip-Funktionalität für 1h Kerzen
                 canvas.addEventListener('mouseenter', function() {
                   infoDiv.classList.remove('d-none');
-                  if (current1hData) {
-                    update1hCandleInfo(infoDiv, current1hData);
+                  if (current1hData && current1hData.length > 0) {
+                    update1hCandlesInfo(infoDiv, current1hData);
                   }
                 });
 
@@ -1333,10 +1442,10 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('🕯️ Cache-Größe:', Object.keys(candlestickDataCache).length);
             
             // Lade aktuelle 1h Kerzen-Daten vom Server
-            let current1hCandleCache = <%= raw @current_1h_candle_data.to_json %>;
-            console.log('🕯️ Initialer 1h Kerzen-Cache:', current1hCandleCache);
-            console.log('🕯️ 1h Cache-Keys:', Object.keys(current1hCandleCache));
-            console.log('🕯️ 1h Cache-Größe:', Object.keys(current1hCandleCache).length);
+            let current1hCandlesCache = <%= raw @current_1h_candle_data.to_json %>;
+            console.log('🕯️ Initialer 1h Kerzen-Cache:', current1hCandlesCache);
+            console.log('🕯️ 1h Cache-Keys:', Object.keys(current1hCandlesCache));
+            console.log('🕯️ 1h Cache-Größe:', Object.keys(current1hCandlesCache).length);
             
             function loadRealCandlestickData(cryptoId) {
               // Verwende die gecachten Daten
@@ -1351,22 +1460,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Lade aktuelle 1h Kerzen-Daten
-            function loadCurrent1hCandleData(cryptoId) {
-              const data = current1hCandleCache[cryptoId] || null;
+            function loadCurrent1hCandlesData(cryptoId) {
+              const data = current1hCandlesCache[cryptoId] || null;
               console.log(`🕯️ Lade 1h Kerzen-Daten für Crypto ID ${cryptoId}:`, data);
               
               // Debug: Zeige alle verfügbaren Cache-Daten
               if (!data) {
                 console.log(`⚠️ Keine 1h Daten für ${cryptoId} im Cache`);
-                console.log(`🔍 Verfügbare Cache-Keys:`, Object.keys(current1hCandleCache));
-                console.log(`🔍 Cache-Inhalt:`, current1hCandleCache);
+                console.log(`🔍 Verfügbare Cache-Keys:`, Object.keys(current1hCandlesCache));
+                console.log(`🔍 Cache-Inhalt:`, current1hCandlesCache);
                 
                 // Temporäre Lösung: Versuche 1h Daten aus Mini-Candlestick-Daten zu generieren
                 const miniData = candlestickDataCache[cryptoId] || [];
                 if (miniData.length > 0) {
-                  console.log(`🕯️ Verwende Mini-Candlestick-Daten als Fallback für 1h Kerze`);
+                  console.log(`🕯️ Verwende Mini-Candlestick-Daten als Fallback für 1h Kerzen`);
                   const lastCandle = miniData[miniData.length - 1];
-                  return {
+                  return [{
                     open: lastCandle.open,
                     high: lastCandle.high,
                     low: lastCandle.low,
@@ -1375,7 +1484,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     isGreen: lastCandle.isGreen,
                     isComplete: false,
                     isCurrentHour: false
-                  };
+                  }];
                 }
               }
               
@@ -1383,12 +1492,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Update die gecachten 1h Kerzen-Daten
-            function updateCurrent1hCandleCache(cryptoId, newData) {
-              current1hCandleCache[cryptoId] = newData;
+            function updateCurrent1hCandlesCache(cryptoId, newData) {
+              current1hCandlesCache[cryptoId] = newData;
             }
             
             // Generiere 1h Kerzen-Daten aus Mini-Candlestick-Daten
-            function generateCurrent1hCandleData(cryptoId) {
+            function generateCurrent1hCandlesData(cryptoId) {
               console.log(`🕯️ Generiere 1h Kerzen-Daten für Crypto ID: ${cryptoId}`);
               
               const miniData = candlestickDataCache[cryptoId] || [];
@@ -1397,23 +1506,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 return null;
               }
               
-              // Verwende die letzte Kerze als 1h Kerze
-              const lastCandle = miniData[miniData.length - 1];
+              // Verwende die letzten 3 Kerzen als 1h Kerzen
+              const last3Candles = miniData.slice(-3);
               const currentTime = new Date();
-              const candleTime = new Date(lastCandle.timestamp);
-              const isCurrentHour = currentTime.getHours() === candleTime.getHours() && 
-                                   currentTime.getDate() === candleTime.getDate();
               
-              const generatedData = {
-                open: lastCandle.open,
-                high: lastCandle.high,
-                low: lastCandle.low,
-                close: lastCandle.close,
-                timestamp: lastCandle.timestamp,
-                isGreen: lastCandle.isGreen,
-                isComplete: !isCurrentHour,
-                isCurrentHour: isCurrentHour
-              };
+              const generatedData = last3Candles.map((candle, index) => {
+                const candleTime = new Date(candle.timestamp);
+                const isCurrentHour = currentTime.getHours() === candleTime.getHours() && 
+                                     currentTime.getDate() === candleTime.getDate();
+                
+                return {
+                  open: candle.open,
+                  high: candle.high,
+                  low: candle.low,
+                  close: candle.close,
+                  timestamp: candle.timestamp,
+                  isGreen: candle.isGreen,
+                  isComplete: !isCurrentHour,
+                  isCurrentHour: isCurrentHour
+                };
+              });
               
               console.log(`✅ 1h Kerzen-Daten generiert für ${cryptoId}:`, generatedData);
               return generatedData;
@@ -1457,19 +1569,25 @@ document.addEventListener('DOMContentLoaded', function() {
               const all1hData = [];
               
               // Sammle alle verfügbaren 1h Kerzen-Daten
-              Object.keys(current1hCandleCache).forEach(cryptoId => {
-                const data = current1hCandleCache[cryptoId];
-                if (data) {
-                  all1hData.push(data);
+              Object.keys(current1hCandlesCache).forEach(cryptoId => {
+                const data = current1hCandlesCache[cryptoId];
+                if (data && Array.isArray(data)) {
+                  // Füge alle Kerzen aus dem Array hinzu
+                  data.forEach(candle => {
+                    all1hData.push(candle);
+                  });
                 }
               });
               
               // Falls keine Daten im Cache, generiere aus Mini-Candlestick-Daten
               if (all1hData.length === 0) {
                 Object.keys(candlestickDataCache).forEach(cryptoId => {
-                  const generatedData = generateCurrent1hCandleData(cryptoId);
-                  if (generatedData) {
-                    all1hData.push(generatedData);
+                  const generatedData = generateCurrent1hCandlesData(cryptoId);
+                  if (generatedData && Array.isArray(generatedData)) {
+                    // Füge alle Kerzen aus dem generierten Array hinzu
+                    generatedData.forEach(candle => {
+                      all1hData.push(candle);
+                    });
                   }
                 });
               }
@@ -1621,7 +1739,69 @@ function updateCandlestickInfo(infoDiv, candle) {
   infoDiv.querySelector('.close-price').textContent = close.toFixed(2);
 }
 
-// Update Mini-Candlestick-Info mit Prozentwerten der letzten vollständigen Kerze
+// Erstelle individuelle Tooltips für jede Kerze
+function createIndividualTooltips(container, candleCount) {
+  console.log(`🕯️ Erstelle ${candleCount} individuelle Tooltips`);
+  
+  // Entferne alte Tooltips
+  container.querySelectorAll('.candlestick-tooltip').forEach(t => t.remove());
+  
+  // Erstelle Tooltips für jede Kerze
+  for (let i = 0; i < candleCount; i++) {
+    const tooltip = document.createElement('div');
+    tooltip.className = `candlestick-tooltip candlestick-tooltip-${i} d-none`;
+    tooltip.innerHTML = `
+      <small>Kerze ${i + 1}: O: <span class="open-price">-</span></small><br>
+      <small>H: <span class="high-price">-</span></small><br>
+      <small>L: <span class="low-price">-</span></small><br>
+      <small>C: <span class="close-price">-</span></small>
+    `;
+    container.appendChild(tooltip);
+  }
+  
+  console.log(`✅ ${candleCount} individuelle Tooltips erstellt`);
+}
+
+// Zeige Tooltip für spezifische Kerze
+function showTooltip(container, candleIndex, candleData) {
+  const tooltip = container.querySelector(`.candlestick-tooltip-${candleIndex}`);
+  if (tooltip && candleData) {
+    updateIndividualTooltip(tooltip, candleData, candleIndex);
+    tooltip.classList.remove('d-none');
+    console.log(`🕯️ Tooltip für Kerze ${candleIndex + 1} angezeigt`);
+  }
+}
+
+// Verstecke alle Tooltips
+function hideAllTooltips(container) {
+  container.querySelectorAll('.candlestick-tooltip').forEach(tooltip => {
+    tooltip.classList.add('d-none');
+  });
+}
+
+// Update individuellen Tooltip mit Prozentwerten
+function updateIndividualTooltip(tooltip, candle, candleIndex) {
+  // Konvertiere Strings zu Numbers für Berechnungen
+  const open = parseFloat(candle.open);
+  const high = parseFloat(candle.high);
+  const low = parseFloat(candle.low);
+  const close = parseFloat(candle.close);
+  
+  // Berechne prozentuale Änderungen
+  const highChange = ((high - open) / open) * 100;
+  const lowChange = ((low - open) / open) * 100;
+  const closeChange = ((close - open) / open) * 100;
+  
+  // Update Tooltip mit Prozentwerten
+  tooltip.querySelector('.open-price').textContent = open.toFixed(2);
+  tooltip.querySelector('.high-price').textContent = `${high.toFixed(2)} (${highChange >= 0 ? '+' : ''}${highChange.toFixed(2)}%)`;
+  tooltip.querySelector('.low-price').textContent = `${low.toFixed(2)} (${lowChange >= 0 ? '+' : ''}${lowChange.toFixed(2)}%)`;
+  tooltip.querySelector('.close-price').textContent = `${close.toFixed(2)} (${closeChange >= 0 ? '+' : ''}${closeChange.toFixed(2)}%)`;
+  
+  console.log(`🕯️ Tooltip für Kerze ${candleIndex + 1} aktualisiert: Open=${open}, High=${high} (${highChange.toFixed(2)}%), Low=${low} (${lowChange.toFixed(2)}%), Close=${close} (${closeChange.toFixed(2)}%)`);
+}
+
+// Update Mini-Candlestick-Info mit Prozentwerten der letzten vollständigen Kerze (Legacy)
 function updateMiniCandlestickInfo(infoDiv, candle) {
   // Konvertiere Strings zu Numbers für Berechnungen
   const open = parseFloat(candle.open);
@@ -1643,13 +1823,21 @@ function updateMiniCandlestickInfo(infoDiv, candle) {
   console.log(`🕯️ Mini-Candlestick-Tooltip aktualisiert: Open=${open}, High=${high} (${highChange.toFixed(2)}%), Low=${low} (${lowChange.toFixed(2)}%), Close=${close} (${closeChange.toFixed(2)}%)`);
 }
 
-// Update 1h Kerzen-Info mit Prozentwerten
-function update1hCandleInfo(infoDiv, candle) {
+// Update 1h Kerzen-Info mit Prozentwerten (letzte Kerze)
+function update1hCandlesInfo(infoDiv, candles) {
+  if (!candles || candles.length === 0) {
+    console.log(`⚠️ Keine 1h Kerzen-Daten für Tooltip verfügbar`);
+    return;
+  }
+  
+  // Verwende die letzte Kerze für den Tooltip
+  const lastCandle = candles[candles.length - 1];
+  
   // Konvertiere Strings zu Numbers für Berechnungen
-  const open = parseFloat(candle.open);
-  const high = parseFloat(candle.high);
-  const low = parseFloat(candle.low);
-  const close = parseFloat(candle.close);
+  const open = parseFloat(lastCandle.open);
+  const high = parseFloat(lastCandle.high);
+  const low = parseFloat(lastCandle.low);
+  const close = parseFloat(lastCandle.close);
   
   // Berechne prozentuale Änderungen
   const highChange = ((high - open) / open) * 100;
@@ -1662,12 +1850,12 @@ function update1hCandleInfo(infoDiv, candle) {
   infoDiv.querySelector('.low-price').textContent = `${low.toFixed(2)} (${lowChange >= 0 ? '+' : ''}${lowChange.toFixed(2)}%)`;
   infoDiv.querySelector('.close-price').textContent = `${close.toFixed(2)} (${closeChange >= 0 ? '+' : ''}${closeChange.toFixed(2)}%)`;
   
-  console.log(`🕯️ 1h Kerzen-Tooltip aktualisiert: Open=${open}, High=${high} (${highChange.toFixed(2)}%), Low=${low} (${lowChange.toFixed(2)}%), Close=${close} (${closeChange.toFixed(2)}%)`);
+  console.log(`🕯️ 1h Kerzen-Tooltip aktualisiert (letzte Kerze): Open=${open}, High=${high} (${highChange.toFixed(2)}%), Low=${low} (${lowChange.toFixed(2)}%), Close=${close} (${closeChange.toFixed(2)}%)`);
 }
 
-// Zeichne aktuelle 1h Kerze
-function drawCurrent1hCandle(canvas, data) {
-  console.log(`🕯️ drawCurrent1hCandle aufgerufen für Canvas:`, canvas);
+// Zeichne aktuelle 1h Kerzen (3 Kerzen)
+function drawCurrent1hCandles(canvas, data) {
+  console.log(`🕯️ drawCurrent1hCandles aufgerufen für Canvas:`, canvas);
   console.log(`🕯️ 1h Daten:`, data);
   
   const ctx = canvas.getContext('2d');
@@ -1679,7 +1867,7 @@ function drawCurrent1hCandle(canvas, data) {
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
   
-  if (!data) {
+  if (!data || data.length === 0) {
     console.log('⚠️ Keine 1h Kerzen-Daten verfügbar - Chart bleibt leer');
     
     // Zeichne einen Platzhalter-Text
@@ -1690,127 +1878,110 @@ function drawCurrent1hCandle(canvas, data) {
     return;
   }
   
-  // Debug: Zeige die 1h Kerze Details
-  console.log(`🕯️ 1h Kerze Details:`, {
-    open: data.open,
-    high: data.high,
-    low: data.low,
-    close: data.close,
-    isGreen: data.isGreen,
-    isComplete: data.isComplete,
-    isCurrentHour: data.isCurrentHour,
-    timestamp: data.timestamp
-  });
+  // Verwende die letzten 3 Kerzen
+  const candles = data.slice(-3);
+  console.log(`🕯️ Zeichne ${candles.length} 1h Kerzen:`, candles);
   
-  // Debug: Zeige die 1h Kerze
-  console.log(`🕯️ 1h Kerze:`, data);
-  console.log(`🕯️ Ist abgeschlossen:`, data.isComplete);
-  
-  // Zeichne die einzelne 1h Kerze
-  const candleWidth = width * 0.6;
-  const availableHeight = height * 0.8;
-  const candleX = (width - candleWidth) / 2;
-  const candleY = (height - availableHeight) / 2;
-  
-  // Verwende prozentualen Maßstab für alle 1h Kerzen
+  // Berechne prozentualen Maßstab für alle Kerzen
   const percentageScale = calculatePercentage1hScale();
   
-  let openPrice, highPrice, lowPrice, closePrice;
-  let maxPercentageChange;
+  // Zeichne jede Kerze
+  const candleWidth = width / candles.length;
+  const padding = 4;
+  const availableWidth = width - (padding * 2);
+  const availableHeight = height - (padding * 2);
   
-  if (percentageScale && percentageScale.maxPercentageChange > 0) {
-    // Verwende prozentualen Maßstab
-    openPrice = parseFloat(data.open);
-    highPrice = parseFloat(data.high);
-    lowPrice = parseFloat(data.low);
-    closePrice = parseFloat(data.close);
-    maxPercentageChange = percentageScale.maxPercentageChange;
+  candles.forEach((candle, index) => {
+    const x = index * candleWidth + padding;
+    const candleX = x + candleWidth * 0.1;
+    const candleW = candleWidth * 0.8;
     
-    console.log(`🕯️ Verwende prozentualen Maßstab: Max. Änderung=${maxPercentageChange.toFixed(2)}%`);
-  } else {
-    // Fallback: Verwende lokalen Maßstab
-    openPrice = parseFloat(data.open);
-    highPrice = parseFloat(data.high);
-    lowPrice = parseFloat(data.low);
-    closePrice = parseFloat(data.close);
-    
-    // Berechne lokale prozentuale Änderungen
-    const highChange = ((highPrice - openPrice) / openPrice) * 100;
-    const lowChange = ((lowPrice - openPrice) / openPrice) * 100;
-    maxPercentageChange = Math.max(highChange, Math.abs(lowChange));
-    
-    console.log(`🕯️ Verwende lokalen prozentualen Maßstab: Max. Änderung=${maxPercentageChange.toFixed(2)}%`);
-  }
-  
-  if (maxPercentageChange === 0) {
-    // Doji - nur horizontale Linie
-    ctx.strokeStyle = data.isGreen ? '#28a745' : '#dc3545';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(candleX, height / 2);
-    ctx.lineTo(candleX + candleWidth, height / 2);
-    ctx.stroke();
-  } else {
-    // Normale Kerze mit prozentualer Skalierung
-    const centerY = height / 2; // Mittellinie (Open-Preis)
+    // Konvertiere Preise zu Numbers
+    const openPrice = parseFloat(candle.open);
+    const highPrice = parseFloat(candle.high);
+    const lowPrice = parseFloat(candle.low);
+    const closePrice = parseFloat(candle.close);
     
     // Berechne prozentuale Änderungen
     const highChange = ((highPrice - openPrice) / openPrice) * 100;
     const lowChange = ((lowPrice - openPrice) / openPrice) * 100;
     const closeChange = ((closePrice - openPrice) / openPrice) * 100;
     
-    // Skaliere prozentuale Änderungen auf Canvas-Höhe
-    const scaleFactor = availableHeight / (maxPercentageChange * 2); // *2 für positive und negative Änderungen
+    // Verwende prozentualen Maßstab oder lokalen Maßstab
+    let maxPercentageChange;
+    if (percentageScale && percentageScale.maxPercentageChange > 0) {
+      maxPercentageChange = percentageScale.maxPercentageChange;
+    } else {
+      maxPercentageChange = Math.max(highChange, Math.abs(lowChange));
+    }
     
-    const highY = centerY - (highChange * scaleFactor);
-    const lowY = centerY - (lowChange * scaleFactor);
-    const openY = centerY; // Open-Preis ist immer in der Mitte
-    const closeY = centerY - (closeChange * scaleFactor);
-    
-    // Zeichne Docht (High-Low Linie)
-    ctx.strokeStyle = data.isGreen ? '#28a745' : '#dc3545';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(candleX + candleWidth / 2, highY);
-    ctx.lineTo(candleX + candleWidth / 2, lowY);
-    ctx.stroke();
-    
-    // Zeichne Kerze (Open-Close Rechteck)
-    const candleTop = Math.min(openY, closeY);
-    const candleBottom = Math.max(openY, closeY);
-    const candleBodyHeight = Math.abs(closeY - openY);
-    
-    if (candleBodyHeight === 0) {
+    if (maxPercentageChange === 0) {
       // Doji - nur horizontale Linie
-      ctx.strokeStyle = data.isGreen ? '#28a745' : '#dc3545';
+      ctx.strokeStyle = candle.isGreen ? '#28a745' : '#dc3545';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(candleX, openY);
-      ctx.lineTo(candleX + candleWidth, openY);
+      ctx.moveTo(candleX, height / 2);
+      ctx.lineTo(candleX + candleW, height / 2);
       ctx.stroke();
     } else {
-      // Normale Kerze
-      ctx.fillStyle = data.isGreen ? '#28a745' : '#dc3545';
-      ctx.fillRect(candleX, candleTop, candleWidth, candleBodyHeight);
+      // Normale Kerze mit prozentualer Skalierung
+      const centerY = height / 2; // Mittellinie (Open-Preis)
       
-      // Kerzen-Rand
-      ctx.strokeStyle = data.isGreen ? '#28a745' : '#dc3545';
+      // Skaliere prozentuale Änderungen auf Canvas-Höhe
+      const scaleFactor = availableHeight / (maxPercentageChange * 2); // *2 für positive und negative Änderungen
+      
+      const highY = centerY - (highChange * scaleFactor);
+      const lowY = centerY - (lowChange * scaleFactor);
+      const openY = centerY; // Open-Preis ist immer in der Mitte
+      const closeY = centerY - (closeChange * scaleFactor);
+      
+      // Zeichne Docht (High-Low Linie)
+      ctx.strokeStyle = candle.isGreen ? '#28a745' : '#dc3545';
       ctx.lineWidth = 1;
-      ctx.strokeRect(candleX, candleTop, candleWidth, candleBodyHeight);
+      ctx.beginPath();
+      ctx.moveTo(candleX + candleW / 2, highY);
+      ctx.lineTo(candleX + candleW / 2, lowY);
+      ctx.stroke();
+      
+      // Zeichne Kerze (Open-Close Rechteck)
+      const candleTop = Math.min(openY, closeY);
+      const candleBottom = Math.max(openY, closeY);
+      const candleBodyHeight = Math.abs(closeY - openY);
+      
+      if (candleBodyHeight === 0) {
+        // Doji - nur horizontale Linie
+        ctx.strokeStyle = candle.isGreen ? '#28a745' : '#dc3545';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(candleX, openY);
+        ctx.lineTo(candleX + candleW, openY);
+        ctx.stroke();
+      } else {
+        // Normale Kerze
+        ctx.fillStyle = candle.isGreen ? '#28a745' : '#dc3545';
+        ctx.fillRect(candleX, candleTop, candleW, candleBodyHeight);
+        
+        // Kerzen-Rand
+        ctx.strokeStyle = candle.isGreen ? '#28a745' : '#dc3545';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(candleX, candleTop, candleW, candleBodyHeight);
+      }
     }
-  }
+  });
   
-  // Markiere verschiedene Zustände der Kerze
+  // Markiere verschiedene Zustände der Kerzen
   canvas.classList.remove('incomplete', 'complete', 'old');
   
-  if (data.isCurrentHour) {
-    if (!data.isComplete) {
+  // Prüfe ob die letzte Kerze aus der aktuellen Stunde ist
+  const lastCandle = candles[candles.length - 1];
+  if (lastCandle.isCurrentHour) {
+    if (!lastCandle.isComplete) {
       canvas.classList.add('incomplete'); // Aktuelle Stunde, noch nicht abgeschlossen
     } else {
       canvas.classList.add('complete'); // Aktuelle Stunde, abgeschlossen
     }
   } else {
-    canvas.classList.add('old'); // Ältere Kerze
+    canvas.classList.add('old'); // Ältere Kerzen
   }
 }
 
@@ -1827,10 +1998,10 @@ function drawCurrent1hCandle(canvas, data) {
                         updateMiniCandlestick(miniCanvas, data.price, data.cryptocurrency_id);
                       }
                       
-                      // Update 1h Kerze
-                      const current1hCanvas = container.querySelector('.current-1h-candle');
+                      // Update 1h Kerzen
+                      const current1hCanvas = container.querySelector('.current-1h-candles');
                       if (current1hCanvas) {
-                        updateCurrent1hCandle(current1hCanvas, data.price, data.cryptocurrency_id);
+                        updateCurrent1hCandles(current1hCanvas, data.price, data.cryptocurrency_id);
                       }
                     }
                   }
@@ -1878,40 +2049,43 @@ function drawCurrent1hCandle(canvas, data) {
               }
             }
             
-            // Update aktuelle 1h Kerze mit neuem Preis
-            function updateCurrent1hCandle(canvas, newPrice, cryptoId) {
-              console.log(`🕯️ Update 1h Kerze für ${cryptoId}: $${newPrice}`);
+            // Update aktuelle 1h Kerzen mit neuem Preis
+            function updateCurrent1hCandles(canvas, newPrice, cryptoId) {
+              console.log(`🕯️ Update 1h Kerzen für ${cryptoId}: $${newPrice}`);
               
               // Lade aktuelle 1h Kerzen-Daten
-              let current1hData = loadCurrent1hCandleData(cryptoId);
+              let current1hData = loadCurrent1hCandlesData(cryptoId);
               
-              if (current1hData) {
+              if (current1hData && current1hData.length > 0) {
+                // Update die letzte Kerze (aktuelle)
+                const lastCandle = current1hData[current1hData.length - 1];
+                
                 // Konvertiere zu Numbers für Vergleich
-                const currentHigh = parseFloat(current1hData.high);
-                const currentLow = parseFloat(current1hData.low);
-                const currentOpen = parseFloat(current1hData.open);
+                const currentHigh = parseFloat(lastCandle.high);
+                const currentLow = parseFloat(lastCandle.low);
+                const currentOpen = parseFloat(lastCandle.open);
                 const newPriceNum = parseFloat(newPrice);
                 
                 // Wenn der neue Preis höher ist als der aktuelle High, update High
                 if (newPriceNum > currentHigh) {
-                  current1hData.high = newPriceNum;
+                  lastCandle.high = newPriceNum;
                 }
                 
                 // Wenn der neue Preis niedriger ist als der aktuelle Low, update Low
                 if (newPriceNum < currentLow) {
-                  current1hData.low = newPriceNum;
+                  lastCandle.low = newPriceNum;
                 }
                 
                 // Update Close-Preis
-                current1hData.close = newPriceNum;
+                lastCandle.close = newPriceNum;
                 
                 // Update isGreen basierend auf Open vs Close
-                current1hData.isGreen = newPriceNum > currentOpen;
+                lastCandle.isGreen = newPriceNum > currentOpen;
                 
-                // Zeichne die aktualisierte 1h Kerze
-                drawCurrent1hCandle(canvas, current1hData);
+                // Zeichne die aktualisierten 1h Kerzen
+                drawCurrent1hCandles(canvas, current1hData);
                 
-                console.log(`✅ 1h Kerze aktualisiert für ${cryptoId}`);
+                console.log(`✅ 1h Kerzen aktualisiert für ${cryptoId}`);
                 
                 // Zeichne alle 1h Kerzen neu, um gleichen Maßstab zu gewährleisten
                 setTimeout(() => {
@@ -1927,6 +2101,12 @@ function drawCurrent1hCandle(canvas, data) {
               if (newCandles && newCandles.length > 0) {
                 // Zeichne die neuen Candlesticks direkt
                 drawMiniCandlesticks(canvas, newCandles);
+                
+                // Update die Tooltips für die neuen Daten
+                const container = canvas.closest('.mini-candlestick-container');
+                if (container) {
+                  createIndividualTooltips(container, newCandles.length);
+                }
                 
                 console.log(`✅ Mini-Candlestick mit Candle-Daten aktualisiert für ${cryptoId}`);
               }
@@ -2003,23 +2183,364 @@ function drawCurrent1hCandle(canvas, data) {
             // Manuelle Initialisierung der 1h Kerzen nach 2 Sekunden
             setTimeout(() => {
               console.log('🕯️ Manuelle Initialisierung der 1h Kerzen...');
+              
+              // Debug: Zeige alle 1h Kerzen-Canvases
+              const current1hCanvases = document.querySelectorAll('.current-1h-candles');
+              console.log(`🔍 Gefundene 1h Kerzen-Canvases: ${current1hCanvases.length}`);
+              current1hCanvases.forEach((canvas, index) => {
+                console.log(`🔍 Canvas ${index}:`, canvas);
+                console.log(`🔍 Crypto ID:`, canvas.dataset.cryptoId);
+              });
+              
+              // Debug: Zeige Cache-Daten
+              console.log(`🔍 1h Kerzen-Cache:`, current1hCandlesCache);
+              console.log(`🔍 Mini-Candlestick-Cache:`, candlestickDataCache);
+              
               refreshCurrent1hCandles();
             }, 2000);
+            
+            // Test der DataTable-Initialisierung nach 3 Sekunden
+            setTimeout(() => {
+              console.log('🔍 Teste DataTable-Initialisierung...');
+              checkDataTableInitialization();
+              
+              // Test der Neusortierung nach 5 Sekunden
+              setTimeout(() => {
+                console.log(`🧪 Teste Neusortierung...`);
+                forceResortWithRetry();
+              }, 2000);
+            }, 3000);
+            
+            // Test der 1h Kerzen nach 1 Sekunde
+            setTimeout(() => {
+              console.log('🕯️ Teste 1h Kerzen...');
+              
+              // Zeichne einfache Test-Kerzen
+              const current1hCanvases = document.querySelectorAll('.current-1h-candles');
+              console.log(`🔍 Test: Gefundene 1h Kerzen-Canvases: ${current1hCanvases.length}`);
+              
+              current1hCanvases.forEach((canvas, index) => {
+                console.log(`🔍 Test Canvas ${index}:`, canvas);
+                
+                // Zeichne eine einfache Test-Kerze
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Zeichne eine rote Test-Kerze
+                ctx.fillStyle = '#dc3545';
+                ctx.fillRect(10, 10, 20, 20);
+                
+                console.log(`✅ Test-Kerze gezeichnet für Canvas ${index}`);
+              });
+            }, 1000);
             
             // Funktion zum Neuziehen aller 1h Kerzen mit gleichem prozentualen Maßstab
             function redrawAll1hCandles() {
               console.log(`🕯️ Zeichne alle 1h Kerzen mit gleichem prozentualen Maßstab neu`);
               
-              const current1hCanvases = document.querySelectorAll('.current-1h-candle');
+              const current1hCanvases = document.querySelectorAll('.current-1h-candles');
               current1hCanvases.forEach(canvas => {
                 const cryptoId = canvas.dataset.cryptoId;
-                const data = current1hCandleCache[cryptoId] || generateCurrent1hCandleData(cryptoId);
+                const data = current1hCandlesCache[cryptoId] || generateCurrent1hCandlesData(cryptoId);
                 
-                if (data) {
-                  drawCurrent1hCandle(canvas, data);
-                  console.log(`✅ 1h Kerze neu gezeichnet für ${cryptoId}`);
+                if (data && data.length > 0) {
+                  drawCurrent1hCandles(canvas, data);
+                  console.log(`✅ 1h Kerzen neu gezeichnet für ${cryptoId}`);
                 }
               });
+            }
+            
+            // Funktion zum Wiederanwenden der aktuellen Sortierung
+            function reapplyCurrentSort() {
+              console.log(`🔄 Wende aktuelle Sortierung erneut an`);
+              
+              // Warte kurz, damit DOM-Updates abgeschlossen sind
+              setTimeout(() => {
+                try {
+                  const table = $('#crypto-table').DataTable();
+                  console.log(`🔍 DataTable gefunden:`, table);
+                  
+                  if (table) {
+                    // Hole aktuelle Sortierung
+                    const currentOrder = table.order();
+                    console.log(`🔍 Aktuelle Sortierung:`, currentOrder);
+                    
+                    if (currentOrder && currentOrder.length > 0) {
+                      console.log(`🔄 Aktuelle Sortierung: Spalte ${currentOrder[0][0]}, Richtung: ${currentOrder[0][1]}`);
+                      
+                      // Debug: Zeige data-sort Attribute für alle Zeilen
+                      debugDataSortAttributes();
+                      
+                      // Wende Sortierung erneut an
+                      table.order(currentOrder).draw();
+                      console.log(`✅ Sortierung erfolgreich wieder angewendet`);
+                    } else {
+                      console.log(`⚠️ Keine aktuelle Sortierung gefunden, verwende Standard-Sortierung`);
+                      // Verwende Standard-Sortierung (RSI aufsteigend)
+                      table.order([7, 'asc']).draw();
+                      console.log(`✅ Standard-Sortierung angewendet`);
+                    }
+                  } else {
+                    console.log(`⚠️ DataTable nicht gefunden, versuche erneut...`);
+                    
+                    // Versuche DataTable erneut zu initialisieren
+                    setTimeout(() => {
+                      const retryTable = $('#crypto-table').DataTable();
+                      if (retryTable) {
+                        console.log(`✅ DataTable bei Wiederholung gefunden`);
+                        retryTable.order([7, 'asc']).draw();
+                        console.log(`✅ Sortierung nach Wiederholung angewendet`);
+                      } else {
+                        console.log(`❌ DataTable auch bei Wiederholung nicht gefunden`);
+                      }
+                    }, 200);
+                  }
+                } catch (error) {
+                  console.error(`❌ Fehler bei der Neusortierung:`, error);
+                  
+                  // Fallback: Versuche manuelle Sortierung
+                  try {
+                    const table = $('#crypto-table').DataTable();
+                    if (table) {
+                      table.order([7, 'asc']).draw();
+                      console.log(`✅ Fallback-Sortierung angewendet`);
+                    }
+                  } catch (fallbackError) {
+                    console.error(`❌ Auch Fallback-Sortierung fehlgeschlagen:`, fallbackError);
+                  }
+                }
+              }, 50); // Kurze Verzögerung für DOM-Updates
+            }
+            
+            // Funktion zum Debuggen der data-sort Attribute
+            function debugDataSortAttributes() {
+              console.log(`🔍 Debug data-sort Attribute:`);
+              
+              const rows = document.querySelectorAll('#crypto-table tbody tr');
+              rows.forEach((row, index) => {
+                const rsiCell = row.cells[7];
+                const rocCell = row.cells[8];
+                const rocDerivativeCell = row.cells[9];
+                
+                if (rsiCell) {
+                  const rsiSort = rsiCell.getAttribute('data-sort');
+                  const rsiText = rsiCell.textContent.trim();
+                  console.log(`📊 Zeile ${index}: RSI data-sort="${rsiSort}", Text="${rsiText}"`);
+                }
+                
+                if (rocCell) {
+                  const rocSort = rocCell.getAttribute('data-sort');
+                  const rocText = rocCell.textContent.trim();
+                  console.log(`📊 Zeile ${index}: ROC data-sort="${rocSort}", Text="${rocText}"`);
+                }
+                
+                if (rocDerivativeCell) {
+                  const rocDerivativeSort = rocDerivativeCell.getAttribute('data-sort');
+                  const rocDerivativeText = rocDerivativeCell.textContent.trim();
+                  console.log(`📊 Zeile ${index}: ROC' data-sort="${rocDerivativeSort}", Text="${rocDerivativeText}"`);
+                }
+              });
+            }
+            
+            // Funktion zum Überprüfen der DataTable-Initialisierung
+            function checkDataTableInitialization() {
+              console.log(`🔍 Überprüfe DataTable-Initialisierung:`);
+              
+              const tableElement = document.getElementById('crypto-table');
+              console.log(`🔍 Table-Element gefunden:`, !!tableElement);
+              
+              if (tableElement) {
+                console.log(`🔍 Table-Element ID:`, tableElement.id);
+                console.log(`🔍 Table-Element Klassen:`, tableElement.className);
+              }
+              
+              // Versuche DataTable zu finden
+              let table = null;
+              try {
+                table = $('#crypto-table').DataTable();
+                console.log(`✅ DataTable gefunden:`, !!table);
+                
+                if (table) {
+                  console.log(`🔍 DataTable Einstellungen:`, {
+                    order: table.order(),
+                    page: table.page(),
+                    info: table.page.info()
+                  });
+                }
+              } catch (error) {
+                console.log(`❌ DataTable nicht gefunden:`, error.message);
+              }
+              
+              // Überprüfe jQuery
+              console.log(`🔍 jQuery verfügbar:`, typeof $ !== 'undefined');
+              console.log(`🔍 DataTables Plugin verfügbar:`, typeof $.fn.DataTable !== 'undefined');
+            }
+            
+            // Funktion zum Erzwingen der Neusortierung
+            function forceResort() {
+              console.log(`🔄 Erzwinge Neusortierung...`);
+              
+              setTimeout(() => {
+                try {
+                  const table = $('#crypto-table').DataTable();
+                  if (table) {
+                    // Hole aktuelle Sortierung oder verwende Standard
+                    const currentOrder = table.order();
+                    const orderToApply = (currentOrder && currentOrder.length > 0) ? currentOrder : [[7, 'asc']];
+                    
+                    console.log(`🔄 Wende Sortierung an:`, orderToApply);
+                    table.order(orderToApply).draw();
+                    console.log(`✅ Neusortierung erzwungen`);
+                  } else {
+                    console.log(`❌ DataTable nicht verfügbar für erzwungene Neusortierung`);
+                  }
+                } catch (error) {
+                  console.error(`❌ Fehler bei erzwungener Neusortierung:`, error);
+                }
+              }, 100);
+            }
+            
+            // Funktion zum Erzwingen der Neusortierung mit mehreren Versuchen
+            function forceResortWithRetry() {
+              console.log(`🔄 Erzwinge Neusortierung mit Wiederholung...`);
+              
+              let attempts = 0;
+              const maxAttempts = 5;
+              
+              const attemptResort = () => {
+                attempts++;
+                console.log(`🔄 Versuch ${attempts} von ${maxAttempts}`);
+                
+                try {
+                  // Versuche verschiedene Wege, die DataTable zu finden
+                  let table = null;
+                  
+                  // Methode 1: Direkter DataTable-Zugriff
+                  try {
+                    table = $('#crypto-table').DataTable();
+                  } catch (e) {
+                    console.log(`⚠️ DataTable direkter Zugriff fehlgeschlagen:`, e.message);
+                  }
+                  
+                  // Methode 2: Über jQuery
+                  if (!table) {
+                    try {
+                      table = $($('#crypto-table')).DataTable();
+                    } catch (e) {
+                      console.log(`⚠️ DataTable jQuery-Zugriff fehlgeschlagen:`, e.message);
+                    }
+                  }
+                  
+                  // Methode 3: Über DOM-Element
+                  if (!table) {
+                    try {
+                      const tableElement = document.getElementById('crypto-table');
+                      if (tableElement) {
+                        table = $(tableElement).DataTable();
+                      }
+                    } catch (e) {
+                      console.log(`⚠️ DataTable DOM-Zugriff fehlgeschlagen:`, e.message);
+                    }
+                  }
+                  
+                  if (table) {
+                    console.log(`✅ DataTable gefunden in Versuch ${attempts}`);
+                    
+                    // Hole aktuelle Sortierung oder verwende Standard
+                    const currentOrder = table.order();
+                    console.log(`🔍 Aktuelle Sortierung:`, currentOrder);
+                    
+                    let orderToApply;
+                    if (currentOrder && currentOrder.length > 0) {
+                      orderToApply = currentOrder;
+                      console.log(`🔄 Verwende aktuelle Sortierung:`, orderToApply);
+                    } else {
+                      orderToApply = [[7, 'asc']]; // RSI aufsteigend als Standard
+                      console.log(`🔄 Verwende Standard-Sortierung:`, orderToApply);
+                    }
+                    
+                    // Debug: Zeige alle data-sort Attribute vor der Sortierung
+                    debugDataSortAttributes();
+                    
+                    // Wende Sortierung an
+                    table.order(orderToApply).draw();
+                    console.log(`✅ Neusortierung erfolgreich nach ${attempts} Versuchen`);
+                    
+                    // Debug: Zeige alle data-sort Attribute nach der Sortierung
+                    setTimeout(() => {
+                      console.log(`🔍 Nach der Sortierung:`);
+                      debugDataSortAttributes();
+                    }, 100);
+                    
+                    return true;
+                  } else {
+                    console.log(`❌ DataTable nicht verfügbar (Versuch ${attempts})`);
+                    return false;
+                  }
+                } catch (error) {
+                  console.error(`❌ Fehler bei erzwungener Neusortierung (Versuch ${attempts}):`, error);
+                  return false;
+                }
+              };
+              
+              // Erster Versuch sofort
+              if (!attemptResort() && attempts < maxAttempts) {
+                // Zweiter Versuch nach 100ms
+                setTimeout(() => {
+                  if (!attemptResort() && attempts < maxAttempts) {
+                    // Dritter Versuch nach weiteren 200ms
+                    setTimeout(() => {
+                      if (!attemptResort() && attempts < maxAttempts) {
+                        // Vierter Versuch nach weiteren 300ms
+                        setTimeout(() => {
+                          if (!attemptResort() && attempts < maxAttempts) {
+                            // Fünfter Versuch nach weiteren 500ms
+                            setTimeout(() => {
+                              attemptResort();
+                            }, 500);
+                          }
+                        }, 300);
+                      }
+                    }, 200);
+                  }
+                }, 100);
+              }
+            }
+            
+            // Funktion zum manuellen Erzwingen der Sortierung (Fallback)
+            function forceManualSort() {
+              console.log(`🔄 Erzwinge manuelle Sortierung...`);
+              
+              try {
+                const table = $('#crypto-table').DataTable();
+                if (table) {
+                  // Hole alle Zeilen
+                  const rows = table.rows().nodes();
+                  console.log(`🔍 Anzahl Zeilen:`, rows.length);
+                  
+                  // Sortiere nach RSI (Spalte 7)
+                  const sortedRows = Array.from(rows).sort((a, b) => {
+                    const aRsi = parseFloat(a.cells[7].getAttribute('data-sort') || '0');
+                    const bRsi = parseFloat(b.cells[7].getAttribute('data-sort') || '0');
+                    return aRsi - bRsi; // Aufsteigend
+                  });
+                  
+                  console.log(`🔄 Manuell sortierte Zeilen:`, sortedRows.length);
+                  
+                  // Entferne alle Zeilen und füge sie sortiert wieder hinzu
+                  table.clear();
+                  sortedRows.forEach(row => {
+                    table.row.add(row);
+                  });
+                  table.draw();
+                  
+                  console.log(`✅ Manuelle Sortierung abgeschlossen`);
+                } else {
+                  console.log(`❌ DataTable nicht verfügbar für manuelle Sortierung`);
+                }
+              } catch (error) {
+                console.error(`❌ Fehler bei manueller Sortierung:`, error);
+              }
             }
             
             // Funktion zum Aktualisieren der 1h Kerzen
@@ -2031,18 +2552,18 @@ function drawCurrent1hCandle(canvas, data) {
               console.log(`🕯️ Prozentualer Maßstab für Update:`, percentageScale);
               
               // Update alle 1h Kerzen mit generierten Daten
-              const current1hCanvases = document.querySelectorAll('.current-1h-candle');
+              const current1hCanvases = document.querySelectorAll('.current-1h-candles');
               current1hCanvases.forEach(canvas => {
                 const cryptoId = canvas.dataset.cryptoId;
-                const generatedData = generateCurrent1hCandleData(cryptoId);
+                const generatedData = generateCurrent1hCandlesData(cryptoId);
                 
-                if (generatedData) {
-                  updateCurrent1hCandleCache(cryptoId, generatedData);
-                  drawCurrent1hCandle(canvas, generatedData);
-                  console.log(`✅ 1h Kerze aktualisiert für ${cryptoId}`);
+                if (generatedData && generatedData.length > 0) {
+                  updateCurrent1hCandlesCache(cryptoId, generatedData);
+                  drawCurrent1hCandles(canvas, generatedData);
+                  console.log(`✅ 1h Kerzen aktualisiert für ${cryptoId}`);
                 } else {
                   console.log(`⚠️ Keine 1h Daten für ${cryptoId} - zeichne leeren Chart`);
-                  drawCurrent1hCandle(canvas, null);
+                  drawCurrent1hCandles(canvas, null);
                 }
               });
             }

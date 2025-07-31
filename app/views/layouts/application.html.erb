@@ -322,12 +322,16 @@
           // Custom sorting functions for each indicator column
           // These functions work with live data updated by ActionCable
           $.fn.dataTable.ext.type.order['rsi-pre'] = function(data, type, row, meta) {
+            console.log('🔄 RSI Sortierung für:', data, 'Row:', row);
+            
             // Try to get data-sort attribute from the cell first (updated by ActionCable)
             if (row && row.cells && row.cells[7]) {
               var sortValue = row.cells[7].getAttribute('data-sort');
-              if (sortValue !== null && sortValue !== '-1') {
+              console.log('📊 RSI data-sort Wert:', sortValue);
+              if (sortValue !== null && sortValue !== '-1' && sortValue !== '') {
                 var numValue = parseFloat(sortValue);
                 if (!isNaN(numValue)) {
+                  console.log('✅ RSI Sortierung mit data-sort:', numValue);
                   return numValue;
                 }
               }
@@ -335,31 +339,39 @@
             
             // Fallback: use current visible content
             if (!data || data === 'N/A' || data.includes('N/A')) {
+              console.log('⚠️ RSI N/A Wert, verwende -1');
               return -1; // N/A values go to bottom for RSI
             }
             
             // Remove all HTML tags and extract just the text content
             var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            console.log('📊 RSI Text nach HTML-Entfernung:', textOnly);
             
             // Extract RSI value (0-100)
             var match = textOnly.match(/(\d+\.?\d*)/);
             if (match) {
               var numValue = parseFloat(match[1]);
               if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+                console.log('✅ RSI Sortierung mit extrahiertem Wert:', numValue);
                 return numValue;
               }
             }
             
+            console.log('⚠️ RSI Unbekannter Wert, verwende -1');
             return -1; // Unknown values go to bottom
           };
 
           $.fn.dataTable.ext.type.order['roc-pre'] = function(data, type, row, meta) {
+            console.log('🔄 ROC Sortierung für:', data, 'Row:', row);
+            
             // Try to get data-sort attribute from the cell first (updated by ActionCable)
             if (row && row.cells && row.cells[8]) {
               var sortValue = row.cells[8].getAttribute('data-sort');
-              if (sortValue !== null && sortValue !== '-999') {
+              console.log('📊 ROC data-sort Wert:', sortValue);
+              if (sortValue !== null && sortValue !== '-999' && sortValue !== '') {
                 var numValue = parseFloat(sortValue);
                 if (!isNaN(numValue)) {
+                  console.log('✅ ROC Sortierung mit data-sort:', numValue);
                   return numValue;
                 }
               }
@@ -367,31 +379,39 @@
             
             // Fallback: use current visible content
             if (!data || data === 'N/A' || data.includes('N/A')) {
+              console.log('⚠️ ROC N/A Wert, verwende -999');
               return -999; // N/A values go to bottom for ROC
             }
             
             // Remove all HTML tags and extract just the text content
             var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            console.log('📊 ROC Text nach HTML-Entfernung:', textOnly);
             
             // Extract ROC value (can be negative) - look for -12.34% or 12.34%
             var match = textOnly.match(/([+-]?\d+\.?\d*)/);
             if (match) {
               var numValue = parseFloat(match[1]);
               if (!isNaN(numValue)) {
+                console.log('✅ ROC Sortierung mit extrahiertem Wert:', numValue);
                 return numValue;
               }
             }
             
+            console.log('⚠️ ROC Unbekannter Wert, verwende -999');
             return -999; // Unknown values go to bottom
           };
 
           $.fn.dataTable.ext.type.order['roc-derivative-pre'] = function(data, type, row, meta) {
+            console.log('🔄 ROC\' Sortierung für:', data, 'Row:', row);
+            
             // Try to get data-sort attribute from the cell first (updated by ActionCable)
             if (row && row.cells && row.cells[9]) {
               var sortValue = row.cells[9].getAttribute('data-sort');
-              if (sortValue !== null && sortValue !== '-999') {
+              console.log('📊 ROC\' data-sort Wert:', sortValue);
+              if (sortValue !== null && sortValue !== '-999' && sortValue !== '') {
                 var numValue = parseFloat(sortValue);
                 if (!isNaN(numValue)) {
+                  console.log('✅ ROC\' Sortierung mit data-sort:', numValue);
                   return numValue;
                 }
               }
@@ -399,21 +419,25 @@
             
             // Fallback: use current visible content
             if (!data || data === 'N/A' || data.includes('N/A')) {
+              console.log('⚠️ ROC\' N/A Wert, verwende -999');
               return -999; // N/A values go to bottom for ROC'
             }
             
             // Remove all HTML tags and extract just the text content
             var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            console.log('📊 ROC\' Text nach HTML-Entfernung:', textOnly);
             
             // Extract ROC' value (can be negative) - look for -12.34% or 12.34%
             var match = textOnly.match(/([+-]?\d+\.?\d*)/);
             if (match) {
               var numValue = parseFloat(match[1]);
               if (!isNaN(numValue)) {
+                console.log('✅ ROC\' Sortierung mit extrahiertem Wert:', numValue);
                 return numValue;
               }
             }
             
+            console.log('⚠️ ROC\' Unbekannter Wert, verwende -999');
             return -999; // Unknown values go to bottom
           };
           
