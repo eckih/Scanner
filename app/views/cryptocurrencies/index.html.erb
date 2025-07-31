@@ -1266,11 +1266,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Zeichne Mini-Candlesticks
                 drawMiniCandlesticks(canvas, candlestickData);
 
-                // Tooltip-Funktionalität
+                // Tooltip-Funktionalität für Mini-Candlesticks (letzte vollständige Kerze)
                 canvas.addEventListener('mouseenter', function() {
                   infoDiv.classList.remove('d-none');
-                  if (candlestickData.length > 0) {
-                    updateCandlestickInfo(infoDiv, candlestickData[candlestickData.length - 1]);
+                  const lastCompleteCandle = findLastCompleteCandle(cryptoId);
+                  if (lastCompleteCandle) {
+                    updateMiniCandlestickInfo(infoDiv, lastCompleteCandle);
                   }
                 });
 
@@ -1311,11 +1312,11 @@ document.addEventListener('DOMContentLoaded', function() {
                   drawCurrent1hCandle(canvas, current1hData);
                 }
 
-                // Tooltip-Funktionalität
+                // Tooltip-Funktionalität für 1h Kerzen
                 canvas.addEventListener('mouseenter', function() {
                   infoDiv.classList.remove('d-none');
                   if (current1hData) {
-                    updateCandlestickInfo(infoDiv, current1hData);
+                    update1hCandleInfo(infoDiv, current1hData);
                   }
                 });
 
@@ -1416,6 +1417,98 @@ document.addEventListener('DOMContentLoaded', function() {
               
               console.log(`✅ 1h Kerzen-Daten generiert für ${cryptoId}:`, generatedData);
               return generatedData;
+            }
+            
+            // Finde die letzte vollständige Kerze aus Mini-Candlestick-Daten
+            function findLastCompleteCandle(cryptoId) {
+              console.log(`🕯️ Suche letzte vollständige Kerze für Crypto ID: ${cryptoId}`);
+              
+              const miniData = candlestickDataCache[cryptoId] || [];
+              if (miniData.length === 0) {
+                console.log(`⚠️ Keine Mini-Candlestick-Daten für ${cryptoId} verfügbar`);
+                return null;
+              }
+              
+              const currentTime = new Date();
+              
+              // Suche die letzte vollständige Kerze (nicht aus der aktuellen Stunde)
+              for (let i = miniData.length - 1; i >= 0; i--) {
+                const candle = miniData[i];
+                const candleTime = new Date(candle.timestamp);
+                
+                // Prüfe ob Kerze nicht aus der aktuellen Stunde ist
+                if (currentTime.getHours() !== candleTime.getHours() || 
+                    currentTime.getDate() !== candleTime.getDate()) {
+                  console.log(`✅ Letzte vollständige Kerze gefunden für ${cryptoId}:`, candle);
+                  return candle;
+                }
+              }
+              
+              // Falls keine vollständige Kerze gefunden, verwende die letzte
+              const lastCandle = miniData[miniData.length - 1];
+              console.log(`⚠️ Keine vollständige Kerze gefunden, verwende letzte Kerze für ${cryptoId}:`, lastCandle);
+              return lastCandle;
+            }
+            
+            // Berechne prozentualen Maßstab für 1h Kerzen
+            function calculatePercentage1hScale() {
+              console.log(`🕯️ Berechne prozentualen Maßstab für 1h Kerzen`);
+              
+              const all1hData = [];
+              
+              // Sammle alle verfügbaren 1h Kerzen-Daten
+              Object.keys(current1hCandleCache).forEach(cryptoId => {
+                const data = current1hCandleCache[cryptoId];
+                if (data) {
+                  all1hData.push(data);
+                }
+              });
+              
+              // Falls keine Daten im Cache, generiere aus Mini-Candlestick-Daten
+              if (all1hData.length === 0) {
+                Object.keys(candlestickDataCache).forEach(cryptoId => {
+                  const generatedData = generateCurrent1hCandleData(cryptoId);
+                  if (generatedData) {
+                    all1hData.push(generatedData);
+                  }
+                });
+              }
+              
+              if (all1hData.length === 0) {
+                console.log(`⚠️ Keine 1h Kerzen-Daten für Maßstab-Berechnung verfügbar`);
+                return null;
+              }
+              
+              // Berechne prozentuale Änderungen für alle Kerzen
+              const percentageChanges = all1hData.map(candle => {
+                const open = parseFloat(candle.open);
+                const high = parseFloat(candle.high);
+                const low = parseFloat(candle.low);
+                const close = parseFloat(candle.close);
+                
+                // Berechne prozentuale Änderungen
+                const highChange = ((high - open) / open) * 100;
+                const lowChange = ((low - open) / open) * 100;
+                const closeChange = ((close - open) / open) * 100;
+                
+                return {
+                  highChange: highChange,
+                  lowChange: lowChange,
+                  closeChange: closeChange,
+                  maxChange: Math.max(highChange, Math.abs(lowChange)),
+                  data: candle
+                };
+              });
+              
+              // Finde die maximale prozentuale Änderung
+              const maxPercentageChange = Math.max(...percentageChanges.map(p => p.maxChange));
+              
+              console.log(`📊 Prozentualer 1h Maßstab: Max. Änderung=${maxPercentageChange.toFixed(2)}%`);
+              
+              return {
+                maxPercentageChange: maxPercentageChange,
+                percentageChanges: percentageChanges
+              };
             }
 
 // Zeichne Mini-Candlesticks
@@ -1528,6 +1621,50 @@ function updateCandlestickInfo(infoDiv, candle) {
   infoDiv.querySelector('.close-price').textContent = close.toFixed(2);
 }
 
+// Update Mini-Candlestick-Info mit Prozentwerten der letzten vollständigen Kerze
+function updateMiniCandlestickInfo(infoDiv, candle) {
+  // Konvertiere Strings zu Numbers für Berechnungen
+  const open = parseFloat(candle.open);
+  const high = parseFloat(candle.high);
+  const low = parseFloat(candle.low);
+  const close = parseFloat(candle.close);
+  
+  // Berechne prozentuale Änderungen
+  const highChange = ((high - open) / open) * 100;
+  const lowChange = ((low - open) / open) * 100;
+  const closeChange = ((close - open) / open) * 100;
+  
+  // Update Tooltip mit Prozentwerten
+  infoDiv.querySelector('.open-price').textContent = open.toFixed(2);
+  infoDiv.querySelector('.high-price').textContent = `${high.toFixed(2)} (${highChange >= 0 ? '+' : ''}${highChange.toFixed(2)}%)`;
+  infoDiv.querySelector('.low-price').textContent = `${low.toFixed(2)} (${lowChange >= 0 ? '+' : ''}${lowChange.toFixed(2)}%)`;
+  infoDiv.querySelector('.close-price').textContent = `${close.toFixed(2)} (${closeChange >= 0 ? '+' : ''}${closeChange.toFixed(2)}%)`;
+  
+  console.log(`🕯️ Mini-Candlestick-Tooltip aktualisiert: Open=${open}, High=${high} (${highChange.toFixed(2)}%), Low=${low} (${lowChange.toFixed(2)}%), Close=${close} (${closeChange.toFixed(2)}%)`);
+}
+
+// Update 1h Kerzen-Info mit Prozentwerten
+function update1hCandleInfo(infoDiv, candle) {
+  // Konvertiere Strings zu Numbers für Berechnungen
+  const open = parseFloat(candle.open);
+  const high = parseFloat(candle.high);
+  const low = parseFloat(candle.low);
+  const close = parseFloat(candle.close);
+  
+  // Berechne prozentuale Änderungen
+  const highChange = ((high - open) / open) * 100;
+  const lowChange = ((low - open) / open) * 100;
+  const closeChange = ((close - open) / open) * 100;
+  
+  // Update Tooltip mit Prozentwerten
+  infoDiv.querySelector('.open-price').textContent = open.toFixed(2);
+  infoDiv.querySelector('.high-price').textContent = `${high.toFixed(2)} (${highChange >= 0 ? '+' : ''}${highChange.toFixed(2)}%)`;
+  infoDiv.querySelector('.low-price').textContent = `${low.toFixed(2)} (${lowChange >= 0 ? '+' : ''}${lowChange.toFixed(2)}%)`;
+  infoDiv.querySelector('.close-price').textContent = `${close.toFixed(2)} (${closeChange >= 0 ? '+' : ''}${closeChange.toFixed(2)}%)`;
+  
+  console.log(`🕯️ 1h Kerzen-Tooltip aktualisiert: Open=${open}, High=${high} (${highChange.toFixed(2)}%), Low=${low} (${lowChange.toFixed(2)}%), Close=${close} (${closeChange.toFixed(2)}%)`);
+}
+
 // Zeichne aktuelle 1h Kerze
 function drawCurrent1hCandle(canvas, data) {
   console.log(`🕯️ drawCurrent1hCandle aufgerufen für Canvas:`, canvas);
@@ -1575,12 +1712,37 @@ function drawCurrent1hCandle(canvas, data) {
   const candleX = (width - candleWidth) / 2;
   const candleY = (height - availableHeight) / 2;
   
-  // Skaliere Preise auf Canvas-Höhe
-  const minPrice = Math.min(data.low, data.open, data.close);
-  const maxPrice = Math.max(data.high, data.open, data.close);
-  const priceRange = maxPrice - minPrice;
+  // Verwende prozentualen Maßstab für alle 1h Kerzen
+  const percentageScale = calculatePercentage1hScale();
   
-  if (priceRange === 0) {
+  let openPrice, highPrice, lowPrice, closePrice;
+  let maxPercentageChange;
+  
+  if (percentageScale && percentageScale.maxPercentageChange > 0) {
+    // Verwende prozentualen Maßstab
+    openPrice = parseFloat(data.open);
+    highPrice = parseFloat(data.high);
+    lowPrice = parseFloat(data.low);
+    closePrice = parseFloat(data.close);
+    maxPercentageChange = percentageScale.maxPercentageChange;
+    
+    console.log(`🕯️ Verwende prozentualen Maßstab: Max. Änderung=${maxPercentageChange.toFixed(2)}%`);
+  } else {
+    // Fallback: Verwende lokalen Maßstab
+    openPrice = parseFloat(data.open);
+    highPrice = parseFloat(data.high);
+    lowPrice = parseFloat(data.low);
+    closePrice = parseFloat(data.close);
+    
+    // Berechne lokale prozentuale Änderungen
+    const highChange = ((highPrice - openPrice) / openPrice) * 100;
+    const lowChange = ((lowPrice - openPrice) / openPrice) * 100;
+    maxPercentageChange = Math.max(highChange, Math.abs(lowChange));
+    
+    console.log(`🕯️ Verwende lokalen prozentualen Maßstab: Max. Änderung=${maxPercentageChange.toFixed(2)}%`);
+  }
+  
+  if (maxPercentageChange === 0) {
     // Doji - nur horizontale Linie
     ctx.strokeStyle = data.isGreen ? '#28a745' : '#dc3545';
     ctx.lineWidth = 2;
@@ -1589,11 +1751,21 @@ function drawCurrent1hCandle(canvas, data) {
     ctx.lineTo(candleX + candleWidth, height / 2);
     ctx.stroke();
   } else {
-    // Normale Kerze
-    const highY = ((maxPrice - data.high) / priceRange) * availableHeight + candleY;
-    const lowY = ((maxPrice - data.low) / priceRange) * availableHeight + candleY;
-    const openY = ((maxPrice - data.open) / priceRange) * availableHeight + candleY;
-    const closeY = ((maxPrice - data.close) / priceRange) * availableHeight + candleY;
+    // Normale Kerze mit prozentualer Skalierung
+    const centerY = height / 2; // Mittellinie (Open-Preis)
+    
+    // Berechne prozentuale Änderungen
+    const highChange = ((highPrice - openPrice) / openPrice) * 100;
+    const lowChange = ((lowPrice - openPrice) / openPrice) * 100;
+    const closeChange = ((closePrice - openPrice) / openPrice) * 100;
+    
+    // Skaliere prozentuale Änderungen auf Canvas-Höhe
+    const scaleFactor = availableHeight / (maxPercentageChange * 2); // *2 für positive und negative Änderungen
+    
+    const highY = centerY - (highChange * scaleFactor);
+    const lowY = centerY - (lowChange * scaleFactor);
+    const openY = centerY; // Open-Preis ist immer in der Mitte
+    const closeY = centerY - (closeChange * scaleFactor);
     
     // Zeichne Docht (High-Low Linie)
     ctx.strokeStyle = data.isGreen ? '#28a745' : '#dc3545';
@@ -1740,6 +1912,11 @@ function drawCurrent1hCandle(canvas, data) {
                 drawCurrent1hCandle(canvas, current1hData);
                 
                 console.log(`✅ 1h Kerze aktualisiert für ${cryptoId}`);
+                
+                // Zeichne alle 1h Kerzen neu, um gleichen Maßstab zu gewährleisten
+                setTimeout(() => {
+                  redrawAll1hCandles();
+                }, 100);
               }
             }
 
@@ -1829,9 +2006,29 @@ function drawCurrent1hCandle(canvas, data) {
               refreshCurrent1hCandles();
             }, 2000);
             
+            // Funktion zum Neuziehen aller 1h Kerzen mit gleichem prozentualen Maßstab
+            function redrawAll1hCandles() {
+              console.log(`🕯️ Zeichne alle 1h Kerzen mit gleichem prozentualen Maßstab neu`);
+              
+              const current1hCanvases = document.querySelectorAll('.current-1h-candle');
+              current1hCanvases.forEach(canvas => {
+                const cryptoId = canvas.dataset.cryptoId;
+                const data = current1hCandleCache[cryptoId] || generateCurrent1hCandleData(cryptoId);
+                
+                if (data) {
+                  drawCurrent1hCandle(canvas, data);
+                  console.log(`✅ 1h Kerze neu gezeichnet für ${cryptoId}`);
+                }
+              });
+            }
+            
             // Funktion zum Aktualisieren der 1h Kerzen
             function refreshCurrent1hCandles() {
               console.log(`🕯️ Aktualisiere 1h Kerzen`);
+              
+              // Berechne zuerst den prozentualen Maßstab
+              const percentageScale = calculatePercentage1hScale();
+              console.log(`🕯️ Prozentualer Maßstab für Update:`, percentageScale);
               
               // Update alle 1h Kerzen mit generierten Daten
               const current1hCanvases = document.querySelectorAll('.current-1h-candle');
