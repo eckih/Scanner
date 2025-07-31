@@ -52,6 +52,6 @@ namespace :crypto do
     
     puts ""
     puts "🎉 Fertig! #{missing_pairs.count} neue Pairs hinzugefügt."
-    puts "🔄 Starten Sie den WebSocket-Service neu, um die neuen Pairs zu aktivieren."
+    puts "[REFRESH] Starten Sie den WebSocket-Service neu, um die neuen Pairs zu aktivieren."
   end
 end

@@ -1,4 +1,4 @@
-# 🔄 Datenbank-Refaktorierung Vorschlag
+# [REFRESH] Datenbank-Refaktorierung Vorschlag
 
 ## 🎯 Ziel
 Eliminierung von Datenredundanz und Vereinfachung der Datenbankstruktur
@@ -76,7 +76,7 @@ CREATE INDEX idx_indicators_type ON indicators(indicator_type);
 CREATE INDEX idx_indicators_calculated_at ON indicators(calculated_at);
 ```
 
-## 🔄 Migration Plan
+## [REFRESH] Migration Plan
 
 ### Phase 1: Neue Tabelle erstellen
 ```ruby

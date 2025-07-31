@@ -42,7 +42,7 @@ namespace :crypto do
     end
     
     # Behebe Duplikate
-    puts "\n🔄 Behebe Duplikate..."
+    puts "\n[REFRESH] Behebe Duplikate..."
     
     grouped_cryptos.each do |normalized_symbol, cryptos|
       if cryptos.length > 1

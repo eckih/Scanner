@@ -54,7 +54,7 @@ namespace :crypto do
             puts "❌ Fehler beim Speichern von #{pair}: #{crypto.errors.full_messages.join(', ')}"
           end
         else
-          puts "⚠️ Keine Preisdaten für #{pair} gefunden"
+          puts "[!] Keine Preisdaten für #{pair} gefunden"
         end
         
         # Kurze Pause zwischen API-Aufrufen
@@ -97,7 +97,7 @@ namespace :crypto do
           'market_cap_rank' => market_cap_data['market_cap_rank']
         }
       else
-        puts "⚠️ Binance API Fehler für #{symbol}: #{response.code}"
+        puts "[!] Binance API Fehler für #{symbol}: #{response.code}"
         return nil
       end
     rescue => e
@@ -124,7 +124,7 @@ namespace :crypto do
         end
       end
     rescue => e
-      puts "⚠️ CoinGecko API Fehler für #{symbol}: #{e.message}"
+      puts "[!] CoinGecko API Fehler für #{symbol}: #{e.message}"
     end
     
     return { 'market_cap' => 0, 'market_cap_rank' => 9999 }

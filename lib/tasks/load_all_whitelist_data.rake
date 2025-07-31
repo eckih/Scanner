@@ -52,7 +52,7 @@ namespace :crypto do
             klines = fetch_binance_klines(binance_symbol, interval, start_time, end_time)
             
             if klines.empty?
-              puts "⚠️ Keine #{interval} Daten für #{binance_symbol} gefunden"
+              puts "[!] Keine #{interval} Daten für #{binance_symbol} gefunden"
               next
             end
             
@@ -174,7 +174,7 @@ namespace :crypto do
     
     uri.query = URI.encode_www_form(params)
     
-    puts "🔗 API-Aufruf: #{uri}"
+    puts "[->] API-Aufruf: #{uri}"
     
     response = Net::HTTP.get_response(uri)
     
@@ -221,7 +221,7 @@ namespace :crypto do
         if rsi_value
           puts "✅ RSI #{timeframe}: #{rsi_value}"
         else
-          puts "⚠️ RSI-Berechnung für #{timeframe} fehlgeschlagen (nicht genug Daten)"
+          puts "[!] RSI-Berechnung für #{timeframe} fehlgeschlagen (nicht genug Daten)"
         end
       rescue => e
         puts "❌ Fehler bei RSI-Berechnung für #{timeframe}: #{e.message}"

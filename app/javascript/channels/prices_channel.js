@@ -8,7 +8,7 @@ console.log("🔌 Consumer Subscriptions:", consumer.subscriptions)
 consumer.subscriptions.create("PricesChannel", {
   connected() {
     console.log("✅ Connected to PricesChannel")
-    console.log("🔗 WebSocket URL:", consumer.url)
+    console.log("[->] WebSocket URL:", consumer.url)
     console.log("📡 Subscription:", this)
     console.log("📡 Subscription ID:", this.id)
   },
@@ -45,7 +45,7 @@ consumer.subscriptions.create("PricesChannel", {
     }
     
          if (!row) {
-       console.log("⚠️ Row not found for crypto ID:", data.cryptocurrency_id, "Symbol:", data.symbol)
+       console.log("[!] Row not found for crypto ID:", data.cryptocurrency_id, "Symbol:", data.symbol)
        return
      }
      
@@ -84,7 +84,7 @@ consumer.subscriptions.create("PricesChannel", {
         
         console.log("✅ RSI-Update completed for:", data.symbol)
       } else {
-        console.log("⚠️ RSI cell not found for crypto ID:", data.cryptocurrency_id)
+        console.log("[!] RSI cell not found for crypto ID:", data.cryptocurrency_id)
       }
          } else if (data.update_type === 'indicator' && data.indicator_type === 'rsi') {
        // RSI-Update (neues Format)
@@ -117,7 +117,7 @@ consumer.subscriptions.create("PricesChannel", {
         
         console.log("✅ Indikator-Update completed for:", data.symbol)
       } else {
-        console.log("⚠️ RSI cell not found for crypto ID:", data.cryptocurrency_id)
+        console.log("[!] RSI cell not found for crypto ID:", data.cryptocurrency_id)
       }
     } else if (data.update_type === 'counters') {
       // Zähler-Update
@@ -140,25 +140,25 @@ consumer.subscriptions.create("PricesChannel", {
         messageCounter.textContent = data.message_counter || 0
         console.log("💬 Nachrichten-Zähler aktualisiert:", data.message_counter)
       } else {
-        console.log("⚠️ message-counter Element nicht gefunden")
+        console.log("[!] message-counter Element nicht gefunden")
       }
       if (klineCounter) {
         klineCounter.textContent = data.kline_counter || 0
         console.log("📈 Klines-Zähler aktualisiert:", data.kline_counter)
       } else {
-        console.log("⚠️ kline-counter Element nicht gefunden")
+        console.log("[!] kline-counter Element nicht gefunden")
       }
       if (priceUpdateCounter) {
         priceUpdateCounter.textContent = data.price_update_counter || 0
         console.log("💰 Preis-Updates-Zähler aktualisiert:", data.price_update_counter)
       } else {
-        console.log("⚠️ price-update-counter Element nicht gefunden")
+        console.log("[!] price-update-counter Element nicht gefunden")
       }
       if (rsiCalculationCounter) {
         rsiCalculationCounter.textContent = data.rsi_calculation_counter || 0
         console.log("📊 RSI-Berechnungen-Zähler aktualisiert:", data.rsi_calculation_counter)
       } else {
-        console.log("⚠️ rsi-calculation-counter Element nicht gefunden")
+        console.log("[!] rsi-calculation-counter Element nicht gefunden")
       }
     } else {
       // Preis-Update (bestehende Logik)
@@ -172,10 +172,10 @@ consumer.subscriptions.create("PricesChannel", {
         const priceLink = priceCell.querySelector('a')
         if (priceLink) {
           priceLink.textContent = formattedPrice
-          console.log("🔗 Updated existing price link:", formattedPrice)
+          console.log("[->] Updated existing price link:", formattedPrice)
         } else {
           priceCell.innerHTML = `<strong><a href="/cryptocurrencies/${data.cryptocurrency_id}/chart" target="_blank" class="text-decoration-none text-primary chart-link" title="Chart anzeigen">${formattedPrice}</a></strong>`
-          console.log("🔗 Created new price link:", formattedPrice)
+          console.log("[->] Created new price link:", formattedPrice)
         }
         
         // Aktualisiere auch das data-sort Attribut für die Sortierung
@@ -190,7 +190,7 @@ consumer.subscriptions.create("PricesChannel", {
         
         console.log("✅ Price update completed for:", data.symbol)
       } else {
-        console.log("⚠️ Price cell not found for crypto ID:", data.cryptocurrency_id)
+        console.log("[!] Price cell not found for crypto ID:", data.cryptocurrency_id)
       }
     }
   }

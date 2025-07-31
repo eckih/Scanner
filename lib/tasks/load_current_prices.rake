@@ -84,7 +84,7 @@ namespace :crypto do
           'volume' => data['volume']
         }
       else
-        puts "⚠️ Binance API Fehler für #{symbol}: #{response.code}"
+        puts "[!] Binance API Fehler für #{symbol}: #{response.code}"
         return nil
       end
     rescue => e

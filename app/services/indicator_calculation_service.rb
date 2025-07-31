@@ -9,7 +9,7 @@ class IndicatorCalculationService
     ).order(timestamp: :desc).limit(period + 1)
     
     if historical_data.count < period + 1
-      Rails.logger.warn "⚠️ Nicht genügend Daten für RSI-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
+      Rails.logger.warn "[!] Nicht genügend Daten für RSI-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
       return nil
     end
     
@@ -45,7 +45,7 @@ class IndicatorCalculationService
     ).order(timestamp: :desc).limit(period + 1)
     
     if historical_data.count < period + 1
-      Rails.logger.warn "⚠️ Nicht genügend Daten für ROC-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
+      Rails.logger.warn "[!] Nicht genügend Daten für ROC-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
       return nil
     end
     
@@ -79,7 +79,7 @@ class IndicatorCalculationService
     ).order(timestamp: :desc).limit(period + 2)
     
     if historical_data.count < period + 2
-      Rails.logger.warn "⚠️ Nicht genügend Daten für ROC Derivative: #{historical_data.count} von #{period + 2} benötigt"
+      Rails.logger.warn "[!] Nicht genügend Daten für ROC Derivative: #{historical_data.count} von #{period + 2} benötigt"
       return nil
     end
     

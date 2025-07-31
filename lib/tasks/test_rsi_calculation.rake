@@ -31,7 +31,7 @@ namespace :crypto do
       puts "📊 Verfügbare Datensätze: #{total_data}"
       
       if total_data < period + 1
-        puts "⚠️ Nicht genug Daten für RSI-Berechnung (benötigt: #{period + 1})"
+        puts "[!] Nicht genug Daten für RSI-Berechnung (benötigt: #{period + 1})"
         next
       end
       
@@ -85,7 +85,7 @@ namespace :crypto do
       # Berechne RSI
       if avg_loss == 0
         rsi = 50.0
-        puts "⚠️ Keine Verluste vorhanden, RSI = 50"
+        puts "[!] Keine Verluste vorhanden, RSI = 50"
       else
         rs = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))

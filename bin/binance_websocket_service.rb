@@ -54,6 +54,9 @@ MAX_RECONNECT_ATTEMPTS = 10 # Maximale Anzahl Reconnect-Versuche vor Pause
 # --- Market Cap Update Intervall ---
 MARKET_CAP_UPDATE_INTERVAL = 300 # 5 Minuten: Wie oft Market Cap Daten aktualisiert werden
 
+# --- Candlestick Update Intervall ---
+CANDLESTICK_UPDATE_INTERVAL = 60 # 1 Minute: Wie oft Kerzendaten aktualisiert werden
+
 # --- Connection Pool Management ---
 # Optimiertes Connection Pool Management für PostgreSQL (Multi-Threading fähig)
 def with_database_connection
@@ -61,17 +64,17 @@ def with_database_connection
     begin
       yield
     rescue ActiveRecord::ConnectionTimeoutError => e
-      Rails.logger.error "❌ Connection Pool Timeout: #{e.message}"
+      Rails.logger.error "[X] Connection Pool Timeout: #{e.message}"
       # PostgreSQL kann mehr Verbindungen handhaben, also weniger aggressive Retry-Logik
       sleep 0.05
       retry
     rescue PG::ConnectionBad, PG::UnableToSend => e
-      Rails.logger.error "❌ PostgreSQL Verbindungsfehler: #{e.message}"
+      Rails.logger.error "[X] PostgreSQL Verbindungsfehler: #{e.message}"
       # Versuche Verbindung wiederherzustellen
       connection.reconnect! if connection.respond_to?(:reconnect!)
       retry
     rescue => e
-      Rails.logger.error "❌ Datenbankfehler: #{e.class} - #{e.message}"
+      Rails.logger.error "[X] Datenbankfehler: #{e.class} - #{e.message}"
       raise e
     end
   end
@@ -116,7 +119,7 @@ def increment_websocket_counter(counter_type)
 end
 
 def log_websocket_counters
-  console_safe_log "📊 WebSocket Zähler - Nachrichten: #{$websocket_message_counter}, Klines: #{$websocket_kline_counter}, Preis-Updates: #{$websocket_price_update_counter}, RSI-Berechnungen: #{$websocket_rsi_calculation_counter}, Datenrate: #{$last_data_rate}/min"
+  console_safe_log "[Grafik] WebSocket Zähler - Nachrichten: #{$websocket_message_counter}, Klines: #{$websocket_kline_counter}, Preis-Updates: #{$websocket_price_update_counter}, RSI-Berechnungen: #{$websocket_rsi_calculation_counter}, Datenrate: #{$last_data_rate}/min"
   
   # Broadcast Zähler per ActionCable
   broadcast_websocket_counters
@@ -135,7 +138,7 @@ def broadcast_websocket_counters
     })
     console_safe_log "📡 Zähler gebroadcastet: Nachrichten=#{$websocket_message_counter}, Klines=#{$websocket_kline_counter}, Preis-Updates=#{$websocket_price_update_counter}, RSI-Berechnungen=#{$websocket_rsi_calculation_counter}, Datenrate=#{$last_data_rate}/min"
   rescue => e
-    console_safe_log "❌ Fehler beim Broadcast der Zähler: #{e.message}"
+    console_safe_log "[X] Fehler beim Broadcast der Zähler: #{e.message}"
   end
 end
 
@@ -179,7 +182,7 @@ end
 # Diese Klasse ist für das Laden von Market Cap Daten von der CoinGecko API zuständig.
 class MarketCapService
   def self.fetch_market_cap_data
-    console_safe_log "📊 Lade Market Cap Daten von CoinGecko API..."
+    console_safe_log "[Grafik] Lade Market Cap Daten von CoinGecko API..."
     
     begin
       # Lade Konfiguration für Symbol-Mapping
@@ -196,19 +199,19 @@ class MarketCapService
       coin_data = fetch_coin_data_from_coingecko(coin_gecko_ids)
       
       if coin_data.empty?
-        Rails.logger.warn "⚠️ Keine CoinGecko Daten erhalten"
+        Rails.logger.warn "[!] Keine CoinGecko Daten erhalten"
         return
       end
       
-      console_safe_log "📊 Verarbeite #{coin_data.length} Coins für Market Cap Update"
+      console_safe_log "[Grafik] Verarbeite #{coin_data.length} Coins für Market Cap Update"
       
       # Aktualisiere die Datenbank
       update_market_cap_in_database(coin_data, symbol_mapping)
       
-      console_safe_log "✅ Market Cap Daten erfolgreich aktualisiert"
+      console_safe_log "[OK] Market Cap Daten erfolgreich aktualisiert"
       
     rescue => e
-      Rails.logger.error "❌ Fehler beim Laden der Market Cap Daten: #{e.class} - #{e.message}"
+      Rails.logger.error "[X] Fehler beim Laden der Market Cap Daten: #{e.class} - #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
     end
   end
@@ -538,7 +541,7 @@ class MarketCapService
       end
     end
     
-    Rails.logger.info "📊 Symbol-Mapping erstellt: #{mapping.inspect}"
+    Rails.logger.info "[Grafik] Symbol-Mapping erstellt: #{mapping.inspect}"
     mapping
   end
   
@@ -559,26 +562,26 @@ class MarketCapService
     
     uri.query = URI.encode_www_form(params)
     
-    Rails.logger.info "📊 Rufe CoinGecko API auf: #{uri}"
-    Rails.logger.info "📊 Coin IDs: #{coin_ids.inspect}"
+    Rails.logger.info "[Grafik] Rufe CoinGecko API auf: #{uri}"
+    Rails.logger.info "[Grafik] Coin IDs: #{coin_ids.inspect}"
     
     response = Net::HTTP.get_response(uri)
     
-    Rails.logger.info "📊 CoinGecko Response Code: #{response.code}"
+    Rails.logger.info "[Grafik] CoinGecko Response Code: #{response.code}"
     
     unless response.is_a?(Net::HTTPSuccess)
-      Rails.logger.error "❌ Fehler beim Laden der CoinGecko Daten: #{response.code} - #{response.message}"
-      Rails.logger.error "❌ Response Body: #{response.body}"
+      Rails.logger.error "[X] Fehler beim Laden der CoinGecko Daten: #{response.code} - #{response.message}"
+      Rails.logger.error "[X] Response Body: #{response.body}"
       return {}
     end
     
     coin_data = JSON.parse(response.body)
-    Rails.logger.info "📊 CoinGecko Daten erhalten: #{coin_data.length} Coins"
+    Rails.logger.info "[Grafik] CoinGecko Daten erhalten: #{coin_data.length} Coins"
     
     # Erstelle Hash mit CoinGecko-ID als Key
     coin_data.index_by { |coin| coin['id'] }
   rescue => e
-    Rails.logger.error "❌ Fehler beim Laden der CoinGecko Daten: #{e.class} - #{e.message}"
+    Rails.logger.error "[X] Fehler beim Laden der CoinGecko Daten: #{e.class} - #{e.message}"
     {}
   end
   
@@ -606,11 +609,11 @@ class MarketCapService
           last_updated: Time.current
         )
         
-        Rails.logger.info "📊 Market Cap für #{binance_symbol}: #{market_cap} (Rank: #{market_cap_rank}, Volume: #{total_volume})"
+        Rails.logger.info "[Grafik] Market Cap für #{binance_symbol}: #{market_cap} (Rank: #{market_cap_rank}, Volume: #{total_volume})"
       end
     end
   rescue => e
-    Rails.logger.error "❌ Fehler beim Aktualisieren der Market Cap Daten: #{e.class} - #{e.message}"
+    Rails.logger.error "[X] Fehler beim Aktualisieren der Market Cap Daten: #{e.class} - #{e.message}"
     end
   end
 
@@ -633,14 +636,14 @@ def handle_message(msg)
       elsif raw_data.respond_to?(:to_str)
         data_string = raw_data.to_str
       else
-        console_safe_log "⚠️ Unbekannter msg.data Typ: #{raw_data.class}"
+        console_safe_log "[!] Unbekannter msg.data Typ: #{raw_data.class}"
         return
       end
     elsif msg.respond_to?(:to_s)
       # Fallback: Versuche msg direkt zu konvertieren
       data_string = msg.to_s
     else
-      console_safe_log "⚠️ msg hat keine data Eigenschaft und kann nicht konvertiert werden"
+      console_safe_log "[!] msg hat keine data Eigenschaft und kann nicht konvertiert werden"
       return
     end
     
@@ -682,16 +685,16 @@ def handle_message(msg)
     
   rescue TypeError => e
     # Behandle TypeError bei der Nachrichtenverarbeitung
-    console_safe_log "❌ TypeError bei WebSocket Nachricht: #{e.message}"
+    console_safe_log "[X] TypeError bei WebSocket Nachricht: #{e.message}"
     if msg.respond_to?(:data)
-      debug_log "❌ msg.data Typ: #{msg.data.class}, Inhalt: #{msg.data.inspect}"
+      debug_log "[X] msg.data Typ: #{msg.data.class}, Inhalt: #{msg.data.inspect}"
     else
-      debug_log "❌ msg hat keine data Eigenschaft"
+      debug_log "[X] msg hat keine data Eigenschaft"
     end
     # Ignoriere TypeError und fahre fort
     return
   rescue => e
-    console_safe_log "❌ Fehler beim Verarbeiten der WebSocket Nachricht: #{e.class} - #{e.message}"
+    console_safe_log "[X] Fehler beim Verarbeiten der WebSocket Nachricht: #{e.class} - #{e.message}"
     # Ignoriere andere Fehler und fahre fort
     return
   end
@@ -734,13 +737,13 @@ private def process_kline_data(symbol, kline)
               market_cap: 1_000_000,  # Dummy-Wert
               market_cap_rank: 999    # Dummy-Wert
             )
-            console_safe_log "✅ Neues Pair #{db_symbol} automatisch erstellt (ID: #{cryptocurrency.id})"
+            console_safe_log "[OK] Neues Pair #{db_symbol} automatisch erstellt (ID: #{cryptocurrency.id})"
           else
-            console_safe_log "⚠️ Symbol #{db_symbol} nicht in Whitelist - überspringe"
+            console_safe_log "[!] Symbol #{db_symbol} nicht in Whitelist - überspringe"
           end
         end
       rescue => e
-        console_safe_log "❌ Fehler beim Erstellen von #{db_symbol}: #{e.message}"
+        console_safe_log "[X] Fehler beim Erstellen von #{db_symbol}: #{e.message}"
       end
     end
     
@@ -755,7 +758,7 @@ private def process_kline_data(symbol, kline)
       if kline['x'] # Nur bei abgeschlossenen Kerzen
         rsi_value = IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, '1m', period)
         increment_websocket_counter(:rsi_calculation)
-        debug_log "📊 RSI berechnet für #{cryptocurrency.symbol}: #{rsi_value} (geschlossene Kerze)"
+        debug_log "[Grafik] RSI berechnet für #{cryptocurrency.symbol}: #{rsi_value} (geschlossene Kerze)"
       end
       
       # ROC und ROC' alle 30 Sekunden (auch für unvollständige Kerzen)
@@ -767,15 +770,15 @@ private def process_kline_data(symbol, kline)
         begin
           # ROC-Berechnung mit aktuellem Close-Kurs
           roc_value = IndicatorCalculationService.calculate_and_save_roc(cryptocurrency, '1m', 14)
-          debug_log "📊 ROC berechnet für #{cryptocurrency.symbol}: #{roc_value}% (alle 30s)"
+          debug_log "[Grafik] ROC berechnet für #{cryptocurrency.symbol}: #{roc_value}% (alle 30s)"
           
           # ROC Derivative-Berechnung mit aktuellem Close-Kurs
           roc_derivative_value = IndicatorCalculationService.calculate_and_save_roc_derivative(cryptocurrency, '1m', 14)
-          debug_log "📊 ROC' berechnet für #{cryptocurrency.symbol}: #{roc_derivative_value}% (alle 30s)"
+          debug_log "[Grafik] ROC' berechnet für #{cryptocurrency.symbol}: #{roc_derivative_value}% (alle 30s)"
           
           @last_roc_calculation[cryptocurrency.id] = current_time
         rescue => e
-          debug_log "⚠️ ROC/ROC' Berechnung für #{cryptocurrency.symbol} fehlgeschlagen: #{e.message}"
+          debug_log "[!] ROC/ROC' Berechnung für #{cryptocurrency.symbol} fehlgeschlagen: #{e.message}"
         end
       end
       
@@ -783,12 +786,12 @@ private def process_kline_data(symbol, kline)
       # Warnung nur beim ersten Mal pro Symbol
       @warned_indicator_symbols ||= Set.new
       unless @warned_indicator_symbols.include?(symbol)
-        console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe Indikator-Berechnungen"
+        console_safe_log "[!] Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe Indikator-Berechnungen"
         @warned_indicator_symbols.add(symbol)
       end
     end
   rescue => e
-    console_safe_log "❌ FEHLER bei Indikator-Berechnungen für #{symbol}: #{e.message}"
+    console_safe_log "[X] FEHLER bei Indikator-Berechnungen für #{symbol}: #{e.message}"
   end
   
   # Speichere nur abgeschlossene Kerzen in die Datenbank für konsistente historische Daten
@@ -813,7 +816,7 @@ private def process_kline_data(symbol, kline)
       # Suche nur nach bestehenden Cryptocurrencies - KEINE NEUE ERSTELLUNG
       cryptocurrency = Cryptocurrency.find_by(symbol: db_symbol)
       unless cryptocurrency
-        console_safe_log "⚠️ Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe Kline-Speicherung"
+        console_safe_log "[!] Cryptocurrency #{db_symbol} nicht in Whitelist - überspringe Kline-Speicherung"
         return
       end
       
@@ -824,7 +827,7 @@ private def process_kline_data(symbol, kline)
     update_24h_change(cryptocurrency, kline['c'].to_f)
     
     # RSI wird bereits in process_kline_data berechnet - keine doppelte Berechnung nötig
-    debug_log "📊 RSI bereits berechnet in process_kline_data für #{cryptocurrency.symbol}"
+    debug_log "[Grafik] RSI bereits berechnet in process_kline_data für #{cryptocurrency.symbol}"
       
       attrs = {
         cryptocurrency: cryptocurrency,
@@ -843,16 +846,19 @@ private def process_kline_data(symbol, kline)
       begin
         result = CryptoHistoryData.record_data(attrs[:cryptocurrency], attrs, '1m')
         if result.persisted?
-        verbose_log "📊 [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
+          verbose_log "[Grafik] [#{attrs[:timestamp].strftime('%H:%M:%S')}] #{symbol} O:#{attrs[:open]} H:#{attrs[:high]} L:#{attrs[:low]} C:#{attrs[:close]} V:#{attrs[:volume]}"
+          
+          # Broadcast candle data update for mini-candlesticks
+          broadcast_candle_update(cryptocurrency, attrs)
         else
-        debug_log "⏭️ Datensatz bereits vorhanden für #{symbol} um #{attrs[:timestamp].strftime('%H:%M:%S')}"
+          debug_log "⏭️ Datensatz bereits vorhanden für #{symbol} um #{attrs[:timestamp].strftime('%H:%M:%S')}"
         end
       rescue => e
-        safe_rails_log "❌ Fehler beim Speichern in CryptoHistoryData: #{e.class} - #{e.message}", :error
+        safe_rails_log "[X] Fehler beim Speichern in CryptoHistoryData: #{e.class} - #{e.message}", :error
     end
   end
   rescue => e
-    safe_rails_log "❌ Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}", :error
+    safe_rails_log "[X] Fehler beim Speichern der Kline für #{symbol}: #{e.class} - #{e.message}", :error
   end
 
 # Berechne und aktualisiere die 24h Preisänderung
@@ -888,10 +894,10 @@ private def update_24h_change(cryptocurrency, current_price)
         price_change = ((current_price - old_price) / old_price) * 100
         is_24h_complete = false
         
-        Rails.logger.warn "⚠️ Keine 24h Daten für #{cryptocurrency.symbol}, verwende ältesten Wert (#{time_diff_hours.round(1)}h alt): #{price_change.round(2)}%"
+        Rails.logger.warn "[!] Keine 24h Daten für #{cryptocurrency.symbol}, verwende ältesten Wert (#{time_diff_hours.round(1)}h alt): #{price_change.round(2)}%"
       else
         # Keine historischen Daten überhaupt verfügbar
-        Rails.logger.warn "⚠️ Keine historischen Daten für #{cryptocurrency.symbol} verfügbar"
+        Rails.logger.warn "[!] Keine historischen Daten für #{cryptocurrency.symbol} verfügbar"
         return
       end
     end
@@ -903,7 +909,7 @@ private def update_24h_change(cryptocurrency, current_price)
     )
     
   rescue => e
-    Rails.logger.error "❌ Fehler bei 24h-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+    Rails.logger.error "[X] Fehler bei 24h-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
   end
 end
 
@@ -924,7 +930,7 @@ private def start_ping_monitor(ws)
         begin
           ws.ping(ping_payload)
         rescue => e
-          Rails.logger.error "❌ Fehler beim Senden des Pings: #{e.message}"
+          Rails.logger.error "[X] Fehler beim Senden des Pings: #{e.message}"
           # Erzwinge Reconnect bei Ping-Fehler
           begin
             ws.close if ws.respond_to?(:close)
@@ -934,13 +940,13 @@ private def start_ping_monitor(ws)
           break
         end
       else
-        Rails.logger.warn "⚠️ WebSocket nicht offen, stoppe Ping-Monitor"
+        Rails.logger.warn "[!] WebSocket nicht offen, stoppe Ping-Monitor"
         break
       end
     end
   end
 rescue => e
-  Rails.logger.error "❌ Fehler beim Starten des Ping-Monitors: #{e.class} - #{e.message}"
+  Rails.logger.error "[X] Fehler beim Starten des Ping-Monitors: #{e.class} - #{e.message}"
 end
 
 private def stop_ping_monitor(ping_interval_thread)
@@ -961,7 +967,7 @@ private def calculate_rsi_for_cryptocurrency(cryptocurrency)
     # Verwende den neuen IndicatorCalculationService
     IndicatorCalculationService.calculate_and_save_rsi(cryptocurrency, timeframe, period)
   rescue => e
-    console_safe_log "❌ Fehler bei RSI-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+    console_safe_log "[X] Fehler bei RSI-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
   end
 end
 
@@ -982,7 +988,7 @@ end
       default_timeframe
     end
   rescue => e
-    Rails.logger.error "❌ Fehler beim Laden des Timeframes: #{e.message}"
+    Rails.logger.error "[X] Fehler beim Laden des Timeframes: #{e.message}"
     '1m' # Fallback - geändert zurück zu '1m'
   end
 
@@ -1000,7 +1006,7 @@ private def get_current_rsi_period
     default_period
   end
 rescue => e
-  Rails.logger.error "❌ Fehler beim Laden der RSI-Periode: #{e.message}"
+  Rails.logger.error "[X] Fehler beim Laden der RSI-Periode: #{e.message}"
   14 # Fallback
 end
 
@@ -1031,18 +1037,18 @@ def broadcast_price_realtime(symbol, price)
         })
         debug_log "🚀 Preis-Broadcast für #{symbol}: #{price}"
       rescue => e
-        console_safe_log "❌ FEHLER beim Preis-Broadcast für #{symbol}: #{e.message}"
+        console_safe_log "[X] FEHLER beim Preis-Broadcast für #{symbol}: #{e.message}"
       end
     else
       # Warnung nur beim ersten Mal pro Symbol
       @warned_symbols ||= Set.new
       unless @warned_symbols.include?(symbol)
-        console_safe_log "⚠️ Symbol #{symbol} (#{convert_websocket_symbol_to_db_format(symbol)}) nicht in Whitelist - überspringe Preis-Update"
+        console_safe_log "[!] Symbol #{symbol} (#{convert_websocket_symbol_to_db_format(symbol)}) nicht in Whitelist - überspringe Preis-Update"
         @warned_symbols.add(symbol)
       end
     end
   rescue => e
-    Rails.logger.error "❌ Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
+    Rails.logger.error "[X] Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
   end
 end
 
@@ -1065,7 +1071,7 @@ def convert_websocket_symbol_to_db_format(websocket_symbol)
   end
 end
 
-# 📊 DATENBANK-BROADCAST: Sendet Preis bei abgeschlossenen Kerzen (mit vollständigen Logs)
+# [Grafik] DATENBANK-BROADCAST: Sendet Preis bei abgeschlossenen Kerzen (mit vollständigen Logs)
 def broadcast_price(symbol, price)  
   Rails.logger.info "🔔 Sende ActionCable Broadcast für abgeschlossene Kerze #{symbol}: #{price}"
   
@@ -1092,21 +1098,125 @@ def broadcast_price(symbol, price)
           candle_closed: true, # Flag für abgeschlossene Kerzen
         })
         
-        verbose_log "✅ Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id})"
+        verbose_log "[OK] Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id})"
       rescue => e
-        Rails.logger.error "❌ Fehler beim Broadcast: #{e.class} - #{e.message}"
+        Rails.logger.error "[X] Fehler beim Broadcast: #{e.class} - #{e.message}"
       end
     else
       # Warnung nur beim ersten Mal pro Symbol für broadcast_price
       @warned_symbols_broadcast ||= Set.new
       unless @warned_symbols_broadcast.include?(symbol)
-        console_safe_log "⚠️ Symbol #{symbol} (#{convert_websocket_symbol_to_db_format(symbol)}) nicht in Whitelist - überspringe abgeschlossene Kerze"
+        console_safe_log "[!] Symbol #{symbol} (#{convert_websocket_symbol_to_db_format(symbol)}) nicht in Whitelist - überspringe abgeschlossene Kerze"
         @warned_symbols_broadcast.add(symbol)
       end
     end
   rescue => e
-    Rails.logger.error "❌ Fehler beim ActionCable Broadcast: #{e.class} - #{e.message}"
+    Rails.logger.error "[X] Fehler beim ActionCable Broadcast: #{e.class} - #{e.message}"
     Rails.logger.error e.backtrace.join("\n")
+  end
+end
+
+# [Kerze] CANDLE BROADCAST: Sendet Candle-Daten für Mini-Candlesticks
+def broadcast_candle_update(cryptocurrency, candle_data)
+  Rails.logger.info "[Kerze] Sende Candle-Update für #{cryptocurrency.symbol}: O:#{candle_data[:open]} H:#{candle_data[:high]} L:#{candle_data[:low]} C:#{candle_data[:close]}"
+  
+  begin
+    # Hole die letzten 5 Kerzen für den Mini-Candlestick
+    candles = CryptoHistoryData.where(cryptocurrency: cryptocurrency, interval: '1m')
+                              .order(timestamp: :desc)
+                              .limit(5)
+                              .reverse
+    
+    candle_array = candles.map do |candle|
+      {
+        open: candle.open_price,
+        high: candle.high_price,
+        low: candle.low_price,
+        close: candle.close_price,
+        timestamp: candle.timestamp,
+        isGreen: candle.close_price > candle.open_price
+      }
+    end
+    
+    verbose_log "[Grafik] Broadcasting Candle-Update für #{cryptocurrency.symbol}: #{candle_array.length} Kerzen"
+    
+    # ActionCable-Broadcast für Candle-Updates
+    ActionCable.server.broadcast("prices", {
+      cryptocurrency_id: cryptocurrency.id,
+      symbol: cryptocurrency.symbol,
+      type: 'candle_update',
+      candles: candle_array,
+      timestamp: Time.now.iso8601
+    })
+    
+    verbose_log "[OK] Candle-Broadcast erfolgreich: #{cryptocurrency.symbol}"
+  rescue => e
+    Rails.logger.error "[X] Fehler beim Candle-Broadcast: #{e.class} - #{e.message}"
+  end
+end
+
+# [Kerze] MINÜTLICHES CANDLESTICK UPDATE: Sendet alle Kerzendaten jede Minute
+def broadcast_all_candlesticks_update
+  Rails.logger.info "[Kerze] Starte minütliches Candlestick-Update für alle Kryptowährungen..."
+  
+  begin
+    # Lade alle aktiven Kryptowährungen
+    cryptocurrencies = with_database_connection do
+      Cryptocurrency.all
+    end
+    
+    if cryptocurrencies.empty?
+      Rails.logger.warn "[!] Keine Kryptowährungen für Candlestick-Update gefunden"
+      return
+    end
+    
+    Rails.logger.info "[Grafik] Aktualisiere Candlesticks für #{cryptocurrencies.length} Kryptowährungen..."
+    
+    cryptocurrencies.each do |cryptocurrency|
+      begin
+        # Hole die letzten 5 Kerzen für diese Kryptowährung
+        candles = with_database_connection do
+          CryptoHistoryData.where(cryptocurrency: cryptocurrency, interval: '1m')
+                           .order(timestamp: :desc)
+                           .limit(5)
+                           .reverse
+        end
+        
+        if candles.any?
+          candle_array = candles.map do |candle|
+            {
+              open: candle.open_price,
+              high: candle.high_price,
+              low: candle.low_price,
+              close: candle.close_price,
+              timestamp: candle.timestamp,
+              isGreen: candle.close_price > candle.open_price
+            }
+          end
+          
+          # Sende über ActionCable
+          ActionCable.server.broadcast("prices", {
+            cryptocurrency_id: cryptocurrency.id,
+            symbol: cryptocurrency.symbol,
+            type: 'candle_update',
+            candles: candle_array,
+            timestamp: Time.now.iso8601
+          })
+          
+          Rails.logger.debug "[OK] #{Time.now.strftime('%H:%M:%S')} Candlestick-Update gesendet für #{cryptocurrency.symbol} (#{candles.length} Kerzen)"
+        else
+          Rails.logger.debug "[!] Keine Kerzendaten gefunden für #{cryptocurrency.symbol}"
+        end
+        
+      rescue => e
+        Rails.logger.error "[X] Fehler beim Candlestick-Update für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+      end
+    end
+    
+    Rails.logger.info "[OK] Minütliches Candlestick-Update abgeschlossen"
+    
+  rescue => e
+    Rails.logger.error "[X] Fehler beim minütlichen Candlestick-Update: #{e.class} - #{e.message}"
   end
 end
 
@@ -1122,14 +1232,14 @@ def start_binance_websocket_service
   
   # Starte Market Cap Updates in separatem Thread
   Thread.new do
-    console_safe_log "📊 Starte Market Cap Update Timer..."
+    console_safe_log "[Grafik] Starte Market Cap Update Timer..."
     
     loop do
       begin
         MarketCapService.fetch_market_cap_data
         sleep MARKET_CAP_UPDATE_INTERVAL
       rescue => e
-        Rails.logger.error "❌ Fehler im Market Cap Update Timer: #{e.class} - #{e.message}"
+        Rails.logger.error "[X] Fehler im Market Cap Update Timer: #{e.class} - #{e.message}"
         sleep 60 # Warte 1 Minute bei Fehler
       end
     end
@@ -1137,15 +1247,30 @@ def start_binance_websocket_service
   
   # Starte Zähler-Ausgabe Timer in separatem Thread
   Thread.new do
-    console_safe_log "📊 Starte WebSocket Zähler Timer..."
+    console_safe_log "[Grafik] Starte WebSocket Zähler Timer..."
     
     loop do
       begin
         log_websocket_counters
         sleep 10 # Alle 10 Sekunden Zähler ausgeben
       rescue => e
-        Rails.logger.error "❌ Fehler im Zähler Timer: #{e.class} - #{e.message}"
-        sleep 10 # Warte 10 Sekunden bei Fehler
+        Rails.logger.error "[X] Fehler im Zähler Timer: #{e.class} - #{e.message}"
+        sleep 60 # Warte 10 Sekunden bei Fehler
+      end
+    end
+  end
+  
+  # Starte minütliches Candlestick-Update Timer in separatem Thread
+  Thread.new do
+    console_safe_log "[Kerze] Starte minütliches Candlestick-Update Timer..."
+    
+    loop do
+      begin
+        broadcast_all_candlesticks_update
+        sleep CANDLESTICK_UPDATE_INTERVAL
+      rescue => e
+        Rails.logger.error "[X] Fehler im Candlestick-Update Timer: #{e.class} - #{e.message}"
+        sleep 60 # Warte 1 Minute bei Fehler
       end
     end
   end
@@ -1156,13 +1281,13 @@ def start_binance_websocket_service
   
   loop do
     begin
-      Rails.logger.info "🔄 Starte WebSocket Verbindung (Versuch #{reconnect_attempts + 1})..."
+      Rails.logger.info "[REFRESH] Starte WebSocket Verbindung (Versuch #{reconnect_attempts + 1})..."
       
       # Lade Paare aus der Konfiguration
       pairs = PairSelector.load_pairs
       
       if pairs.empty?
-        Rails.logger.error "❌ Keine Paare gefunden. Beende Service."
+        Rails.logger.error "[X] Keine Paare gefunden. Beende Service."
         break
       end
       
@@ -1170,7 +1295,7 @@ def start_binance_websocket_service
       stream_names = pairs.map { |pair| "#{pair}@kline_1m" }
       ws_url = "#{BINANCE_WS_BASE_URL}/#{stream_names.join('/')}"
       
-      Rails.logger.info "🔗 Verbinde mit: #{ws_url}"
+      Rails.logger.info "[->] Verbinde mit: #{ws_url}"
       
       # Erstelle WebSocket Verbindung mit verbesserter Fehlerbehandlung
       begin
@@ -1186,7 +1311,7 @@ def start_binance_websocket_service
         end
         
         ws.on :open do
-          Rails.logger.info "✅ WebSocket Verbindung geöffnet"
+          Rails.logger.info "[OK] WebSocket Verbindung geöffnet"
           last_successful_connection = Time.now
           reconnect_attempts = 0 # Reset Reconnect-Zähler bei erfolgreicher Verbindung
           last_pong_received = Time.now
@@ -1194,11 +1319,11 @@ def start_binance_websocket_service
         end
         
         ws.on :error do |e|
-          Rails.logger.error "❌ WebSocket Fehler: #{e.message}"
+          Rails.logger.error "[X] WebSocket Fehler: #{e.message}"
         end
         
         ws.on :close do |e|
-          Rails.logger.warn "⚠️ WebSocket Verbindung geschlossen: #{e.code} - #{e.reason}"
+          Rails.logger.warn "[!] WebSocket Verbindung geschlossen: #{e.code} - #{e.reason}"
           stop_ping_monitor(ping_interval_thread)
         end
         
@@ -1236,22 +1361,22 @@ def start_binance_websocket_service
             end
           end
         rescue => e
-          Rails.logger.error "❌ WebSocket.run Fehler: #{e.class} - #{e.message}"
+          Rails.logger.error "[X] WebSocket.run Fehler: #{e.class} - #{e.message}"
         end
         
       rescue => e
-        Rails.logger.error "❌ WebSocket Verbindungsfehler: #{e.class} - #{e.message}"
+        Rails.logger.error "[X] WebSocket Verbindungsfehler: #{e.class} - #{e.message}"
       end
       
     rescue => e
       reconnect_attempts += 1
-      Rails.logger.error "❌ WebSocket Service Fehler (Versuch #{reconnect_attempts}): #{e.class} - #{e.message}"
+      Rails.logger.error "[X] WebSocket Service Fehler (Versuch #{reconnect_attempts}): #{e.class} - #{e.message}"
       
       # Exponentieller Backoff mit Maximum
       delay = [RECONNECT_INITIAL_DELAY_SECONDS * (2 ** (reconnect_attempts - 1)), RECONNECT_MAX_DELAY_SECONDS].min
       
       if reconnect_attempts >= MAX_RECONNECT_ATTEMPTS
-        Rails.logger.error "❌ Maximale Reconnect-Versuche erreicht. Pausiere für 5 Minuten..."
+        Rails.logger.error "[X] Maximale Reconnect-Versuche erreicht. Pausiere für 5 Minuten..."
         sleep 300 # 5 Minuten Pause
         reconnect_attempts = 0 # Reset für nächsten Zyklus
       else

@@ -4,7 +4,7 @@ require 'json'
 namespace :crypto do
   desc "Synchronisiere Datenbank mit der bot.json Whitelist"
   task sync_whitelist: :environment do
-    puts "🔄 Synchronisiere Datenbank mit bot.json Whitelist..."
+    puts "[REFRESH] Synchronisiere Datenbank mit bot.json Whitelist..."
     
     # Lade bot.json Konfiguration
     config_path = Rails.root.join('config', 'bot.json')
@@ -83,7 +83,7 @@ namespace :crypto do
               puts "❌ Fehler beim Speichern von #{pair}: #{crypto.errors.full_messages.join(', ')}"
             end
           else
-            puts "⚠️ Keine Preisdaten für #{pair} gefunden"
+            puts "[!] Keine Preisdaten für #{pair} gefunden"
           end
           
           # Kurze Pause zwischen API-Aufrufen
@@ -98,7 +98,7 @@ namespace :crypto do
     end
     
     # Finale Synchronisation: Aktualisiere alle vorhandenen Kryptowährungen
-    puts "\n🔄 Aktualisiere alle vorhandenen Kryptowährungen..."
+    puts "\n[REFRESH] Aktualisiere alle vorhandenen Kryptowährungen..."
     
     Cryptocurrency.where(symbol: whitelist).each do |crypto|
       begin
@@ -156,7 +156,7 @@ namespace :crypto do
           'market_cap_rank' => market_cap_data['market_cap_rank']
         }
       else
-        puts "⚠️ Binance API Fehler für #{symbol}: #{response.code}"
+        puts "[!] Binance API Fehler für #{symbol}: #{response.code}"
         return nil
       end
     rescue => e
@@ -183,7 +183,7 @@ namespace :crypto do
         end
       end
     rescue => e
-      puts "⚠️ CoinGecko API Fehler für #{symbol}: #{e.message}"
+      puts "[!] CoinGecko API Fehler für #{symbol}: #{e.message}"
     end
     
     return { 'market_cap' => 0, 'market_cap_rank' => 9999 }

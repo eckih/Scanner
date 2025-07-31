@@ -26,7 +26,7 @@ namespace :crypto do
         klines = fetch_binance_klines(symbol, interval, start_time, end_time)
         
         if klines.empty?
-          puts "⚠️ Keine #{interval} Daten für #{symbol} gefunden"
+          puts "[!] Keine #{interval} Daten für #{symbol} gefunden"
           next
         end
         
@@ -112,7 +112,7 @@ namespace :crypto do
     
     uri.query = URI.encode_www_form(params)
     
-    puts "🔗 API-Aufruf: #{uri}"
+    puts "[->] API-Aufruf: #{uri}"
     
     response = Net::HTTP.get_response(uri)
     
@@ -145,7 +145,7 @@ namespace :crypto do
       ).order(:timestamp).limit(period + 10) # Extra Daten für bessere Berechnung
       
       if historical_data.count < period
-        puts "⚠️ Nicht genug Daten für #{timeframe} RSI (benötigt: #{period}, vorhanden: #{historical_data.count})"
+        puts "[!] Nicht genug Daten für #{timeframe} RSI (benötigt: #{period}, vorhanden: #{historical_data.count})"
         next
       end
       
@@ -159,7 +159,7 @@ namespace :crypto do
         
         puts "✅ RSI #{timeframe}: #{rsi_value.round(2)}"
       else
-        puts "⚠️ RSI-Berechnung für #{timeframe} fehlgeschlagen"
+        puts "[!] RSI-Berechnung für #{timeframe} fehlgeschlagen"
       end
     end
   end

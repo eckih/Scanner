@@ -1,7 +1,7 @@
 namespace :crypto do
   desc "Bereinige Symbol-Duplikate und standardisiere Format"
   task cleanup_symbol_duplicates: :environment do
-    puts "🔄 Starte Symbol-Bereinigung..."
+    puts "[REFRESH] Starte Symbol-Bereinigung..."
     
     # Definiere bevorzugte Formate (mit / für bessere Lesbarkeit)
     preferred_formats = {
@@ -69,7 +69,7 @@ namespace :crypto do
           end
         end
       else
-        puts "⚠️  Kein bevorzugtes Format für #{base_symbol} definiert"
+        puts "[!]  Kein bevorzugtes Format für #{base_symbol} definiert"
       end
     end
     

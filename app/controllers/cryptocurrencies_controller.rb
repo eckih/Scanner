@@ -27,6 +27,12 @@ class CryptocurrenciesController < ApplicationController
                                       .where(interval: '1m')
                                       .pluck(:cryptocurrency_id, :close_price)
                                       .to_h
+
+    # Lade Mini-Candlestick-Daten für alle Cryptos
+    @mini_candlestick_data = load_mini_candlestick_data(@cryptocurrencies, @current_timeframe)
+    
+    # Lade aktuelle 1h Kerzen für alle Cryptos
+    @current_1h_candle_data = load_current_1h_candle_data(@cryptocurrencies)
   end
 
   def show
@@ -217,5 +223,187 @@ class CryptocurrenciesController < ApplicationController
       roc: cryptocurrency.roc_history(timeframe, period, 100),
       roc_derivative: [] # Noch nicht implementiert
     }
+  end
+
+  def mini_candlestick_data
+    timeframe = params[:timeframe] || '1m'
+    
+    # Lade nur Kryptowährungen aus der bot.json Whitelist
+    whitelist = load_whitelist_pairs
+    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
+    
+    candlestick_data = load_mini_candlestick_data(cryptocurrencies, timeframe)
+    
+    render json: candlestick_data
+  end
+
+  def current_1h_candle_data
+    # Lade nur Kryptowährungen aus der bot.json Whitelist
+    whitelist = load_whitelist_pairs
+    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
+    
+    current_candle_data = load_current_1h_candle_data(cryptocurrencies)
+    
+    render json: current_candle_data
+  end
+
+  def load_mini_candlestick_data(cryptocurrencies, timeframe)
+    candlestick_data = {}
+    
+    Rails.logger.info "🕯️ Lade Mini-Candlestick-Daten für #{cryptocurrencies.count} Cryptos mit Timeframe: #{timeframe}"
+    
+    # Berechne den Zeitbereich basierend auf dem Timeframe
+    timeframe_minutes = case timeframe
+                        when '1m' then 1
+                        when '5m' then 5
+                        when '15m' then 15
+                        when '1h' then 60
+                        when '4h' then 240
+                        when '1d' then 1440
+                        else 1
+                        end
+    
+    # Zeitbereich: Letzte 5 Kerzen + aktueller Zeitraum
+    time_range = (timeframe_minutes * 6).minutes.ago
+    
+    cryptocurrencies.each do |crypto|
+      Rails.logger.info "🕯️ Verarbeite Crypto: #{crypto.symbol} (ID: #{crypto.id})"
+      
+      # Hole nur Kerzen aus den letzten Minuten für den aktuellen Timeframe
+      candles = CryptoHistoryData.where(cryptocurrency: crypto, interval: timeframe)
+                                .where('timestamp >= ?', time_range)
+                                .order(timestamp: :asc) # Chronologische Reihenfolge
+                                .limit(5)
+      
+      Rails.logger.info "🕯️ Gefundene Kerzen für #{crypto.symbol} (seit #{time_range.strftime('%H:%M:%S')}): #{candles.count}"
+      
+      if candles.any?
+        # Prüfe, ob die Kerzen aktuell genug sind (nicht älter als 2 Timeframes)
+        max_age = (timeframe_minutes * 2).minutes.ago
+        recent_candles = candles.select { |candle| candle.timestamp >= max_age }
+        
+        Rails.logger.info "🕯️ Aktuelle Kerzen für #{crypto.symbol} (seit #{max_age.strftime('%H:%M:%S')}): #{recent_candles.count}"
+        
+        if recent_candles.any?
+          candlestick_data[crypto.id] = recent_candles.map do |candle|
+            {
+              open: candle.open_price,
+              high: candle.high_price,
+              low: candle.low_price,
+              close: candle.close_price,
+              timestamp: candle.timestamp,
+              isGreen: candle.close_price > candle.open_price
+            }
+          end
+        else
+          Rails.logger.warn "🕯️ Keine aktuellen Kerzen für #{crypto.symbol} - zu alt"
+          candlestick_data[crypto.id] = []
+        end
+      else
+        # Fallback: Versuche andere Timeframes, aber nur wenn sie aktuell sind
+        Rails.logger.warn "🕯️ Keine Daten für #{timeframe} gefunden, versuche andere Timeframes für #{crypto.symbol}"
+        
+        fallback_timeframes = ['1m', '5m', '15m', '1h'].reject { |tf| tf == timeframe }
+        fallback_candles = nil
+        
+        fallback_timeframes.each do |fallback_tf|
+          fallback_minutes = case fallback_tf
+                            when '1m' then 1
+                            when '5m' then 5
+                            when '15m' then 15
+                            when '1h' then 60
+                            else 1
+                            end
+          
+          fallback_range = (fallback_minutes * 3).minutes.ago
+          fallback_candles = CryptoHistoryData.where(cryptocurrency: crypto, interval: fallback_tf)
+                                            .where('timestamp >= ?', fallback_range)
+                                            .order(timestamp: :asc)
+                                            .limit(5)
+          
+          if fallback_candles.any?
+            Rails.logger.info "🕯️ Fallback-Daten gefunden für #{crypto.symbol} mit Timeframe #{fallback_tf}: #{fallback_candles.count} Kerzen"
+            break
+          end
+        end
+        
+        if fallback_candles&.any?
+          candlestick_data[crypto.id] = fallback_candles.map do |candle|
+            {
+              open: candle.open_price,
+              high: candle.high_price,
+              low: candle.low_price,
+              close: candle.close_price,
+              timestamp: candle.timestamp,
+              isGreen: candle.close_price > candle.open_price
+            }
+          end
+        else
+          Rails.logger.warn "🕯️ Keine aktuellen Fallback-Daten gefunden für #{crypto.symbol}"
+          candlestick_data[crypto.id] = []
+        end
+      end
+      
+      Rails.logger.info "🕯️ Verarbeitete Daten für #{crypto.symbol}: #{candlestick_data[crypto.id].length} Kerzen"
+    end
+    
+    Rails.logger.info "🕯️ Gesamt Mini-Candlestick-Daten: #{candlestick_data.keys.length} Cryptos"
+    candlestick_data
+  end
+
+  def load_current_1h_candle_data(cryptocurrencies)
+    current_candle_data = {}
+    
+    Rails.logger.info "🕯️ Lade aktuelle 1h Kerzen für #{cryptocurrencies.count} Cryptos"
+    
+    cryptocurrencies.each do |crypto|
+      Rails.logger.info "🕯️ Verarbeite aktuelle 1h Kerze für: #{crypto.symbol} (ID: #{crypto.id})"
+      
+      # Finde die aktuelle 1h Kerze (auch wenn nicht abgeschlossen)
+      current_hour_start = Time.now.beginning_of_hour
+      current_hour_end = Time.now.end_of_hour
+      
+      # Suche nach der aktuellen 1h Kerze
+      current_candle = CryptoHistoryData.where(cryptocurrency: crypto, interval: '1h')
+                                       .where('timestamp >= ? AND timestamp <= ?', current_hour_start, current_hour_end)
+                                       .order(timestamp: :desc)
+                                       .first
+      
+      # Wenn keine Kerze für die aktuelle Stunde gefunden wurde, suche nach der neuesten 1h Kerze
+      if !current_candle
+        Rails.logger.warn "🕯️ Keine 1h Kerze für aktuelle Stunde gefunden für #{crypto.symbol}, suche nach neuester 1h Kerze"
+        
+        current_candle = CryptoHistoryData.where(cryptocurrency: crypto, interval: '1h')
+                                         .order(timestamp: :desc)
+                                         .first
+      end
+      
+      if current_candle
+        Rails.logger.info "🕯️ 1h Kerze gefunden für #{crypto.symbol}: #{current_candle.timestamp}"
+        
+        # Prüfe ob die Kerze für die aktuelle Stunde ist
+        is_current_hour = current_candle.timestamp >= current_hour_start && current_candle.timestamp <= current_hour_end
+        is_complete = Time.now >= current_hour_end && is_current_hour
+        
+        current_candle_data[crypto.id] = {
+          open: current_candle.open_price,
+          high: current_candle.high_price,
+          low: current_candle.low_price,
+          close: current_candle.close_price,
+          timestamp: current_candle.timestamp,
+          isGreen: current_candle.close_price > current_candle.open_price,
+          isComplete: is_complete,
+          isCurrentHour: is_current_hour
+        }
+        
+        Rails.logger.info "🕯️ 1h Kerze Details für #{crypto.symbol}: O:#{current_candle.open_price} H:#{current_candle.high_price} L:#{current_candle.low_price} C:#{current_candle.close_price} (Aktuelle Stunde: #{is_current_hour}, Abgeschlossen: #{is_complete})"
+      else
+        Rails.logger.warn "🕯️ Keine 1h Kerze gefunden für #{crypto.symbol}"
+        current_candle_data[crypto.id] = nil
+      end
+    end
+    
+    Rails.logger.info "🕯️ Gesamt aktuelle 1h Kerzen: #{current_candle_data.keys.length} Cryptos"
+    current_candle_data
   end
 end 

@@ -29,6 +29,8 @@ Rails.application.routes.draw do
       get :last_update
       post :calculate_rsi
       post :update_rsi_settings
+      get :mini_candlestick_data
+      get :current_1h_candle_data
     end
     member do
       get :chart
@@ -66,4 +68,7 @@ Rails.application.routes.draw do
   
   # WebSocket-Zähler Route
   post '/websocket_counters/send', to: 'websocket_counters#send_counters'
+  
+  # 1h Kerzen-Daten Route
+  get '/cryptocurrencies/current_1h_candle_data', to: 'cryptocurrencies#current_1h_candle_data'
 end 

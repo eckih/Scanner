@@ -10,7 +10,7 @@ class RsiCalculationService
     ).order(timestamp: :desc).limit(period + 1) # Neueste zuerst, period+1 Kerzen
     
     if historical_data.count < period + 1
-      Rails.logger.warn "⚠️ Nicht genügend Daten für RSI-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
+      Rails.logger.warn "[!] Nicht genügend Daten für RSI-Berechnung: #{historical_data.count} von #{period + 1} benötigt"
       return nil
     end
     

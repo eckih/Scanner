@@ -85,7 +85,7 @@ namespace :crypto do
               symbol_usdc = symbol.gsub('USDT', 'USDC')
               url_usdc = "https://api.binance.com/api/v3/klines?symbol=#{symbol_usdc}&interval=#{binance_interval}&startTime=#{start_time}&endTime=#{end_time}&limit=1000"
               
-              puts "    🔄 Versuche mit USDC: #{url_usdc}"
+              puts "    [REFRESH] Versuche mit USDC: #{url_usdc}"
               
               uri_usdc = URI(url_usdc)
               response_usdc = Net::HTTP.get_response(uri_usdc)

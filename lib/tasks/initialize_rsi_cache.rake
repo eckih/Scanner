@@ -1,7 +1,7 @@
 namespace :rsi do
   desc "Initialisiere RSI-Cache mit historischen Daten"
   task initialize_cache: :environment do
-    puts "🔄 Initialisiere RSI-Cache mit historischen Daten..."
+    puts "[REFRESH] Initialisiere RSI-Cache mit historischen Daten..."
     
     # Lade aktuelle Frontend-Einstellungen
     timeframe = Rails.cache.read('frontend_selected_timeframe') || '1h'
@@ -10,7 +10,7 @@ namespace :rsi do
     puts "📊 Verwende Timeframe: #{timeframe}, Periode: #{period}"
     
     Cryptocurrency.find_each do |crypto|
-      puts "🔄 Initialisiere Cache für #{crypto.symbol}..."
+      puts "[REFRESH] Initialisiere Cache für #{crypto.symbol}..."
       
       # Hole historische Daten für den Cache
       historical_data = CryptoHistoryData.where(
@@ -36,7 +36,7 @@ namespace :rsi do
         
         puts "✅ #{crypto.symbol}: RSI = #{rsi_value} (#{price_cache.length} Preise im Cache)"
       else
-        puts "⚠️ #{crypto.symbol}: Nicht genügend historische Daten (#{historical_data.count} von #{period + 1})"
+        puts "[!] #{crypto.symbol}: Nicht genügend historische Daten (#{historical_data.count} von #{period + 1})"
       end
     end
     

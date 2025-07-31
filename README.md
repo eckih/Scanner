@@ -219,7 +219,7 @@ VERBOSE_LOGGING=true
 - **Handelsvolumen**
 - **Market Cap**
 
-## 🔄 Live-Updates
+## [REFRESH] Live-Updates
 
 ### WebSocket-Integration
 - Echtzeit-Preisupdates von Binance
