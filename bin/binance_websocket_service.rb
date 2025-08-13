@@ -865,81 +865,9 @@ private def process_kline_data(symbol, kline)
 
 # Berechne und aktualisiere die 24h, 1h und 30min Preisänderungen
 private def update_24h_change(cryptocurrency, current_price)
-  begin
-    # Berechne 24h Änderung
-    twenty_four_hours_ago = Time.now - 24.hours
-    historical_data_24h = CryptoHistoryData.where(
-      cryptocurrency: cryptocurrency,
-      timestamp: ..twenty_four_hours_ago,
-      interval: '1m'
-    ).order(:timestamp).last
-    
-    # Berechne 1h Änderung
-    one_hour_ago = Time.now - 1.hour
-    historical_data_1h = CryptoHistoryData.where(
-      cryptocurrency: cryptocurrency,
-      timestamp: ..one_hour_ago,
-      interval: '1m'
-    ).order(:timestamp).last
-    
-    # Berechne 30min Änderung
-    thirty_minutes_ago = Time.now - 30.minutes
-    historical_data_30min = CryptoHistoryData.where(
-      cryptocurrency: cryptocurrency,
-      timestamp: ..thirty_minutes_ago,
-      interval: '1m'
-    ).order(:timestamp).last
-    
-    # 24h Änderung
-    if historical_data_24h
-      old_price_24h = historical_data_24h.close_price
-      price_change_24h = ((current_price - old_price_24h) / old_price_24h) * 100
-      is_24h_complete = true
-      Rails.logger.info "📈 24h Änderung für #{cryptocurrency.symbol}: #{price_change_24h.round(2)}% (von #{old_price_24h} auf #{current_price})"
-    else
-      price_change_24h = 0.0
-      is_24h_complete = false
-      Rails.logger.warn "[!] Keine 24h Daten für #{cryptocurrency.symbol}"
-    end
-    
-    # 1h Änderung
-    if historical_data_1h
-      old_price_1h = historical_data_1h.close_price
-      price_change_1h = ((current_price - old_price_1h) / old_price_1h) * 100
-      is_1h_complete = true
-      Rails.logger.info "📈 1h Änderung für #{cryptocurrency.symbol}: #{price_change_1h.round(2)}%"
-    else
-      price_change_1h = 0.0
-      is_1h_complete = false
-      Rails.logger.warn "[!] Keine 1h Daten für #{cryptocurrency.symbol}"
-    end
-    
-    # 30min Änderung
-    if historical_data_30min
-      old_price_30min = historical_data_30min.close_price
-      price_change_30min = ((current_price - old_price_30min) / old_price_30min) * 100
-      is_30min_complete = true
-      Rails.logger.info "📈 30min Änderung für #{cryptocurrency.symbol}: #{price_change_30min.round(2)}%"
-    else
-      price_change_30min = 0.0
-      is_30min_complete = false
-      Rails.logger.warn "[!] Keine 30min Daten für #{cryptocurrency.symbol}"
-    end
-    
-    # Aktualisiere alle Änderungen in der Cryptocurrency-Tabelle
-    cryptocurrency.update!(
-      price_change_percentage_24h: price_change_24h.round(2),
-      price_change_24h_complete: is_24h_complete,
-      price_change_percentage_1h: price_change_1h.round(2),
-      price_change_1h_complete: is_1h_complete,
-      price_change_percentage_30min: price_change_30min.round(2),
-      price_change_30min_complete: is_30min_complete,
-      last_updated: Time.now
-    )
-    
-  rescue => e
-    Rails.logger.error "[X] Fehler bei Preisänderungs-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
-  end
+  # Änderungen werden jetzt dynamisch im Model berechnet
+  # Nur last_updated aktualisieren
+  cryptocurrency.update!(last_updated: Time.now)
 end
 
 

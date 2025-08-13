@@ -146,15 +146,15 @@ class Cryptocurrency < ApplicationRecord
   end
   
   def price_change_24h_complete?
-    price_change_24h_complete == true
+    has_24h_data?
   end
   
   def price_change_1h_complete?
-    price_change_1h_complete == true
+    has_1h_data?
   end
   
   def price_change_30min_complete?
-    price_change_30min_complete == true
+    has_30min_data?
   end
   
   def price_change_color_class
