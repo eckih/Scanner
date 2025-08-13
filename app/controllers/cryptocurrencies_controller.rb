@@ -263,41 +263,27 @@ class CryptocurrenciesController < ApplicationController
                         else 1
                         end
     
-    # Zeitbereich: Letzte 5 Kerzen + aktueller Zeitraum
-    time_range = (timeframe_minutes * 6).minutes.ago
-    
     cryptocurrencies.each do |crypto|
       Rails.logger.info "🕯️ Verarbeite Crypto: #{crypto.symbol} (ID: #{crypto.id})"
       
-      # Hole nur Kerzen aus den letzten Minuten für den aktuellen Timeframe
-      candles = CryptoHistoryData.where(cryptocurrency: crypto, interval: timeframe)
-                                .where('timestamp >= ?', time_range)
-                                .order(timestamp: :asc) # Chronologische Reihenfolge
-                                .limit(5)
+      # Hole die letzten 5 Kerzen für den gewählten Timeframe (immer die neuesten)
+      candles_desc = CryptoHistoryData.where(cryptocurrency: crypto, interval: timeframe)
+                                      .order(timestamp: :desc)
+                                      .limit(5)
+      candles = candles_desc.reverse # Chronologisch (älteste zuerst)
       
-      Rails.logger.info "🕯️ Gefundene Kerzen für #{crypto.symbol} (seit #{time_range.strftime('%H:%M:%S')}): #{candles.count}"
+      Rails.logger.info "🕯️ Gefundene Kerzen für #{crypto.symbol}: #{candles.count}"
       
       if candles.any?
-        # Prüfe, ob die Kerzen aktuell genug sind (nicht älter als 2 Timeframes)
-        max_age = (timeframe_minutes * 2).minutes.ago
-        recent_candles = candles.select { |candle| candle.timestamp >= max_age }
-        
-        Rails.logger.info "🕯️ Aktuelle Kerzen für #{crypto.symbol} (seit #{max_age.strftime('%H:%M:%S')}): #{recent_candles.count}"
-        
-        if recent_candles.any?
-          candlestick_data[crypto.id] = recent_candles.map do |candle|
-            {
-              open: candle.open_price,
-              high: candle.high_price,
-              low: candle.low_price,
-              close: candle.close_price,
-              timestamp: candle.timestamp,
-              isGreen: candle.close_price > candle.open_price
-            }
-          end
-        else
-          Rails.logger.warn "🕯️ Keine aktuellen Kerzen für #{crypto.symbol} - zu alt"
-          candlestick_data[crypto.id] = []
+        candlestick_data[crypto.id] = candles.map do |candle|
+          {
+            open: candle.open_price.to_f,
+            high: candle.high_price.to_f,
+            low: candle.low_price.to_f,
+            close: candle.close_price.to_f,
+            timestamp: candle.timestamp,
+            isGreen: candle.close_price > candle.open_price
+          }
         end
       else
         # Fallback: Versuche andere Timeframes, aber nur wenn sie aktuell sind
@@ -328,12 +314,14 @@ class CryptocurrenciesController < ApplicationController
         end
         
         if fallback_candles&.any?
-          candlestick_data[crypto.id] = fallback_candles.map do |candle|
+          # Nutze die letzten 5 Fallback-Kerzen (chronologisch)
+          fallback_list = fallback_candles.sort_by(&:timestamp).last(5)
+          candlestick_data[crypto.id] = fallback_list.map do |candle|
             {
-              open: candle.open_price,
-              high: candle.high_price,
-              low: candle.low_price,
-              close: candle.close_price,
+              open: candle.open_price.to_f,
+              high: candle.high_price.to_f,
+              low: candle.low_price.to_f,
+              close: candle.close_price.to_f,
               timestamp: candle.timestamp,
               isGreen: candle.close_price > candle.open_price
             }
@@ -363,10 +351,10 @@ class CryptocurrenciesController < ApplicationController
       current_hour_start = Time.now.beginning_of_hour
       current_hour_end = Time.now.end_of_hour
       
-      # Suche nach den letzten 3 1h Kerzen
+      # Suche nach den letzten 3 1h Kerzen (oder mehr, falls nicht genug vorhanden)
       recent_candles = CryptoHistoryData.where(cryptocurrency: crypto, interval: '1h')
                                        .order(timestamp: :desc)
-                                       .limit(3)
+                                       .limit(5)
       
       if recent_candles.any?
         Rails.logger.info "🕯️ #{recent_candles.count} 1h Kerzen gefunden für #{crypto.symbol}"
@@ -378,16 +366,19 @@ class CryptocurrenciesController < ApplicationController
           is_complete = Time.now >= current_hour_end && is_current_hour
           
           {
-            open: candle.open_price,
-            high: candle.high_price,
-            low: candle.low_price,
-            close: candle.close_price,
+            open: candle.open_price.to_f,
+            high: candle.high_price.to_f,
+            low: candle.low_price.to_f,
+            close: candle.close_price.to_f,
             timestamp: candle.timestamp,
             isGreen: candle.close_price > candle.open_price,
             isComplete: is_complete,
             isCurrentHour: is_current_hour
           }
         end
+        
+        # Verwende nur die letzten 3 Kerzen
+        candles_array = candles_array.last(3)
         
         current_candle_data[crypto.id] = candles_array
         

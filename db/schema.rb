@@ -57,6 +57,10 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_28_070000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.boolean "price_change_24h_complete"
+    t.decimal "price_change_percentage_1h", precision: 10, scale: 2
+    t.decimal "price_change_percentage_30min", precision: 10, scale: 2
+    t.boolean "price_change_1h_complete", default: false
+    t.boolean "price_change_30min_complete", default: false
     t.index ["last_updated"], name: "index_cryptocurrencies_on_last_updated"
     t.index ["market_cap"], name: "index_cryptocurrencies_on_market_cap"
     t.index ["market_cap_rank"], name: "index_cryptocurrencies_on_market_cap_rank"

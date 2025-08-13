@@ -46,16 +46,115 @@ class Cryptocurrency < ApplicationRecord
     symbol
   end
   
-  def price_change_percentage_24h_formatted
-    return "0.00%" if price_change_percentage_24h.nil?
+  # Dynamische Berechnung der Preisänderungen aus historischen Daten
+  def calculate_24h_change
+    twenty_four_hours_ago = Time.now - 24.hours
+    historical_data = crypto_history_data.where(
+      timestamp: ..twenty_four_hours_ago,
+      interval: '1m'
+    ).order(:timestamp).last
     
-    percentage = price_change_percentage_24h.round(2)
+    if historical_data && current_price
+      old_price = historical_data.close_price
+      ((current_price - old_price) / old_price) * 100
+    else
+      0.0
+    end
+  end
+  
+  def calculate_1h_change
+    one_hour_ago = Time.now - 1.hour
+    historical_data = crypto_history_data.where(
+      timestamp: ..one_hour_ago,
+      interval: '1m'
+    ).order(:timestamp).last
+    
+    if historical_data && current_price
+      old_price = historical_data.close_price
+      ((current_price - old_price) / old_price) * 100
+    else
+      0.0
+    end
+  end
+  
+  def calculate_30min_change
+    thirty_minutes_ago = Time.now - 30.minutes
+    historical_data = crypto_history_data.where(
+      timestamp: ..thirty_minutes_ago,
+      interval: '1m'
+    ).order(:timestamp).last
+    
+    if historical_data && current_price
+      old_price = historical_data.close_price
+      ((current_price - old_price) / old_price) * 100
+    else
+      0.0
+    end
+  end
+  
+  # Vollständigkeit der Daten prüfen
+  def has_24h_data?
+    twenty_four_hours_ago = Time.now - 24.hours
+    crypto_history_data.where(
+      timestamp: ..twenty_four_hours_ago,
+      interval: '1m'
+    ).exists?
+  end
+  
+  def has_1h_data?
+    one_hour_ago = Time.now - 1.hour
+    crypto_history_data.where(
+      timestamp: ..one_hour_ago,
+      interval: '1m'
+    ).exists?
+  end
+  
+  def has_30min_data?
+    thirty_minutes_ago = Time.now - 30.minutes
+    crypto_history_data.where(
+      timestamp: ..thirty_minutes_ago,
+      interval: '1m'
+    ).exists?
+  end
+  
+  # Formatierte Ausgabe der dynamisch berechneten Werte
+  def price_change_percentage_24h_formatted
+    change = calculate_24h_change
+    return "0.00%" if change == 0.0 && !has_24h_data?
+    
+    percentage = change.round(2)
+    sign = percentage >= 0 ? "+" : ""
+    "#{sign}#{percentage}%"
+  end
+  
+  def price_change_percentage_1h_formatted
+    change = calculate_1h_change
+    return "0.00%" if change == 0.0 && !has_1h_data?
+    
+    percentage = change.round(2)
+    sign = percentage >= 0 ? "+" : ""
+    "#{sign}#{percentage}%"
+  end
+  
+  def price_change_percentage_30min_formatted
+    change = calculate_30min_change
+    return "0.00%" if change == 0.0 && !has_30min_data?
+    
+    percentage = change.round(2)
     sign = percentage >= 0 ? "+" : ""
     "#{sign}#{percentage}%"
   end
   
   def price_change_24h_complete?
     price_change_24h_complete == true
+  end
+  
+  def price_change_1h_complete?
+    price_change_1h_complete == true
+  end
+  
+  def price_change_30min_complete?
+    price_change_30min_complete == true
   end
   
   def price_change_color_class

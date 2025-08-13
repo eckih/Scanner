@@ -324,9 +324,9 @@
           $.fn.dataTable.ext.type.order['rsi-pre'] = function(data, type, row, meta) {
             console.log('🔄 RSI Sortierung für:', data, 'Row:', row);
             
-            // Try to get data-sort attribute from the cell first (updated by ActionCable)
-            if (row && row.cells && row.cells[7]) {
-              var sortValue = row.cells[7].getAttribute('data-sort');
+                         // Try to get data-sort attribute from the cell first (updated by ActionCable)
+             if (row && row.cells && row.cells[9]) {
+               var sortValue = row.cells[9].getAttribute('data-sort');
               console.log('📊 RSI data-sort Wert:', sortValue);
               if (sortValue !== null && sortValue !== '-1' && sortValue !== '') {
                 var numValue = parseFloat(sortValue);
@@ -364,9 +364,9 @@
           $.fn.dataTable.ext.type.order['roc-pre'] = function(data, type, row, meta) {
             console.log('🔄 ROC Sortierung für:', data, 'Row:', row);
             
-            // Try to get data-sort attribute from the cell first (updated by ActionCable)
-            if (row && row.cells && row.cells[8]) {
-              var sortValue = row.cells[8].getAttribute('data-sort');
+                         // Try to get data-sort attribute from the cell first (updated by ActionCable)
+             if (row && row.cells && row.cells[10]) {
+               var sortValue = row.cells[10].getAttribute('data-sort');
               console.log('📊 ROC data-sort Wert:', sortValue);
               if (sortValue !== null && sortValue !== '-999' && sortValue !== '') {
                 var numValue = parseFloat(sortValue);
@@ -405,8 +405,8 @@
             console.log('🔄 ROC\' Sortierung für:', data, 'Row:', row);
             
             // Try to get data-sort attribute from the cell first (updated by ActionCable)
-            if (row && row.cells && row.cells[9]) {
-              var sortValue = row.cells[9].getAttribute('data-sort');
+            if (row && row.cells && row.cells[11]) {
+              var sortValue = row.cells[11].getAttribute('data-sort');
               console.log('📊 ROC\' data-sort Wert:', sortValue);
               if (sortValue !== null && sortValue !== '-999' && sortValue !== '') {
                 var numValue = parseFloat(sortValue);
@@ -503,6 +503,29 @@
             return parseFloat(number) * multiplier || 0;
           };
           
+          // Custom sorting function for percentage changes (24h, 1h, 30min)
+          $.fn.dataTable.ext.type.order['percentage-pre'] = function(data) {
+            console.log('🔄 Prozent-Sortierung für:', data);
+            
+            if (!data || data === 'N/A' || data === '0.00%') {
+              console.log('⚠️ Prozent N/A/0.00% Wert, verwende 0');
+              return 0;
+            }
+            
+            // Remove HTML tags first
+            var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            console.log('📊 Prozent Text nach HTML-Entfernung:', textOnly);
+            
+            // Remove % and + signs, keep - for negative values
+            var number = textOnly.replace(/[+%]/g, '');
+            console.log('📊 Prozent Zahl nach Zeichen-Entfernung:', number);
+            
+            var result = parseFloat(number) || 0;
+            console.log('✅ Prozent Sortierung Ergebnis:', result);
+            
+            return result;
+          };
+          
           $('#crypto-table').DataTable({
             "language": {
               "lengthMenu": "Zeige _MENU_ Einträge pro Seite",
@@ -519,7 +542,7 @@
               }
             },
             "pageLength": 25,
-            "order": [[ 7, "asc" ]],
+            "order": [[ 9, "asc" ]], // RSI Spalte (Index 9)
             "columnDefs": [
               {
                 "targets": [0], // Rang Spalte
@@ -530,19 +553,23 @@
                 "type": "price"
               },
               {
-                "targets": [5, 6], // Market Cap und Volume Spalten
+                "targets": [4, 5, 6], // 24h, 1h, 30min Änderung Spalten
+                "type": "percentage"
+              },
+              {
+                "targets": [7, 8], // Market Cap und Volume Spalten
                 "type": "currency"
               },
               {
-                "targets": [7], // RSI Spalte
+                "targets": [9], // RSI Spalte
                 "type": "rsi"
               },
               {
-                "targets": [8], // ROC Spalte
+                "targets": [10], // ROC Spalte
                 "type": "roc"
               },
               {
-                "targets": [9], // ROC' Spalte
+                "targets": [11], // ROC' Spalte
                 "type": "roc-derivative"
               }
             ]
