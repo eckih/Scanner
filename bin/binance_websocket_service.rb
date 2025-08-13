@@ -798,10 +798,10 @@ private def process_kline_data(symbol, kline)
     if kline['x'] == true
       save_kline(symbol, kline)
     else
-    debug_log "⏳ Überspringe Datenbank-Speicherung für unvollständige Kerze #{symbol} (Preis bereits gebroadcastet)"
+      debug_log "⏳ Überspringe Datenbank-Speicherung für unvollständige Kerze #{symbol} (Preis bereits gebroadcastet)"
     end
   rescue StandardError => e
-          safe_rails_log "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}", :error
+    safe_rails_log "Fehler beim Verarbeiten/Speichern der Kline für #{symbol}: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}", :error
   end
 
   # Speichert die Kline-Daten in der Datenbank.
@@ -868,57 +868,6 @@ private def update_24h_change(cryptocurrency, current_price)
   # Änderungen werden jetzt dynamisch im Model berechnet
   # Nur last_updated aktualisieren
   cryptocurrency.update!(last_updated: Time.now)
-end
-
-
-  begin
-    # Hole den Preis von vor 24 Stunden
-    twenty_four_hours_ago = Time.now - 24.hours
-    
-    # Suche nach dem letzten verfügbaren Datensatz von vor 24 Stunden (immer 1m für 24h-Berechnung)
-    historical_data = CryptoHistoryData.where(
-      cryptocurrency: cryptocurrency,
-      timestamp: ..twenty_four_hours_ago,
-      interval: '1m'
-    ).order(:timestamp).last
-    
-    if historical_data
-      # Vollständige 24h Daten verfügbar
-      old_price = historical_data.close_price
-      price_change = ((current_price - old_price) / old_price) * 100
-      is_24h_complete = true
-      
-      Rails.logger.info "📈 Fallback 24h Änderung für #{cryptocurrency.symbol}: #{price_change.round(2)}% (von #{old_price} auf #{current_price})"
-    else
-      # Keine 24h Daten verfügbar - verwende den ältesten verfügbaren Wert
-      oldest_data = CryptoHistoryData.where(
-        cryptocurrency: cryptocurrency,
-        interval: '1m'
-      ).order(:timestamp).first
-      
-      if oldest_data
-        old_price = oldest_data.close_price
-        time_diff_hours = (Time.now - oldest_data.timestamp) / 3600.0
-        price_change = ((current_price - old_price) / old_price) * 100
-        is_24h_complete = false
-        
-        Rails.logger.warn "[!] Keine 24h Daten für #{cryptocurrency.symbol}, verwende ältesten Wert (#{time_diff_hours.round(1)}h alt): #{price_change.round(2)}%"
-      else
-        # Keine historischen Daten überhaupt verfügbar
-        Rails.logger.warn "[!] Keine historischen Daten für #{cryptocurrency.symbol} verfügbar"
-        return
-      end
-    end
-    
-    # Aktualisiere die 24h Änderung in der Cryptocurrency-Tabelle
-    cryptocurrency.update!(
-      price_change_percentage_24h: price_change.round(2),
-      price_change_24h_complete: is_24h_complete
-    )
-    
-  rescue => e
-    Rails.logger.error "[X] Fehler bei Fallback 24h-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
-  end
 end
 
 # Prüfe ob 24h Änderung aktualisiert werden soll (alle 5 Minuten)
@@ -1045,14 +994,18 @@ def broadcast_price_realtime(symbol, price)
     if cryptocurrency
       # Direkter ActionCable-Broadcast (da wir im gleichen Container sind)
       begin
+        # Berechne 24h, 1h und 30min Änderungen
+        price_changes = calculate_price_changes(cryptocurrency, price)
+        
         ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
           symbol: symbol,
           timestamp: Time.now.iso8601,
-          realtime: true
+          realtime: true,
+          price_changes: price_changes
         })
-        debug_log "🚀 Preis-Broadcast für #{symbol}: #{price}"
+        debug_log "🚀 Preis-Broadcast für #{symbol}: #{price} (24h: #{price_changes[:change_24h]}%, 1h: #{price_changes[:change_1h]}%, 30min: #{price_changes[:change_30min]}%)"
       rescue => e
         console_safe_log "[X] FEHLER beim Preis-Broadcast für #{symbol}: #{e.message}"
       end
@@ -1066,6 +1019,79 @@ def broadcast_price_realtime(symbol, price)
     end
   rescue => e
     Rails.logger.error "[X] Fehler beim Echtzeit-Broadcast: #{e.class} - #{e.message}"
+  end
+end
+
+# Berechnet 24h, 1h und 30min Preisänderungen für ActionCable-Broadcast
+def calculate_price_changes(cryptocurrency, current_price)
+  begin
+    changes = {
+      change_24h: 0.0,
+      change_1h: 0.0,
+      change_30min: 0.0,
+      has_24h_data: false,
+      has_1h_data: false,
+      has_30min_data: false
+    }
+    
+    # 24h Änderung
+    twenty_four_hours_ago = Time.now - 24.hours
+    historical_data_24h = CryptoHistoryData.where(
+      cryptocurrency: cryptocurrency,
+      timestamp: ..twenty_four_hours_ago,
+      interval: '1m'
+    ).order(:timestamp).last
+    
+    if historical_data_24h
+      old_price_24h = historical_data_24h.close_price
+      changes[:change_24h] = ((current_price - old_price_24h) / old_price_24h) * 100
+      changes[:has_24h_data] = true
+    end
+    
+    # 1h Änderung
+    one_hour_ago = Time.now - 1.hour
+    historical_data_1h = CryptoHistoryData.where(
+      cryptocurrency: cryptocurrency,
+      timestamp: ..one_hour_ago,
+      interval: '1m'
+    ).order(:timestamp).last
+    
+    if historical_data_1h
+      old_price_1h = historical_data_1h.close_price
+      changes[:change_1h] = ((current_price - old_price_1h) / old_price_1h) * 100
+      changes[:has_1h_data] = true
+    end
+    
+    # 30min Änderung
+    thirty_minutes_ago = Time.now - 30.minutes
+    historical_data_30min = CryptoHistoryData.where(
+      cryptocurrency: cryptocurrency,
+      timestamp: ..thirty_minutes_ago,
+      interval: '1m'
+    ).order(:timestamp).last
+    
+    if historical_data_30min
+      old_price_30min = historical_data_30min.close_price
+      changes[:change_30min] = ((current_price - old_price_30min) / old_price_30min) * 100
+      changes[:has_30min_data] = true
+    end
+    
+    # Runde alle Werte auf 2 Dezimalstellen
+    changes[:change_24h] = changes[:change_24h].round(2)
+    changes[:change_1h] = changes[:change_1h].round(2)
+    changes[:change_30min] = changes[:change_30min].round(2)
+    
+    changes
+  rescue => e
+    Rails.logger.error "[X] Fehler bei Preisänderungs-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+    {
+      change_24h: 0.0,
+      change_1h: 0.0,
+      change_30min: 0.0,
+      has_24h_data: false,
+      has_1h_data: false,
+      has_30min_data: false
+    }
   end
 end
 
@@ -1107,15 +1133,19 @@ def broadcast_price(symbol, price)
       
       # Direkter ActionCable-Broadcast (da wir im gleichen Container sind)
       begin
+        # Berechne 24h, 1h und 30min Änderungen
+        price_changes = calculate_price_changes(cryptocurrency, price)
+        
         ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
           symbol: symbol,
           timestamp: Time.now.iso8601,
           candle_closed: true, # Flag für abgeschlossene Kerzen
+          price_changes: price_changes
         })
         
-        verbose_log "[OK] Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id})"
+        verbose_log "[OK] Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id}) mit Änderungen: 24h=#{price_changes[:change_24h]}%, 1h=#{price_changes[:change_1h]}%, 30min=#{price_changes[:change_30min]}%"
       rescue => e
         Rails.logger.error "[X] Fehler beim Broadcast: #{e.class} - #{e.message}"
       end

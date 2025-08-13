@@ -163,7 +163,120 @@ document.addEventListener('DOMContentLoaded', function() {
                    console.log(`[!] Preis-Zelle nicht gefunden für ${messageData.symbol}`);
                  }
                  
-                 // 24h Änderung Update (nur bei abgeschlossenen Kerzen)
+                 // Preisänderungen Update (24h, 1h, 30min) - bei allen Updates
+                 if (messageData.price_changes) {
+                   console.log("📊 Preisänderungen erhalten:", messageData.price_changes);
+                   
+                   // 24h Änderung Update
+                   const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Änderung"
+                   if (change24hCell) {
+                     const change24h = parseFloat(messageData.price_changes.change_24h);
+                     const formattedChange = change24h >= 0 ? `+${change24h.toFixed(2)}%` : `${change24h.toFixed(2)}%`;
+                     
+                     // Bestimme die Farbe basierend auf Wert und Vollständigkeit
+                     let colorClass = 'text-danger'; // Standard: rot für unvollständige Daten
+                     
+                     if (messageData.price_changes.has_24h_data === true) {
+                       // Vollständige 24h Daten - normale Farben
+                       colorClass = change24h >= 0 ? 'text-success' : 'text-danger';
+                     } else {
+                       // Unvollständige Daten - immer rot (wie bei 0.00)
+                       colorClass = 'text-danger';
+                     }
+                     
+                     // Aktualisiere den Text und die Farbe
+                     change24hCell.innerHTML = `
+                       <span class="${colorClass}">
+                         ${change24h >= 0 ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>'}
+                         ${formattedChange}
+                       </span>
+                     `;
+                     
+                     const updateType = messageData.price_changes.has_24h_data ? "📈 24h Änderung (vollständig)" : "[!] 24h Änderung (unvollständig)";
+                     console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
+                     
+                     // Animation für 24h Änderung
+                     change24hCell.style.transition = 'background-color 0.5s ease';
+                     change24hCell.style.backgroundColor = colorClass === 'text-success' ? '#d4edda' : '#f8d7da';
+                     setTimeout(() => {
+                       change24hCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                   
+                   // 1h Änderung Update
+                   const change1hCell = row.querySelector('td:nth-child(6)'); // 6. Spalte ist "1h Änderung"
+                   if (change1hCell) {
+                     const change1h = parseFloat(messageData.price_changes.change_1h);
+                     const formattedChange = change1h >= 0 ? `+${change1h.toFixed(2)}%` : `${change1h.toFixed(2)}%`;
+                     
+                     // Bestimme die Farbe basierend auf Wert und Vollständigkeit
+                     let colorClass = 'text-danger'; // Standard: rot für unvollständige Daten
+                     
+                     if (messageData.price_changes.has_1h_data === true) {
+                       // Vollständige 1h Daten - normale Farben
+                       colorClass = change1h >= 0 ? 'text-success' : 'text-danger';
+                     } else {
+                       // Unvollständige Daten - immer rot (wie bei 0.00)
+                       colorClass = 'text-danger';
+                     }
+                     
+                     // Aktualisiere den Text und die Farbe
+                     change1hCell.innerHTML = `
+                       <span class="${colorClass}">
+                         ${change1h >= 0 ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>'}
+                         ${formattedChange}
+                       </span>
+                     `;
+                     
+                     const updateType = messageData.price_changes.has_1h_data ? "📈 1h Änderung (vollständig)" : "[!] 1h Änderung (unvollständig)";
+                     console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
+                     
+                     // Animation für 1h Änderung
+                     change1hCell.style.transition = 'background-color 0.5s ease';
+                     change1hCell.style.backgroundColor = colorClass === 'text-success' ? '#d4edda' : '#f8d7da';
+                     setTimeout(() => {
+                       change1hCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                   
+                   // 30min Änderung Update
+                   const change30minCell = row.querySelector('td:nth-child(7)'); // 7. Spalte ist "30min Änderung"
+                   if (change30minCell) {
+                     const change30min = parseFloat(messageData.price_changes.change_30min);
+                     const formattedChange = change30min >= 0 ? `+${change30min.toFixed(2)}%` : `${change30min.toFixed(2)}%`;
+                     
+                     // Bestimme die Farbe basierend auf Wert und Vollständigkeit
+                     let colorClass = 'text-danger'; // Standard: rot für unvollständige Daten
+                     
+                     if (messageData.price_changes.has_30min_data === true) {
+                       // Vollständige 30min Daten - normale Farben
+                       colorClass = change30min >= 0 ? 'text-success' : 'text-danger';
+                     } else {
+                       // Unvollständige Daten - immer rot (wie bei 0.00)
+                       colorClass = 'text-danger';
+                     }
+                     
+                     // Aktualisiere den Text und die Farbe
+                     change30minCell.innerHTML = `
+                       <span class="${colorClass}">
+                         ${change30min >= 0 ? '<i class="bi bi-arrow-up"></i>' : '<i class="bi bi-arrow-down"></i>'}
+                         ${formattedChange}
+                       </span>
+                     `;
+                     
+                     const updateType = messageData.price_changes.has_30min_data ? "📈 30min Änderung (vollständig)" : "[!] 30min Änderung (unvollständig)";
+                     console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
+                     
+                     // Animation für 30min Änderung
+                     change30minCell.style.transition = 'background-color 0.5s ease';
+                     change30minCell.style.backgroundColor = colorClass === 'text-success' ? '#d4edda' : '#f8d7da';
+                     setTimeout(() => {
+                       change30minCell.style.backgroundColor = '';
+                     }, 500);
+                   }
+                 }
+                 
+                 // Legacy: 24h Änderung Update (nur bei abgeschlossenen Kerzen) - für Kompatibilität
                  if (messageData.candle_closed && messageData.price_change_24h !== undefined) {
                    const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Änderung"
                    if (change24hCell) {

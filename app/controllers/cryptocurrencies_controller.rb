@@ -177,9 +177,27 @@ class CryptocurrenciesController < ApplicationController
     render json: { error: e.message }, status: 500
   end
 
-  
+  def mini_candlestick_data
+    timeframe = params[:timeframe] || '1m'
+    
+    # Lade nur Kryptowährungen aus der bot.json Whitelist
+    whitelist = load_whitelist_pairs
+    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
+    
+    candlestick_data = load_mini_candlestick_data(cryptocurrencies, timeframe)
+    
+    render json: candlestick_data
+  end
 
-
+  def current_1h_candle_data
+    # Lade nur Kryptowährungen aus der bot.json Whitelist
+    whitelist = load_whitelist_pairs
+    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
+    
+    current_candle_data = load_current_1h_candle_data(cryptocurrencies)
+    
+    render json: current_candle_data
+  end
 
   private
 
@@ -223,28 +241,6 @@ class CryptocurrenciesController < ApplicationController
       roc: cryptocurrency.roc_history(timeframe, period, 100),
       roc_derivative: [] # Noch nicht implementiert
     }
-  end
-
-  def mini_candlestick_data
-    timeframe = params[:timeframe] || '1m'
-    
-    # Lade nur Kryptowährungen aus der bot.json Whitelist
-    whitelist = load_whitelist_pairs
-    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
-    
-    candlestick_data = load_mini_candlestick_data(cryptocurrencies, timeframe)
-    
-    render json: candlestick_data
-  end
-
-  def current_1h_candle_data
-    # Lade nur Kryptowährungen aus der bot.json Whitelist
-    whitelist = load_whitelist_pairs
-    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
-    
-    current_candle_data = load_current_1h_candle_data(cryptocurrencies)
-    
-    render json: current_candle_data
   end
 
   def load_mini_candlestick_data(cryptocurrencies, timeframe)
