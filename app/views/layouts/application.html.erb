@@ -441,6 +441,47 @@
             return -999; // Unknown values go to bottom
           };
           
+          // Custom sorting function for ROC formula column (ROC × (1 + ROC'))
+          $.fn.dataTable.ext.type.order['roc-formula-pre'] = function(data, type, row, meta) {
+            console.log('🔄 ROC Formula Sortierung für:', data, 'Row:', row);
+            
+            // Try to get data-sort attribute from the cell first (updated by ActionCable)
+            if (row && row.cells && row.cells[12]) {
+              var sortValue = row.cells[12].getAttribute('data-sort');
+              console.log('📊 ROC Formula data-sort Wert:', sortValue);
+              if (sortValue !== null && sortValue !== '-999' && sortValue !== '') {
+                var numValue = parseFloat(sortValue);
+                if (!isNaN(numValue)) {
+                  console.log('✅ ROC Formula Sortierung mit data-sort:', numValue);
+                  return numValue;
+                }
+              }
+            }
+            
+            // Fallback: use current visible content
+            if (!data || data === 'N/A' || data.includes('N/A')) {
+              console.log('⚠️ ROC Formula N/A Wert, verwende -999');
+              return -999; // N/A values go to bottom for ROC formula
+            }
+            
+            // Remove all HTML tags and extract just the text content
+            var textOnly = data.replace(/<[^>]*>/g, '').trim();
+            console.log('📊 ROC Formula Text nach HTML-Entfernung:', textOnly);
+            
+            // Extract ROC formula value (can be negative) - look for -12.34 or 12.34
+            var match = textOnly.match(/([+-]?\d+\.?\d*)/);
+            if (match) {
+              var numValue = parseFloat(match[1]);
+              if (!isNaN(numValue)) {
+                console.log('✅ ROC Formula Sortierung mit extrahiertem Wert:', numValue);
+                return numValue;
+              }
+            }
+            
+            console.log('⚠️ ROC Formula Unbekannter Wert, verwende -999');
+            return -999; // Unknown values go to bottom
+          };
+          
           // Custom sorting function for rank column (extracts number from badge)
           $.fn.dataTable.ext.type.order['rank-pre'] = function(data) {
             var match = data.match(/#(\d+)/);
@@ -571,6 +612,10 @@
               {
                 "targets": [11], // ROC' Spalte
                 "type": "roc-derivative"
+              },
+              {
+                "targets": [12], // ROC × (1 + ROC') Spalte
+                "type": "roc-formula"
               }
             ]
           });

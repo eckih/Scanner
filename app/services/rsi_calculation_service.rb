@@ -99,18 +99,145 @@ class RsiCalculationService
   # Broadcaste RSI-Update über ActionCable
   def self.broadcast_rsi_update(cryptocurrency, rsi_value, timeframe)
     begin
+      # Berechne ROC-Formel (ROC × (1 + ROC'))
+      roc_formula = calculate_roc_formula(cryptocurrency)
+      
       ActionCable.server.broadcast("prices", {
         cryptocurrency_id: cryptocurrency.id,
         symbol: cryptocurrency.symbol,
         rsi: rsi_value,
         timeframe: timeframe,
         timestamp: Time.now.iso8601,
-        update_type: 'rsi'
+        update_type: 'rsi',
+        roc_formula: roc_formula
       })
       
-      Rails.logger.info "📡 RSI-Update gebroadcastet für #{cryptocurrency.symbol}: #{rsi_value} (#{timeframe})"
+      Rails.logger.info "📡 RSI-Update gebroadcastet für #{cryptocurrency.symbol}: #{rsi_value} (#{timeframe}) mit ROC-Formel: #{roc_formula[:value]}"
     rescue => e
       Rails.logger.error "❌ Fehler beim RSI-Broadcast: #{e.message}"
+    end
+  end
+  
+  # Berechnet erweiterte ROC-Formel (ROC × (1 + ROC') × (1 + 1h_Änderung) × (1 + 30min_Änderung))
+  def self.calculate_roc_formula(cryptocurrency)
+    begin
+      roc_value = cryptocurrency.current_roc('1m')
+      roc_derivative_value = cryptocurrency.current_roc_derivative('1m')
+      
+      # Berechne 1h und 30min Änderungen
+      price_changes = calculate_price_changes(cryptocurrency, cryptocurrency.current_price || 0)
+      
+      if roc_value && roc_derivative_value
+        # Basis-Formel: ROC × (1 + ROC')
+        base_formula = roc_value * (1 + roc_derivative_value)
+        
+        # Erweiterte Formel mit 1h und 30min Änderungen
+        formula_value = base_formula
+        
+        # Multipliziere mit (1 + 1h_Änderung) wenn Daten verfügbar
+        if price_changes[:has_1h_data] && price_changes[:change_1h]
+          change_1h_decimal = price_changes[:change_1h] / 100.0  # Konvertiere % zu Dezimal
+          formula_value *= (1 + change_1h_decimal)
+        end
+        
+        # Multipliziere mit (1 + 30min_Änderung) wenn Daten verfügbar
+        if price_changes[:has_30min_data] && price_changes[:change_30min]
+          change_30min_decimal = price_changes[:change_30min] / 100.0  # Konvertiere % zu Dezimal
+          formula_value *= (1 + change_30min_decimal)
+        end
+        
+        {
+          value: formula_value.round(2),
+          roc: roc_value.round(2),
+          roc_derivative: roc_derivative_value.round(2),
+          change_1h: price_changes[:change_1h] || 0.0,
+          change_30min: price_changes[:change_30min] || 0.0,
+          has_1h_data: price_changes[:has_1h_data],
+          has_30min_data: price_changes[:has_30min_data],
+          has_data: true
+        }
+      else
+        {
+          value: 0.0,
+          roc: roc_value || 0.0,
+          roc_derivative: roc_derivative_value || 0.0,
+          change_1h: price_changes[:change_1h] || 0.0,
+          change_30min: price_changes[:change_30min] || 0.0,
+          has_1h_data: price_changes[:has_1h_data],
+          has_30min_data: price_changes[:has_30min_data],
+          has_data: false
+        }
+      end
+    rescue => e
+      Rails.logger.error "❌ Fehler bei ROC-Formel-Berechnung für #{cryptocurrency.symbol}: #{e.message}"
+      {
+        value: 0.0,
+        roc: 0.0,
+        roc_derivative: 0.0,
+        change_1h: 0.0,
+        change_30min: 0.0,
+        has_1h_data: false,
+        has_30min_data: false,
+        has_data: false
+      }
+    end
+  end
+  
+  # Hilfsmethode für Preisänderungs-Berechnung
+  def self.calculate_price_changes(cryptocurrency, current_price)
+    begin
+      changes = {
+        change_24h: 0.0,
+        change_1h: 0.0,
+        change_30min: 0.0,
+        has_24h_data: false,
+        has_1h_data: false,
+        has_30min_data: false
+      }
+      
+      # 1h Änderung
+      one_hour_ago = Time.now - 1.hour
+      historical_data_1h = CryptoHistoryData.where(
+        cryptocurrency: cryptocurrency,
+        timestamp: ..one_hour_ago,
+        interval: '1m'
+      ).order(:timestamp).last
+      
+      if historical_data_1h
+        old_price_1h = historical_data_1h.close_price
+        changes[:change_1h] = ((current_price - old_price_1h) / old_price_1h) * 100
+        changes[:has_1h_data] = true
+      end
+      
+      # 30min Änderung
+      thirty_minutes_ago = Time.now - 30.minutes
+      historical_data_30min = CryptoHistoryData.where(
+        cryptocurrency: cryptocurrency,
+        timestamp: ..thirty_minutes_ago,
+        interval: '1m'
+      ).order(:timestamp).last
+      
+      if historical_data_30min
+        old_price_30min = historical_data_30min.close_price
+        changes[:change_30min] = ((current_price - old_price_30min) / old_price_30min) * 100
+        changes[:has_30min_data] = true
+      end
+      
+      # Runde alle Werte auf 2 Dezimalstellen
+      changes[:change_1h] = changes[:change_1h].round(2)
+      changes[:change_30min] = changes[:change_30min].round(2)
+      
+      changes
+    rescue => e
+      Rails.logger.error "❌ Fehler bei Preisänderungs-Berechnung für #{cryptocurrency.symbol}: #{e.message}"
+      {
+        change_24h: 0.0,
+        change_1h: 0.0,
+        change_30min: 0.0,
+        has_24h_data: false,
+        has_1h_data: false,
+        has_30min_data: false
+      }
     end
   end
   

@@ -997,13 +997,17 @@ def broadcast_price_realtime(symbol, price)
         # Berechne 24h, 1h und 30min Änderungen
         price_changes = calculate_price_changes(cryptocurrency, price)
         
+        # Berechne ROC-Formel (ROC × (1 + ROC'))
+        roc_formula = calculate_roc_formula(cryptocurrency)
+        
         ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
           symbol: symbol,
           timestamp: Time.now.iso8601,
           realtime: true,
-          price_changes: price_changes
+          price_changes: price_changes,
+          roc_formula: roc_formula
         })
         debug_log "🚀 Preis-Broadcast für #{symbol}: #{price} (24h: #{price_changes[:change_24h]}%, 1h: #{price_changes[:change_1h]}%, 30min: #{price_changes[:change_30min]}%)"
       rescue => e
@@ -1095,6 +1099,76 @@ def calculate_price_changes(cryptocurrency, current_price)
   end
 end
 
+# Berechnet erweiterte ROC-Formel (ROC × (1 + ROC') × (1 + 1h_Änderung) × (1 + 30min_Änderung)) für ActionCable-Broadcast
+def calculate_roc_formula(cryptocurrency)
+  begin
+    roc_value = cryptocurrency.current_roc('1m')
+    roc_derivative_value = cryptocurrency.current_roc_derivative('1m')
+    
+    # Berechne 1h und 30min Änderungen
+    price_changes = calculate_price_changes(cryptocurrency, cryptocurrency.current_price || 0)
+    
+    if roc_value && roc_derivative_value
+      # Basis-Formel: ROC × (1 + ROC')
+      # base_formula = roc_value * (1 + roc_derivative_value)
+      formula_value = roc_value * roc_derivative_value
+      
+      # Erweiterte Formel mit 1h und 30min Änderungen
+      # formula_value = base_formula
+      
+      # Multipliziere mit (1 + 1h_Änderung) wenn Daten verfügbar
+      if price_changes[:has_1h_data] && price_changes[:change_1h]
+        # change_1h_decimal = price_changes[:change_1h] / 100.0  # Konvertiere % zu Dezimal
+        # formula_value *= (1 + change_1h_decimal)
+        formula_value *= price_changes[:change_1h]
+        # formula_value += 1
+      end
+      
+      # Multipliziere mit (1 + 30min_Änderung) wenn Daten verfügbar
+      if price_changes[:has_30min_data] && price_changes[:change_30min]
+        # change_30min_decimal = price_changes[:change_30min] / 100.0  # Konvertiere % zu Dezimal
+        # formula_value *= (1 + change_30min_decimal)
+        formula_value *= price_changes[:change_30min]
+        # formula_value +=2
+      end
+      
+      {
+        value: formula_value.round(2),
+        roc: roc_value.round(2),
+        roc_derivative: roc_derivative_value.round(2),
+        change_1h: price_changes[:change_1h] || 0.0,
+        change_30min: price_changes[:change_30min] || 0.0,
+        has_1h_data: price_changes[:has_1h_data],
+        has_30min_data: price_changes[:has_30min_data],
+        has_data: true
+      }
+    else
+      {
+        value: 0.0,
+        roc: roc_value || 0.0,
+        roc_derivative: roc_derivative_value || 0.0,
+        change_1h: price_changes[:change_1h] || 0.0,
+        change_30min: price_changes[:change_30min] || 0.0,
+        has_1h_data: price_changes[:has_1h_data],
+        has_30min_data: price_changes[:has_30min_data],
+        has_data: false
+      }
+    end
+  rescue => e
+    Rails.logger.error "[X] Fehler bei ROC-Formel-Berechnung für #{cryptocurrency.symbol}: #{e.class} - #{e.message}"
+    {
+      value: 0.0,
+      roc: 0.0,
+      roc_derivative: 0.0,
+      change_1h: 0.0,
+      change_30min: 0.0,
+      has_1h_data: false,
+      has_30min_data: false,
+      has_data: false
+    }
+  end
+end
+
 # Konvertiert WebSocket-Symbol zu Datenbank-Format
 def convert_websocket_symbol_to_db_format(websocket_symbol)
   # websocket_symbol kommt als "btcusdc", "ethusdc", etc.
@@ -1136,13 +1210,17 @@ def broadcast_price(symbol, price)
         # Berechne 24h, 1h und 30min Änderungen
         price_changes = calculate_price_changes(cryptocurrency, price)
         
+        # Berechne ROC-Formel (ROC × (1 + ROC'))
+        roc_formula = calculate_roc_formula(cryptocurrency)
+        
         ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
           symbol: symbol,
           timestamp: Time.now.iso8601,
           candle_closed: true, # Flag für abgeschlossene Kerzen
-          price_changes: price_changes
+          price_changes: price_changes,
+          roc_formula: roc_formula
         })
         
         verbose_log "[OK] Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id}) mit Änderungen: 24h=#{price_changes[:change_24h]}%, 1h=#{price_changes[:change_1h]}%, 30min=#{price_changes[:change_30min]}%"

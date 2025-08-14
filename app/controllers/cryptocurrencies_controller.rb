@@ -391,4 +391,6 @@ class CryptocurrenciesController < ApplicationController
     Rails.logger.info "🕯️ Gesamt aktuelle 1h Kerzen: #{current_candle_data.keys.length} Cryptos"
     current_candle_data
   end
+
+  private
 end 

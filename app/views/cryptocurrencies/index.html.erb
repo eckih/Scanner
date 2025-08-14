@@ -315,6 +315,51 @@ document.addEventListener('DOMContentLoaded', function() {
                    }
                  }
                  
+                 // ROC-Formel Update (bei allen Preis-Updates)
+                 if (messageData.roc_formula) {
+                   const rocFormulaCell = row.querySelector('.roc-formula-cell');
+                   if (rocFormulaCell) {
+                     const formulaValue = parseFloat(messageData.roc_formula.value);
+                     const hasData = messageData.roc_formula.has_data;
+                     
+                     console.log("📊 ROC-Formel Update:", formulaValue, "Has Data:", hasData);
+                     console.log("📊 ROC:", messageData.roc_formula.roc, "ROC':", messageData.roc_formula.roc_derivative);
+                     console.log("📊 1h:", messageData.roc_formula.change_1h, "30min:", messageData.roc_formula.change_30min);
+                     
+                     // Aktualisiere den Wert
+                     rocFormulaCell.textContent = formulaValue.toFixed(2);
+                     
+                     // Aktualisiere data-sort Attribut für Sortierung
+                     const rocFormulaTd = rocFormulaCell.closest('td');
+                     if (rocFormulaTd) {
+                       rocFormulaTd.setAttribute('data-sort', formulaValue);
+                     }
+                     
+                     // Aktualisiere Farbe basierend auf Wert und Datenverfügbarkeit
+                     rocFormulaCell.className = 'badge roc-formula-cell';
+                     if (hasData) {
+                       if (formulaValue >= 5) {
+                         rocFormulaCell.classList.add('bg-success');
+                       } else if (formulaValue <= -5) {
+                         rocFormulaCell.classList.add('bg-danger');
+                       } else {
+                         rocFormulaCell.classList.add('bg-secondary');
+                       }
+                     } else {
+                       rocFormulaCell.classList.add('bg-secondary');
+                     }
+                     
+                     // Animation für ROC-Formel Update
+                     rocFormulaCell.style.transition = 'background-color 0.5s ease';
+                     rocFormulaCell.style.backgroundColor = '#fff3cd';
+                     setTimeout(() => {
+                       rocFormulaCell.style.backgroundColor = '';
+                     }, 500);
+                     
+                     console.log("✅ ROC-Formel Update abgeschlossen für:", messageData.symbol, "- Wert:", formulaValue.toFixed(2));
+                   }
+                 }
+                 
                  // Market Cap Update (nur bei abgeschlossenen Kerzen)
                  if (messageData.candle_closed && messageData.market_cap !== undefined) {
                    const marketCapCell = row.querySelector('td:nth-child(6)'); // 6. Spalte ist "Market Cap"
@@ -441,6 +486,51 @@ document.addEventListener('DOMContentLoaded', function() {
       
       console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(0));
       
+      // ROC-Formel Update (falls vorhanden)
+      if (data.roc_formula) {
+        const rocFormulaCell = foundRow.querySelector('.roc-formula-cell');
+        if (rocFormulaCell) {
+          const formulaValue = parseFloat(data.roc_formula.value);
+          const hasData = data.roc_formula.has_data;
+          
+          console.log("📊 ROC-Formel Update:", formulaValue, "Has Data:", hasData);
+          console.log("📊 ROC:", data.roc_formula.roc, "ROC':", data.roc_formula.roc_derivative);
+          console.log("📊 1h:", data.roc_formula.change_1h, "30min:", data.roc_formula.change_30min);
+          
+          // Aktualisiere den Wert
+          rocFormulaCell.textContent = formulaValue.toFixed(2);
+          
+          // Aktualisiere data-sort Attribut für Sortierung
+          const rocFormulaTd = rocFormulaCell.closest('td');
+          if (rocFormulaTd) {
+            rocFormulaTd.setAttribute('data-sort', formulaValue);
+          }
+          
+          // Aktualisiere Farbe basierend auf Wert und Datenverfügbarkeit
+          rocFormulaCell.className = 'badge roc-formula-cell';
+          if (hasData) {
+            if (formulaValue >= 5) {
+              rocFormulaCell.classList.add('bg-success');
+            } else if (formulaValue <= -5) {
+              rocFormulaCell.classList.add('bg-danger');
+            } else {
+              rocFormulaCell.classList.add('bg-secondary');
+            }
+          } else {
+            rocFormulaCell.classList.add('bg-secondary');
+          }
+          
+          // Animation für ROC-Formel Update
+          rocFormulaCell.style.transition = 'background-color 0.8s ease';
+          rocFormulaCell.style.backgroundColor = '#fff3cd';
+          setTimeout(() => {
+            rocFormulaCell.style.backgroundColor = '';
+          }, 800);
+          
+          console.log("✅ ROC-Formel Update abgeschlossen für:", data.symbol, "- Wert:", formulaValue.toFixed(2));
+        }
+      }
+      
       // Sortiere die Tabelle neu nach dem Update
       setTimeout(() => {
         console.log(`🔄 Starte Neusortierung nach RSI-Update für ${data.symbol}`);
@@ -493,6 +583,51 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 800);
     
     console.log("✅ RSI-Update abgeschlossen für:", data.symbol, "- Wert:", rsiValue.toFixed(0));
+    
+    // ROC-Formel Update (falls vorhanden)
+    if (data.roc_formula) {
+      const rocFormulaCell = row.querySelector('.roc-formula-cell');
+      if (rocFormulaCell) {
+        const formulaValue = parseFloat(data.roc_formula.value);
+        const hasData = data.roc_formula.has_data;
+        
+        console.log("📊 ROC-Formel Update:", formulaValue, "Has Data:", hasData);
+        console.log("📊 ROC:", data.roc_formula.roc, "ROC':", data.roc_formula.roc_derivative);
+        console.log("📊 1h:", data.roc_formula.change_1h, "30min:", data.roc_formula.change_30min);
+        
+        // Aktualisiere den Wert
+        rocFormulaCell.textContent = formulaValue.toFixed(2);
+        
+        // Aktualisiere data-sort Attribut für Sortierung
+        const rocFormulaTd = rocFormulaCell.closest('td');
+        if (rocFormulaTd) {
+          rocFormulaTd.setAttribute('data-sort', formulaValue);
+        }
+        
+        // Aktualisiere Farbe basierend auf Wert und Datenverfügbarkeit
+        rocFormulaCell.className = 'badge roc-formula-cell';
+        if (hasData) {
+          if (formulaValue >= 5) {
+            rocFormulaCell.classList.add('bg-success');
+          } else if (formulaValue <= -5) {
+            rocFormulaCell.classList.add('bg-danger');
+          } else {
+            rocFormulaCell.classList.add('bg-secondary');
+          }
+        } else {
+          rocFormulaCell.classList.add('bg-secondary');
+        }
+        
+        // Animation für ROC-Formel Update
+        rocFormulaCell.style.transition = 'background-color 0.8s ease';
+        rocFormulaCell.style.backgroundColor = '#fff3cd';
+        setTimeout(() => {
+          rocFormulaCell.style.backgroundColor = '';
+        }, 800);
+        
+        console.log("✅ ROC-Formel Update abgeschlossen für:", data.symbol, "- Wert:", formulaValue.toFixed(2));
+      }
+    }
     
     // Sortiere die Tabelle neu nach dem Update
     setTimeout(() => {
@@ -1118,6 +1253,9 @@ document.addEventListener('DOMContentLoaded', function() {
           <th class="d-none d-lg-table-cell">
             ROC' in %
           </th>
+          <th class="d-none d-lg-table-cell">
+            FAC
+          </th>
           <th>Chart</th>
           <th class="d-none d-lg-table-cell">
             1h Kerze
@@ -1271,6 +1409,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 </span>
               <% else %>
                 <span class="badge bg-secondary roc-derivative-cell">N/A</span>
+              <% end %>
+            </td>
+            
+            <td class="d-none d-lg-table-cell" data-sort="<%= begin; roc_val = crypto.current_roc(@current_timeframe); roc_der = crypto.current_roc_derivative(@current_timeframe); change_1h = crypto.price_change_percentage_1h; change_30min = crypto.price_change_percentage_30min; if roc_val && roc_der; base = roc_val * (1 + roc_der); result = base; result *= (1 + (change_1h || 0) / 100.0) if change_1h; result *= (1 + (change_30min || 0) / 100.0) if change_30min; result.round(2); else; -999; end; rescue; -999; end %>">
+              <% roc_value = crypto.current_roc(@current_timeframe) %>
+              <% roc_derivative_value = crypto.current_roc_derivative(@current_timeframe) %>
+              <% change_1h = crypto.price_change_percentage_1h %>
+              <% change_30min = crypto.price_change_percentage_30min %>
+              <% if roc_value && roc_derivative_value %>
+                <% base_formula = roc_value * (1 + roc_derivative_value) %>
+                <% formula_value = base_formula %>
+                <% formula_value *= (1 + (change_1h || 0) / 100.0) if change_1h %>
+                <% formula_value *= (1 + (change_30min || 0) / 100.0) if change_30min %>
+                <% formula_class = if formula_value >= 5
+                                     "bg-success"
+                                   elsif formula_value <= -5
+                                     "bg-danger"
+                                   else
+                                     "bg-secondary"
+                                   end %>
+                <span class="badge <%= formula_class %> roc-formula-cell">
+                  <%= formula_value.round(2) %>
+                </span>
+              <% else %>
+                <span class="badge bg-secondary roc-formula-cell">N/A</span>
               <% end %>
             </td>
                          <td>
