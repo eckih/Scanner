@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_07_28_070000) do
+ActiveRecord::Schema[7.1].define(version: 2025_08_14_183632) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -26,6 +26,22 @@ ActiveRecord::Schema[7.1].define(version: 2025_07_28_070000) do
     t.index ["asset", "created_at"], name: "index_balances_on_asset_and_created_at"
     t.index ["asset"], name: "index_balances_on_asset"
     t.index ["created_at"], name: "index_balances_on_created_at"
+  end
+
+  create_table "column_sums", force: :cascade do |t|
+    t.decimal "sum_24h", precision: 10, scale: 2, default: "0.0", null: false
+    t.decimal "sum_1h", precision: 10, scale: 2, default: "0.0", null: false
+    t.decimal "sum_30min", precision: 10, scale: 2, default: "0.0", null: false
+    t.integer "count_24h", default: 0, null: false
+    t.integer "count_1h", default: 0, null: false
+    t.integer "count_30min", default: 0, null: false
+    t.datetime "calculated_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["calculated_at", "sum_1h"], name: "index_column_sums_on_calculated_at_and_sum_1h"
+    t.index ["calculated_at", "sum_24h"], name: "index_column_sums_on_calculated_at_and_sum_24h"
+    t.index ["calculated_at", "sum_30min"], name: "index_column_sums_on_calculated_at_and_sum_30min"
+    t.index ["calculated_at"], name: "index_column_sums_on_calculated_at"
   end
 
   create_table "crypto_history_data", id: :serial, force: :cascade do |t|

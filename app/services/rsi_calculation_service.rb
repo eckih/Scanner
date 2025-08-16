@@ -102,6 +102,9 @@ class RsiCalculationService
       # Berechne ROC-Formel (ROC × (1 + ROC'))
       roc_formula = calculate_roc_formula(cryptocurrency)
       
+      # Berechne Summen für alle Kryptowährungen
+      sums = calculate_column_sums
+      
       ActionCable.server.broadcast("prices", {
         cryptocurrency_id: cryptocurrency.id,
         symbol: cryptocurrency.symbol,
@@ -109,7 +112,8 @@ class RsiCalculationService
         timeframe: timeframe,
         timestamp: Time.now.iso8601,
         update_type: 'rsi',
-        roc_formula: roc_formula
+        roc_formula: roc_formula,
+        column_sums: sums
       })
       
       Rails.logger.info "📡 RSI-Update gebroadcastet für #{cryptocurrency.symbol}: #{rsi_value} (#{timeframe}) mit ROC-Formel: #{roc_formula[:value]}"
@@ -254,5 +258,66 @@ class RsiCalculationService
     end
     
     Rails.logger.info "✅ RSI-Berechnung für alle Kryptowährungen abgeschlossen"
+  end
+  
+  # Berechnet Summen für alle Spalten (24h, 1h, 30min Änderungen)
+  def self.calculate_column_sums
+    begin
+      # Lade alle Kryptowährungen aus der Whitelist
+      config_path = File.join(Rails.root, 'config', 'bot.json')
+      config = JSON.parse(File.read(config_path))
+      whitelist = config.dig('exchange', 'pair_whitelist') || []
+      
+      cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
+      
+      sum_24h = 0.0
+      sum_1h = 0.0
+      sum_30min = 0.0
+      count_24h = 0
+      count_1h = 0
+      count_30min = 0
+      
+      cryptocurrencies.each do |crypto|
+        # 24h Summe - verwende dynamische Berechnung
+        change_24h = crypto.calculate_24h_change
+        if change_24h && crypto.has_24h_data?
+          sum_24h += change_24h
+          count_24h += 1
+        end
+        
+        # 1h Summe - verwende dynamische Berechnung
+        change_1h = crypto.calculate_1h_change
+        if change_1h && crypto.has_1h_data?
+          sum_1h += change_1h
+          count_1h += 1
+        end
+        
+        # 30min Summe - verwende dynamische Berechnung
+        change_30min = crypto.calculate_30min_change
+        if change_30min && crypto.has_30min_data?
+          sum_30min += change_30min
+          count_30min += 1
+        end
+      end
+      
+      {
+        sum_24h: count_24h > 0 ? sum_24h.round(2) : 0.0,
+        sum_1h: count_1h > 0 ? sum_1h.round(2) : 0.0,
+        sum_30min: count_30min > 0 ? sum_30min.round(2) : 0.0,
+        count_24h: count_24h,
+        count_1h: count_1h,
+        count_30min: count_30min
+      }
+    rescue => e
+      Rails.logger.error "❌ Fehler bei Summen-Berechnung: #{e.message}"
+      {
+        sum_24h: 0.0,
+        sum_1h: 0.0,
+        sum_30min: 0.0,
+        count_24h: 0,
+        count_1h: 0,
+        count_30min: 0
+      }
+    end
   end
 end 

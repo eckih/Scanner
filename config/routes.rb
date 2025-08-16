@@ -44,6 +44,14 @@ Rails.application.routes.draw do
     end
   end
 
+  # Column Sums Routes
+  resources :column_sums, only: [:index] do
+    collection do
+      get :chart_data
+      post :calculate_now
+    end
+  end
+
   # Health check endpoint for production monitoring
   get '/health', to: proc { [200, {'Content-Type' => 'text/plain'}, ['OK']] }
   

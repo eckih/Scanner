@@ -33,6 +33,11 @@ class CryptocurrenciesController < ApplicationController
     
     # Lade aktuelle 1h Kerzen für alle Cryptos
     @current_1h_candle_data = load_current_1h_candle_data(@cryptocurrencies)
+    
+    # Berechne Summen für 24h, 1h und 30min Änderungen
+    @sum_24h_change = calculate_sum_24h_change(@cryptocurrencies)
+    @sum_1h_change = calculate_sum_1h_change(@cryptocurrencies)
+    @sum_30min_change = calculate_sum_30min_change(@cryptocurrencies)
   end
 
   def show
@@ -393,4 +398,46 @@ class CryptocurrenciesController < ApplicationController
   end
 
   private
+
+  def calculate_sum_24h_change(cryptocurrencies)
+    sum = 0.0
+    count = 0
+    
+    cryptocurrencies.each do |crypto|
+      if crypto.price_change_percentage_24h && crypto.price_change_24h_complete?
+        sum += crypto.price_change_percentage_24h
+        count += 1
+      end
+    end
+    
+    count > 0 ? sum.round(2) : 0.0
+  end
+
+  def calculate_sum_1h_change(cryptocurrencies)
+    sum = 0.0
+    count = 0
+    
+    cryptocurrencies.each do |crypto|
+      if crypto.price_change_percentage_1h && crypto.price_change_1h_complete?
+        sum += crypto.price_change_percentage_1h
+        count += 1
+      end
+    end
+    
+    count > 0 ? sum.round(2) : 0.0
+  end
+
+  def calculate_sum_30min_change(cryptocurrencies)
+    sum = 0.0
+    count = 0
+    
+    cryptocurrencies.each do |crypto|
+      if crypto.price_change_percentage_30min && crypto.price_change_30min_complete?
+        sum += crypto.price_change_percentage_30min
+        count += 1
+      end
+    end
+    
+    count > 0 ? sum.round(2) : 0.0
+  end
 end 

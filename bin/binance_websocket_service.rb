@@ -1000,6 +1000,9 @@ def broadcast_price_realtime(symbol, price)
         # Berechne ROC-Formel (ROC × (1 + ROC'))
         roc_formula = calculate_roc_formula(cryptocurrency)
         
+        # Berechne Summen für alle Kryptowährungen
+        sums = calculate_column_sums
+        
         ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
@@ -1007,7 +1010,8 @@ def broadcast_price_realtime(symbol, price)
           timestamp: Time.now.iso8601,
           realtime: true,
           price_changes: price_changes,
-          roc_formula: roc_formula
+          roc_formula: roc_formula,
+          column_sums: sums
         })
         debug_log "🚀 Preis-Broadcast für #{symbol}: #{price} (24h: #{price_changes[:change_24h]}%, 1h: #{price_changes[:change_1h]}%, 30min: #{price_changes[:change_30min]}%)"
       rescue => e
@@ -1213,6 +1217,9 @@ def broadcast_price(symbol, price)
         # Berechne ROC-Formel (ROC × (1 + ROC'))
         roc_formula = calculate_roc_formula(cryptocurrency)
         
+        # Berechne Summen für alle Kryptowährungen
+        sums = calculate_column_sums
+        
         ActionCable.server.broadcast("prices", {
           cryptocurrency_id: cryptocurrency.id,
           price: price,
@@ -1220,7 +1227,8 @@ def broadcast_price(symbol, price)
           timestamp: Time.now.iso8601,
           candle_closed: true, # Flag für abgeschlossene Kerzen
           price_changes: price_changes,
-          roc_formula: roc_formula
+          roc_formula: roc_formula,
+          column_sums: sums
         })
         
         verbose_log "[OK] Broadcast erfolgreich: #{symbol} (ID: #{cryptocurrency.id}) mit Änderungen: 24h=#{price_changes[:change_24h]}%, 1h=#{price_changes[:change_1h]}%, 30min=#{price_changes[:change_30min]}%"
@@ -1509,5 +1517,88 @@ def start_binance_websocket_service
         sleep delay
       end
     end
+  end
+end
+
+# Berechnet Summen für alle Spalten (24h, 1h, 30min Änderungen)
+def calculate_column_sums
+  begin
+    # Lade alle Kryptowährungen aus der Whitelist
+    config_path = File.join(__dir__, '../config/bot.json')
+    config = JSON.parse(File.read(config_path))
+    whitelist = config.dig('exchange', 'pair_whitelist') || []
+    
+    cryptocurrencies = Cryptocurrency.where(symbol: whitelist)
+    
+    sum_24h = 0.0
+    sum_1h = 0.0
+    sum_30min = 0.0
+    count_24h = 0
+    count_1h = 0
+    count_30min = 0
+    
+    cryptocurrencies.each do |crypto|
+      # 24h Summe - verwende dynamische Berechnung
+      change_24h = crypto.calculate_24h_change
+      if change_24h && crypto.has_24h_data?
+        sum_24h += change_24h
+        count_24h += 1
+      end
+      
+      # 1h Summe - verwende dynamische Berechnung
+      change_1h = crypto.calculate_1h_change
+      if change_1h && crypto.has_1h_data?
+        sum_1h += change_1h
+        count_1h += 1
+      end
+      
+      # 30min Summe - verwende dynamische Berechnung
+      change_30min = crypto.calculate_30min_change
+      if change_30min && crypto.has_30min_data?
+        sum_30min += change_30min
+        count_30min += 1
+      end
+    end
+    
+    sums = {
+      sum_24h: count_24h > 0 ? sum_24h.round(2) : 0.0,
+      sum_1h: count_1h > 0 ? sum_1h.round(2) : 0.0,
+      sum_30min: count_30min > 0 ? sum_30min.round(2) : 0.0,
+      count_24h: count_24h,
+      count_1h: count_1h,
+      count_30min: count_30min
+    }
+    
+    # Speichere Summen in der Datenbank (alle 5 Minuten)
+    @last_sum_save ||= Time.now - 301 # Initialisiere für erste Speicherung
+    if Time.now - @last_sum_save >= 300 # Alle 5 Minuten
+      begin
+        ColumnSum.create!(
+          sum_24h: sums[:sum_24h],
+          sum_1h: sums[:sum_1h],
+          sum_30min: sums[:sum_30min],
+          count_24h: sums[:count_24h],
+          count_1h: sums[:count_1h],
+          count_30min: sums[:count_30min],
+          calculated_at: Time.current
+        )
+        @last_sum_save = Time.now
+        Rails.logger.info "💾 Spalten-Summen in Datenbank gespeichert: 24h=#{sums[:sum_24h]}, 1h=#{sums[:sum_1h]}, 30min=#{sums[:sum_30min]}"
+      rescue => e
+        Rails.logger.error "[X] Fehler beim Speichern der Spalten-Summen: #{e.message}"
+      end
+    end
+    
+    sums
+  rescue => e
+    Rails.logger.error "[X] Fehler bei Summen-Berechnung: #{e.class} - #{e.message}"
+    {
+      sum_24h: 0.0,
+      sum_1h: 0.0,
+      sum_30min: 0.0,
+      count_24h: 0,
+      count_1h: 0,
+      count_30min: 0
+    }
   end
 end

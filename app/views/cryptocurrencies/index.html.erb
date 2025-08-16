@@ -167,8 +167,8 @@ document.addEventListener('DOMContentLoaded', function() {
                  if (messageData.price_changes) {
                    console.log("📊 Preisänderungen erhalten:", messageData.price_changes);
                    
-                   // 24h Änderung Update
-                   const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Änderung"
+                           // 24h Δ Update
+        const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Δ"
                    if (change24hCell) {
                      const change24h = parseFloat(messageData.price_changes.change_24h);
                      const formattedChange = change24h >= 0 ? `+${change24h.toFixed(2)}%` : `${change24h.toFixed(2)}%`;
@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        </span>
                      `;
                      
-                     const updateType = messageData.price_changes.has_24h_data ? "📈 24h Änderung (vollständig)" : "[!] 24h Änderung (unvollständig)";
+                     const updateType = messageData.price_changes.has_24h_data ? "📈 24h Δ (vollständig)" : "[!] 24h Δ (unvollständig)";
                      console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
                      
                      // Animation für 24h Änderung
@@ -203,8 +203,8 @@ document.addEventListener('DOMContentLoaded', function() {
                      }, 500);
                    }
                    
-                   // 1h Änderung Update
-                   const change1hCell = row.querySelector('td:nth-child(6)'); // 6. Spalte ist "1h Änderung"
+                           // 1h Δ Update
+        const change1hCell = row.querySelector('td:nth-child(6)'); // 6. Spalte ist "1h Δ"
                    if (change1hCell) {
                      const change1h = parseFloat(messageData.price_changes.change_1h);
                      const formattedChange = change1h >= 0 ? `+${change1h.toFixed(2)}%` : `${change1h.toFixed(2)}%`;
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        </span>
                      `;
                      
-                     const updateType = messageData.price_changes.has_1h_data ? "📈 1h Änderung (vollständig)" : "[!] 1h Änderung (unvollständig)";
+                     const updateType = messageData.price_changes.has_1h_data ? "📈 1h Δ (vollständig)" : "[!] 1h Δ (unvollständig)";
                      console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
                      
                      // Animation für 1h Änderung
@@ -239,8 +239,8 @@ document.addEventListener('DOMContentLoaded', function() {
                      }, 500);
                    }
                    
-                   // 30min Änderung Update
-                   const change30minCell = row.querySelector('td:nth-child(7)'); // 7. Spalte ist "30min Änderung"
+                           // 30min Δ Update
+        const change30minCell = row.querySelector('td:nth-child(7)'); // 7. Spalte ist "30min Δ"
                    if (change30minCell) {
                      const change30min = parseFloat(messageData.price_changes.change_30min);
                      const formattedChange = change30min >= 0 ? `+${change30min.toFixed(2)}%` : `${change30min.toFixed(2)}%`;
@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        </span>
                      `;
                      
-                     const updateType = messageData.price_changes.has_30min_data ? "📈 30min Änderung (vollständig)" : "[!] 30min Änderung (unvollständig)";
+                     const updateType = messageData.price_changes.has_30min_data ? "📈 30min Δ (vollständig)" : "[!] 30min Δ (unvollständig)";
                      console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
                      
                      // Animation für 30min Änderung
@@ -276,9 +276,9 @@ document.addEventListener('DOMContentLoaded', function() {
                    }
                  }
                  
-                 // Legacy: 24h Änderung Update (nur bei abgeschlossenen Kerzen) - für Kompatibilität
+                 // Legacy: 24h Δ Update (nur bei abgeschlossenen Kerzen) - für Kompatibilität
                  if (messageData.candle_closed && messageData.price_change_24h !== undefined) {
-                   const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Änderung"
+                                        const change24hCell = row.querySelector('td:nth-child(5)'); // 5. Spalte ist "24h Δ"
                    if (change24hCell) {
                      const change24h = parseFloat(messageData.price_change_24h);
                      const formattedChange = messageData.price_change_24h_formatted || 
@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        </span>
                      `;
                      
-                     const updateType = messageData.price_change_24h_complete ? "📈 24h Änderung (vollständig)" : "[!] 24h Änderung (unvollständig)";
+                     const updateType = messageData.price_change_24h_complete ? "📈 24h Δ (vollständig)" : "[!] 24h Δ (unvollständig)";
                      console.log(`${updateType} aktualisiert: ${formattedChange} (${messageData.symbol})`);
                      
                      // Animation für 24h Änderung
@@ -357,6 +357,38 @@ document.addEventListener('DOMContentLoaded', function() {
                      }, 500);
                      
                      console.log("✅ ROC-Formel Update abgeschlossen für:", messageData.symbol, "- Wert:", formulaValue.toFixed(2));
+                   }
+                 }
+                 
+                 // Spalten-Summen Update (bei allen Preis-Updates)
+                 if (messageData.column_sums) {
+                   console.log("📊 Spalten-Summen Update:", messageData.column_sums);
+                   
+                   // Update 24h Summe
+                   const header24h = document.querySelector('th:nth-child(5) small');
+                   if (header24h && messageData.column_sums.sum_24h !== undefined) {
+                     const sum24h = messageData.column_sums.sum_24h;
+                     const sign = sum24h >= 0 ? '+' : '';
+                     header24h.textContent = `Σ ${sign}${sum24h}%`;
+                     console.log("✅ 24h Summe aktualisiert:", `${sign}${sum24h}%`);
+                   }
+                   
+                   // Update 1h Summe
+                   const header1h = document.querySelector('th:nth-child(6) small');
+                   if (header1h && messageData.column_sums.sum_1h !== undefined) {
+                     const sum1h = messageData.column_sums.sum_1h;
+                     const sign = sum1h >= 0 ? '+' : '';
+                     header1h.textContent = `Σ ${sign}${sum1h}%`;
+                     console.log("✅ 1h Summe aktualisiert:", `${sign}${sum1h}%`);
+                   }
+                   
+                   // Update 30min Summe
+                   const header30min = document.querySelector('th:nth-child(7) small');
+                   if (header30min && messageData.column_sums.sum_30min !== undefined) {
+                     const sum30min = messageData.column_sums.sum_30min;
+                     const sign = sum30min >= 0 ? '+' : '';
+                     header30min.textContent = `Σ ${sign}${sum30min}%`;
+                     console.log("✅ 30min Summe aktualisiert:", `${sign}${sum30min}%`);
                    }
                  }
                  
@@ -1236,9 +1268,39 @@ document.addEventListener('DOMContentLoaded', function() {
           <th class="d-none d-lg-table-cell">Name</th>
           <th>Symbol</th>
           <th>Preis</th>
-          <th class="d-none d-lg-table-cell">24h Änderung</th>
-          <th class="d-none d-xl-table-cell">1h Änderung</th>
-          <th class="d-none d-xl-table-cell">30min Änderung</th>
+          <th class="d-none d-lg-table-cell">
+            24h Δ
+            <% if @sum_24h_change %>
+              <br><small class="text-info d-none d-md-inline">
+                <%= link_to column_sums_path, target: '_blank', class: 'text-decoration-none text-info', title: '24h Summen-Chart öffnen' do %>
+                  Σ <%= @sum_24h_change >= 0 ? '+' : '' %><%= @sum_24h_change %>%
+                  <i class="bi bi-graph-up ms-1"></i>
+                <% end %>
+              </small>
+            <% end %>
+          </th>
+          <th class="d-none d-xl-table-cell">
+            1h Δ
+            <% if @sum_1h_change %>
+              <br><small class="text-info d-none d-md-inline">
+                <%= link_to column_sums_path, target: '_blank', class: 'text-decoration-none text-info', title: '1h Summen-Chart öffnen' do %>
+                  Σ <%= @sum_1h_change >= 0 ? '+' : '' %><%= @sum_1h_change %>%
+                  <i class="bi bi-graph-up ms-1"></i>
+                <% end %>
+              </small>
+            <% end %>
+          </th>
+          <th class="d-none d-xl-table-cell">
+            30min Δ
+            <% if @sum_30min_change %>
+              <br><small class="text-info d-none d-md-inline">
+                <%= link_to column_sums_path, target: '_blank', class: 'text-decoration-none text-info', title: '30min Summen-Chart öffnen' do %>
+                  Σ <%= @sum_30min_change >= 0 ? '+' : '' %><%= @sum_30min_change %>%
+                  <i class="bi bi-graph-up ms-1"></i>
+                <% end %>
+              </small>
+            <% end %>
+          </th>
           <th class="d-none d-xl-table-cell">Market Cap</th>
           <th class="d-none d-xl-table-cell">Volumen 24h (USD)</th>
           <th>
